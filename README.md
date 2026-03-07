@@ -1,6 +1,51 @@
 # Siyuan Skill
 
-Siyuan Notes 命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能。
+[![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Node](https://img.shields.io/badge/node-%3E%2B%20-green.svg)](https://github.com/dazexcl/siyuan-skill)
+
+> **Siyuan Notes 命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能。**
+
+[![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Features](https://img.shields.io/badge/features-NLP-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+
+## 核心价值
+
+**为 AI Agent 团队提供统一、结构化、可检索的共享知识库**
+
+### 适用场景
+
+✅ 团队规范、项目知识、可复用技能  
+✅ 需要多 Agent 共享的知识  
+✅ 需要长期存储和检索的内容  
+
+### 不适用场景
+
+❌ 日常互动记录、个人学习反思  
+❌ 临时笔记、代码版本管理  
+❌ 实时协作编辑  
+
+### 关键原则
+
+- **思源笔记** = 共享知识库
+- **memory 文件** = 私密记录
+- **MEMORY.md** = 长期记忆
+
+##  目录
+
+- [核心价值](#核心价值)
+- [快速开始](#快速开始)
+- [配置说明](#配置说明)
+- [环境变量](#环境变量)
+- [使用方式](#使用方式)
+- [常用命令](#常用命令)
+- [书写规范](#书写规范)
+- [权限管理](#权限管理)
+- [故障排除](#故障排除)
+- [贡献](#贡献)
+
+---
 
 ## 快速开始
 
@@ -348,76 +393,6 @@ siyuan delete <docId>
 
 # 不推荐：纯文档 ID
 20260304051123-doaxgi4
-```
-
-### Front Matter 使用
-
-Front Matter 是文档顶部的元数据区域，用于存储文档的元信息。
-
-**基本格式：**
-```yaml
----
-title: 文档标题
-date: 2024-01-01
-tags: [tag1, tag2]
-author: 作者名
----
-
-文档内容
-```
-
-**常用字段：**
-- `title` - 文档标题
-- `date` - 创建日期
-- `lastmod` - 最后修改日期
-- `tags` - 标签列表
-- `author` - 作者
-- `category` - 分类
-
-**注意事项：**
-- Front Matter 必须在文档最顶部
-- 使用 `---` 分隔符包裹
-- 支持多行格式
-- 字段名区分大小写
-
-### Markdown 格式
-
-思源笔记支持标准 Markdown 语法，推荐使用以下格式：
-
-**标题：**
-```markdown
-# 一级标题
-## 二级标题
-### 三级标题
-```
-
-**列表：**
-```markdown
-- 无序列表项
-  - 嵌套项
-
-1. 有序列表项
-2. 第二项
-```
-
-**代码块：**
-```markdown
-\`\`\`javascript
-const x = 1;
-\`\`\`
-```
-
-**引用：**
-```markdown
-> 这是一段引用
-> 可以多行
-```
-
-**粗体和斜体：**
-```markdown
-**粗体文本**
-*斜体文本*
-***粗斜体***
 ```
 
 ## 权限管理
