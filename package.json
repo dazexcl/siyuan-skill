@@ -1,0 +1,41 @@
+{
+  "name": "siyuan-skill",
+  "version": "1.2.0",
+  "description": "Siyuan Notes connector skill for AI Agents",
+  "main": "siyuan.js",
+  "bin": {
+    "siyuan": "./siyuan.js"
+  },
+  "keywords": [
+    "siyuan",
+    "notes",
+    "api",
+    "connector",
+    "skill",
+    "ai",
+    "agent"
+  ],
+  "author": "Siyuan Skills",
+  "license": "MIT",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dazexcl/siyuan-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dazexcl/siyuan-skill/issues"
+  },
+  "homepage": "https://github.com/dazexcl/siyuan-skill#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

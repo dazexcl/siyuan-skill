@@ -1,0 +1,34 @@
+{
+  "baseURL": "http://127.0.0.1:6806",
+  "token": "your-api-token-here",
+  "timeout": 10000,
+  "defaultNotebook": "your-notebook-id-here",
+  "defaultFormat": "markdown",
+  "permissionMode": "all",
+  "notebookList": [],
+  "enableCache": true,
+  "enableSync": false,
+  "enableLogging": true,
+  "debugMode": false,
+  "qdrant": {
+    "url": "http://127.0.0.1:6333",
+    "apiKey": "",
+    "collectionName": "siyuan_notes"
+  },
+  "embedding": {
+    "model": "nomic-embed-text",
+    "dimension": 768,
+    "batchSize": 8,
+    "baseUrl": "http://127.0.0.1:11434"
+  },
+  "hybridSearch": {
+    "denseWeight": 0.7,
+    "sparseWeight": 0.3,
+    "limit": 20
+  },
+  "nlp": {
+    "language": "zh",
+    "extractEntities": true,
+    "extractKeywords": true
+  }
+}
