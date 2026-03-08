@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.2.0"
+version: "1.3.0"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能"
 ---
 # 核心价值
