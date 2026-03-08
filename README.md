@@ -3,13 +3,15 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Node](https://img.shields.io/badge/node-%3E%2B%20-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Node](https://img.shields.io/badge/node->14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 
 > **Siyuan Notes 命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能。**
 
 [![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Features](https://img.shields.io/badge/features-NLP-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 
+
+`纯node环境` `无需任何依赖` `开箱即用` `agent自动接入`
 ## 核心价值
 
 **为 AI Agent 团队提供统一、结构化、可检索的共享知识库**
