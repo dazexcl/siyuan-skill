@@ -32,31 +32,43 @@ const command = {
       };
     }
     
-    // 检查传入的ID是笔记本ID还是文档ID
     let actualNotebookId = notebookId;
     let isDocumentId = false;
     let documentId = null;
     
+    console.log('获取文档结构...');
+    
     try {
-      // 尝试获取文档路径信息
       const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: notebookId });
       
-      // 如果成功获取路径信息，说明传入的是文档ID
       if (pathInfo) {
         isDocumentId = true;
         documentId = notebookId;
         actualNotebookId = pathInfo.box || pathInfo.notebook;
         console.log(`检测到文档ID ${notebookId}，使用笔记本ID ${actualNotebookId}`);
       } else {
-        // 如果没有返回路径信息，可能是笔记本ID
         console.log(`假设 ${notebookId} 是笔记本ID`);
       }
     } catch (error) {
-      // 如果失败，说明传入的可能是笔记本ID，直接使用
-      console.log(`无法获取文档路径信息，假设 ${notebookId} 是笔记本ID`);
+      if (error.message && error.message.includes('tree not found')) {
+        console.log(`无法获取文档路径信息，假设 ${notebookId} 是笔记本ID`);
+        
+        const notebooks = await skill.getNotebooks();
+        const notebookExists = notebooks && notebooks.data && 
+          notebooks.data.some(nb => nb.id === notebookId);
+        
+        if (!notebookExists) {
+          return {
+            success: false,
+            error: '笔记本不存在',
+            message: `笔记本 ${notebookId} 不存在或无法访问`
+          };
+        }
+      } else {
+        console.warn('获取文档路径信息失败:', error.message);
+      }
     }
     
-    // 检查权限
     const notebookPermission = Permission.checkNotebookPermission(skill, actualNotebookId);
     if (!notebookPermission.hasPermission) {
       return {

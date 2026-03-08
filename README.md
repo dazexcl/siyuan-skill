@@ -11,10 +11,11 @@
 [![Features](https://img.shields.io/badge/features-NLP-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 
 
-`纯node环境` `无需任何依赖` `开箱即用` `agent自动接入` `灵活拔插` `黑白名单`
+`纯node环境` `无需任何依赖` `开箱即用` `agent自动接入` `灵活拔插` `黑白名单` `渐进式披露`
 ## 核心价值
 
 **提供ai agent可快速接入siyuan笔记的的skill方案**
+
 **为 AI Agent 团队提供统一、结构化、可检索的共享知识库**
 
 ### 适用场景
