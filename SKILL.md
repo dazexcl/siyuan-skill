@@ -66,42 +66,20 @@ siyuan help create
 
 # 命令列表
 
-| 命令 | 别名 | 说明 |
-|-----|------|------|
-| `notebooks` | `nb` | 获取笔记本列表 |
-| `structure` | `ls` | 获取文档结构 |
-| `content` | `cat` | 获取文档内容 |
-| `search` | `find` | 搜索内容（支持向量搜索） |
-| `create` | `new` | 创建文档（自动处理换行符） |
-| `update` | `edit` | 更新文档（自动处理换行符） |
-| `delete` | `rm` | 删除文档 |
-| `move` | `mv` | 移动文档 |
-| `convert` | `path` | 转换 ID 和路径 |
-| `index` | - | 索引文档到向量数据库 |
-| `nlp` | - | NLP 文本分析 |
+使用 `siyuan help` 查看所有可用命令和详细说明。
 
----
+**常用命令**：
+- `nb` - 获取笔记本列表
+- `new` - 创建文档
+- `edit` - 更新文档
+- `rm` - 删除文档
+- `find` - 搜索内容（支持向量搜索）
+- `mv` - 移动文档
+- `path` - 转换 ID 和路径
+- `index` - 索引文档到向量数据库
+- `nlp` - NLP 文本分析
 
-# 详细文档
-
-## 命令详细文档
-- [搜索命令](doc/commands/search.md) - 搜索参数详解、使用示例
-- [创建文档](doc/commands/create.md) - 创建文档特性、Front Matter 使用
-- [更新文档](doc/commands/update.md) - 更新文档内容
-- [删除文档](doc/commands/delete.md) - 删除文档
-- [移动文档](doc/commands/move.md) - 移动文档位置
-- [转换 ID 和路径](doc/commands/convert.md) - ID 和路径互转
-- [获取笔记本列表](doc/commands/notebooks.md) - 获取笔记本列表
-- [索引文档](doc/commands/index.md) - 向量数据库索引
-- [NLP 分析](doc/commands/nlp.md) - 文本分析功能
-
-## 高级主题
-- [向量搜索配置](doc/advanced/vector-search.md) - Qdrant 和 Ollama 配置
-- [最佳实践](doc/advanced/best-practices.md) - 使用建议和注意事项
-
-## 配置文档
-- [环境变量配置](doc/config/environment.md) - 环境变量说明
-- [高级配置](doc/config/advanced.md) - 详细配置选项
+详细命令文档请查看 [doc/commands/](doc/commands/) 目录。
 
 ---
 
