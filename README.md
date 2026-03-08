@@ -1,7 +1,7 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node-%3E%2B%20-green.svg)](https://github.com/dazexcl/siyuan-skill)
 
