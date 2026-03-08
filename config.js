@@ -213,28 +213,19 @@ class ConfigManager {
           } else {
             envConfig.notebookList = [];
           }
+        } else if (notebookListStr.includes(',')) {
+          // 逗号分隔格式：id1,id2,id3
+          envConfig.notebookList = notebookListStr.split(',').map(id => id.trim().replace(/['"]/g, '')).filter(id => id);
+          console.log('环境变量 SIYUAN_NOTEBOOK_LIST 解析成功（逗号分隔）:', envConfig.notebookList);
         } else {
-          // 不是数组格式，尝试解析为单个字符串
+          // 单个笔记本ID
           envConfig.notebookList = [notebookListStr.replace(/['"]/g, '')];
+          console.log('环境变量 SIYUAN_NOTEBOOK_LIST 解析成功（单个ID）:', envConfig.notebookList);
         }
       } catch (error) {
         console.warn('环境变量 SIYUAN_NOTEBOOK_LIST 解析失败:', error.message);
         console.warn('原始值:', process.env.SIYUAN_NOTEBOOK_LIST);
-        // 尝试简单的列表解析作为备用方案
-        try {
-          // 尝试直接解析如 "id1,id2" 格式的字符串
-          if (process.env.SIYUAN_NOTEBOOK_LIST.includes(',')) {
-            envConfig.notebookList = process.env.SIYUAN_NOTEBOOK_LIST.split(',').map(id => id.trim().replace(/['"]/g, ''));
-            console.warn('使用备用解析方案成功:', envConfig.notebookList);
-          } else {
-            // 单个笔记本ID
-            envConfig.notebookList = [process.env.SIYUAN_NOTEBOOK_LIST.trim().replace(/['"]/g, '')];
-            console.warn('使用单个ID解析方案成功:', envConfig.notebookList);
-          }
-        } catch (fallbackError) {
-          console.warn('备用解析方案也失败:', fallbackError.message);
-          envConfig.notebookList = [];
-        }
+        envConfig.notebookList = [];
       }
     }
     
