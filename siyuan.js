@@ -225,11 +225,12 @@ function showCommandHelp(command) {
     },
     'index': {
       aliases: ['index-documents'],
-      description: '索引文档到向量数据库（支持自动分块）',
-      usage: 'siyuan index [--notebook <id>] [--force] [--batch-size <size>]',
+      description: '索引文档到向量数据库（支持增量索引和自动分块）',
+      usage: 'siyuan index [--notebook <id>] [--force] [--no-incremental] [--batch-size <size>]',
       options: [
         { name: '--notebook', description: '索引指定笔记本' },
-        { name: '--force', description: '强制重建索引' },
+        { name: '--force', description: '强制重建索引（清空所有数据）' },
+        { name: '--no-incremental', description: '禁用增量索引，重新索引所有文档' },
         { name: '--doc-ids', description: '索引指定文档ID（逗号分隔）' },
         { name: '--batch-size', description: '批量大小（默认：10）' }
       ],
@@ -237,6 +238,7 @@ function showCommandHelp(command) {
         'siyuan index',
         'siyuan index --notebook <notebook-id>',
         'siyuan index --force',
+        'siyuan index --no-incremental',
         'siyuan index --doc-ids <docId1,docId2,docId3>',
         'siyuan index --batch-size 20'
       ]
@@ -590,6 +592,8 @@ async function main(customArgs = null) {
             indexArgs.docIds = docIdsStr.split(',').map(id => id.trim());
           } else if (args[i] === '--force') {
             indexArgs.force = true;
+          } else if (args[i] === '--no-incremental') {
+            indexArgs.incremental = false;
           } else if (args[i] === '--batch-size' && i + 1 < args.length) {
             indexArgs.batchSize = parseInt(args[++i]);
           }

@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.3.1"
+version: "1.3.2"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能"
 ---
 # 核心价值
@@ -93,6 +93,7 @@ export SIYUAN_BASE_URL="http://127.0.0.1:6806"
 export SIYUAN_TOKEN="your-api-token"
 export SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id"
 export SIYUAN_PERMISSION_MODE="all"
+export SIYUAN_NOTEBOOK_LIST="notebook-id1,notebook-id2"
 ```
 
 ## 配置文件
@@ -120,6 +121,7 @@ export SIYUAN_PERMISSION_MODE="all"
 2. **权限模式**：`all`（无限制）/ `whitelist`（白名单）/ `blacklist`（黑名单）
 3. **缓存机制**：笔记本列表和文档结构会自动缓存，可使用 `--force-refresh` 强制刷新
 4. **向量搜索**：需要单独部署 Qdrant 和 Ollama 服务，否则会回退到 SQL 搜索
+5. **增量索引**：`index` 命令默认启用增量索引，只索引有变化的文档；使用 `--force` 强制重建或 `--no-incremental` 禁用增量
 
 ---
 

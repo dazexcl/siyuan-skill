@@ -9,7 +9,7 @@
 const command = {
   name: 'index-documents',
   description: '将文档索引到向量数据库',
-  usage: 'index-documents [--notebook <id>] [--doc-ids <ids>] [--force] [--batch-size <size>]',
+  usage: 'index-documents [--notebook <id>] [--doc-ids <ids>] [--force] [--incremental] [--batch-size <size>]',
   
   /**
    * 执行指令
@@ -17,7 +17,8 @@ const command = {
    * @param {Object} args - 指令参数
    * @param {string} args.notebookId - 笔记本 ID（可选，索引指定笔记本）
    * @param {Array} args.docIds - 文档 ID 数组（可选，索引指定文档）
-   * @param {boolean} args.force - 是否强制重建索引
+   * @param {boolean} args.force - 是否强制重建索引（清空所有数据）
+   * @param {boolean} args.incremental - 是否增量索引（只索引有变化的文档）
    * @param {number} args.batchSize - 批处理大小（默认：10）
    * @returns {Promise<Object>} 执行结果
    */
@@ -26,6 +27,7 @@ const command = {
       notebookId,
       docIds,
       force = false,
+      incremental = true,
       batchSize = 10
     } = args;
 
@@ -42,6 +44,7 @@ const command = {
 
     try {
       let documentsToIndex = [];
+      let skippedCount = 0;
 
       if (docIds && Array.isArray(docIds) && docIds.length > 0) {
         documentsToIndex = await this.fetchDocumentsByIds(skill, docIds);
@@ -62,6 +65,60 @@ const command = {
       if (force) {
         console.log('强制重建索引，清空现有数据...');
         await skill.vectorManager.clearCollection();
+      } else if (incremental) {
+        // 增量索引：只索引有变化的文档
+        const originalDocIds = [...new Set(documentsToIndex
+          .filter(d => !d.metadata?.isChunk)
+          .map(d => d.originalDocId || d.docId))];
+        
+        if (originalDocIds.length > 0) {
+          console.log('增量索引模式：检查文档更新状态...');
+          const indexedUpdateTimes = await skill.vectorManager.getIndexedDocumentsUpdateTime(originalDocIds);
+          
+          // 找出需要更新的原始文档ID
+          const originalDocsNeedUpdate = new Set();
+          
+          for (const docId of originalDocIds) {
+            const indexedTime = indexedUpdateTimes.get(docId);
+            // 获取该原始文档的最新更新时间
+            const doc = documentsToIndex.find(d => (d.originalDocId || d.docId) === docId && !d.metadata?.isChunk);
+            const docTime = doc?.metadata?.updated || 0;
+            
+            // 如果文档未索引或已更新，则需要索引
+            if (!indexedTime || docTime > indexedTime) {
+              originalDocsNeedUpdate.add(docId);
+            }
+          }
+          
+          // 过滤出需要更新的文档（包括分块）
+          const docsNeedUpdate = [];
+          const docsUnchanged = [];
+          
+          for (const doc of documentsToIndex) {
+            const originalId = doc.originalDocId || doc.docId;
+            
+            // 如果原始文档需要更新，则包含所有分块
+            if (originalDocsNeedUpdate.has(originalId)) {
+              docsNeedUpdate.push(doc);
+            } else {
+              docsUnchanged.push(doc);
+            }
+          }
+          
+          skippedCount = docsUnchanged.length;
+          documentsToIndex = docsNeedUpdate;
+          
+          console.log(`发现 ${originalDocsNeedUpdate.size} 个原始文档需要更新，跳过 ${skippedCount} 个未变化的文档/分块`);
+        }
+      }
+
+      if (documentsToIndex.length === 0) {
+        return {
+          success: true,
+          indexed: 0,
+          skipped: skippedCount,
+          message: '所有文档已是最新，无需重新索引'
+        };
       }
 
       console.log(`开始索引 ${documentsToIndex.length} 个文档...`);
@@ -71,9 +128,10 @@ const command = {
       return {
         success: result.success,
         indexed: result.indexed,
-        total: result.total,
+        skipped: skippedCount,
+        total: result.total + skippedCount,
         errors: result.errors,
-        message: `成功索引 ${result.indexed}/${result.total} 个文档`
+        message: `成功索引 ${result.indexed} 个文档${skippedCount > 0 ? `，跳过 ${skippedCount} 个未变化的文档` : ''}`
       };
     } catch (error) {
       console.error('索引文档失败:', error);
@@ -117,7 +175,9 @@ const command = {
           }
 
           // 检查内容长度，如果超过限制则使用分块
-          const maxContentLength = 4000; // embedding模型的上下文限制
+          // nomic-embed-text 限制 8192 tokens，中文字符可能占用更多 token
+          // 安全起见，使用较小的分块大小
+          const maxContentLength = 2000;
           const docContent = content.content;
 
           if (docContent.length > maxContentLength) {
@@ -193,8 +253,8 @@ const command = {
 
       // 遍历所有子块，收集内容
       let currentChunk = '';
-      const maxChunkLength = 3000; // 每个块的最大长度
-      const minChunkLength = 500; // 最小长度，避免过小的块
+      const maxChunkLength = 1500; // 每个块的最大长度（安全值，避免超出embedding模型限制）
+      const minChunkLength = 300; // 最小长度，避免过小的块
 
       for (const block of childBlocks) {
         // 获取块内容
@@ -297,7 +357,7 @@ const command = {
 
             if (content && content.content) {
               const docContent = content.content;
-              const maxContentLength = 4000; // embedding模型的上下文限制
+              const maxContentLength = 2000; // embedding模型的上下文限制（安全值）
 
               if (docContent.length > maxContentLength) {
                 // 使用思源笔记API获取文档的块列表
