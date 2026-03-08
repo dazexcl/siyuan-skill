@@ -11,9 +11,10 @@
 [![Features](https://img.shields.io/badge/features-NLP-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 
 
-`纯node环境` `无需任何依赖` `开箱即用` `agent自动接入`
+`纯node环境` `无需任何依赖` `开箱即用` `agent自动接入` `灵活拔插` `黑白名单`
 ## 核心价值
 
+**提供ai agent可快速接入siyuan笔记的的skill方案**
 **为 AI Agent 团队提供统一、结构化、可检索的共享知识库**
 
 ### 适用场景
@@ -51,7 +52,50 @@
 
 ## 快速开始
 
-### 安装
+### 安装 Skill
+
+**方式 1：克隆到 Skills 目录（推荐）**
+
+```bash
+# 进入AI工具的 Skills 目录
+cd %USERPROFILE%/skills
+
+# 克隆仓库
+git clone https://github.com/dazexcl/siyuan-skill.git
+
+# 进入技能目录
+cd siyuan-skill
+
+```
+
+**方式 2：手动复制**
+
+```bash
+# 将整个 siyuan-skill 目录复制到 Skills 目录
+```
+
+**验证安装**
+
+```bash
+# 进入技能目录
+cd %USERPROFILE%/skills/siyuan-skill
+
+# 测试命令
+node siyuan.js help
+```
+
+### 配置
+
+#### 方式 1：使用环境变量（推荐）
+
+```bash
+export SIYUAN_BASE_URL="http://127.0.0.1:6806"
+export SIYUAN_TOKEN="你的 API token"
+export SIYUAN_DEFAULT_NOTEBOOK="默认笔记本 ID"
+```
+
+#### 方式 2：直接编辑 config.json
+**复制配置文件**
 
 ```bash
 # 进入技能目录
@@ -64,7 +108,7 @@ cp config.example.json config.json
 # 修改 config.json 中的必要配置项
 ```
 
-### 配置
+**修改配置文件**
 
 创建或编辑 `config.json` 文件：
 
