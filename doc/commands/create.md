@@ -1,0 +1,138 @@
+# 创建文档命令
+
+创建思源笔记文档，支持自动处理换行符、路径自动创建和重名检测。
+
+## 命令格式
+
+```bash
+siyuan create <title> [content] [options]
+```
+
+**别名**：`new`
+
+## 参数说明
+
+| 参数 | 类型 | 必填 | 说明 |
+|-----|------|------|------|
+| `<title>` | string | ✅ | 文档标题 |
+| `[content]` | string | ❌ | 文档内容（可选） |
+| `--parent-id <parentId>` | string | ❌ | 父文档或笔记本 ID |
+| `--path <path>` | string | ❌ | 文档路径（支持绝对路径或相对路径） |
+| `--force` | boolean | ❌ | 强制创建，忽略重名检测 |
+
+## 功能特性
+
+### 自动换行符处理
+支持使用 `\n` 表示换行，系统会自动将其转换为实际的换行符。
+
+```bash
+siyuan create "多行文档" "第一行内容\n第二行内容\n第三行内容"
+```
+
+### 路径自动创建
+如果指定的路径不存在，系统会自动创建中间的文件夹。
+
+```bash
+siyuan create "用户管理" "用户管理模块的详细说明" --path /系统设计/用户管理
+```
+
+### 重名检测
+默认会检测同名文档，可使用 `--force` 参数强制创建。
+
+```bash
+siyuan create "测试文档" "内容" --path /测试 --force
+```
+
+## 使用示例
+
+### 基本创建
+```bash
+# 创建空文档（在默认笔记本根目录）
+siyuan create "我的文档"
+
+# 创建带内容的文档（在默认笔记本根目录）
+siyuan create "我的文档" "文档内容"
+```
+
+### 在指定位置创建
+```bash
+# 在指定父文档下创建文档
+siyuan create "子文档" "文档内容" --parent-id <parentId>
+
+# 在指定路径下创建文档
+siyuan create "子文档" "文档内容" --path /AI/openclaw/插件
+
+# 在指定路径下强制创建（忽略重名检测）
+siyuan create "子文档" "文档内容" --path /AI/openclaw/插件 --force
+```
+
+### 使用路径参数
+```bash
+# 使用路径参数创建文档（简化版）
+siyuan create "API文档" "# API 文档内容" --path /技术文档/API
+
+# 在嵌套路径下创建文档
+siyuan create "用户管理" "用户管理模块的详细说明" --path /系统设计/用户管理
+```
+
+### 多行内容文档
+```bash
+# 创建多行内容文档（自动处理换行符）
+siyuan create "多行文档" "第一行内容\n第二行内容\n第三行内容"
+
+# 创建带格式的文档
+siyuan create "格式文档" "# 标题\n\n这是段落内容\n\n- 列表项1\n- 列表项2"
+```
+
+### Front Matter 使用
+```bash
+# 不添加 Front Matter（直接使用内容）
+siyuan create "我的文档" "# 这是文档内容"
+
+# 自定义 Front Matter（需要手动添加）
+siyuan create "自定义文档" '---
+title: 自定义标题
+date: 2024-01-01
+tags: [tag1, tag2]
+---
+
+这是文档内容'
+
+# 混合使用 - 提供自定义 Front Matter
+siyuan create "高级文档" '---
+title: 高级文档
+author: 张三
+category: 技术
+---
+
+# 详细内容
+
+这里是详细的内容描述...'
+```
+
+## 长内容处理最佳实践
+
+对于超长内容（超过 4000 字符），建议分两步操作：
+
+```bash
+# 1. 先创建空文档
+siyuan create "长文档标题" "" --path /分类
+
+# 2. 然后使用 update 命令更新完整内容
+siyuan update <docId> "完整的超长内容..."
+
+# 或者使用文件重定向
+siyuan create "文件文档" "$(cat content.md)" --path /分类
+```
+
+## 注意事项
+
+1. **内容长度限制**：单次创建的内容长度建议不超过 4000 字符，超长内容请使用 update 命令
+2. **路径格式**：路径以 `/` 开头，例如：`/AI/openclaw/插件`
+3. **重名检测**：默认会检测同名文档，使用 `--force` 可强制创建
+4. **换行符处理**：支持使用 `\n` 表示换行，系统会自动转换
+5. **Front Matter**：需要手动添加，系统不会自动添加 Front Matter
+
+## 相关文档
+- [更新文档命令](update.md)
+- [最佳实践](../advanced/best-practices.md)
