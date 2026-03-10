@@ -65,7 +65,25 @@ siyuan update <docId> "$(cat content.md)"
 3. **内容长度**：支持超长内容，无长度限制
 4. **覆盖更新**：更新会完全覆盖原有内容，请谨慎操作
 
+---
+
+## 全文档更新 vs 块更新
+
+思源笔记支持两种内容更新方式：
+
+| 方式 | 命令 | 适用场景 |
+|------|------|----------|
+| 全文档更新 | `siyuan edit <docId> <content>` | 大规模重写、创建新文档 |
+| 块更新 | `siyuan bu <blockId> <content>` | 局部修改、保留块属性 |
+
+**Agent 操作建议**：推荐优先使用**块更新**，效率更高且不会丢失块属性。
+
+详细对比请参考 [SKILL.md - 全文档更新 vs 块更新](../../SKILL.md#全文档更新-vs-块更新)。
+
+---
+
 ## 相关文档
 - [创建文档命令](create.md)
 - [删除文档命令](delete.md)
+- [块控制命令](block-control.md) - 块级别更新操作
 - [最佳实践](../advanced/best-practices.md)

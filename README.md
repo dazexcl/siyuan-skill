@@ -1,14 +1,14 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.3.2-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 
 > **Siyuan Notes 命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能。**
 
 [![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Features](https://img.shields.io/badge/features-NLP-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Features](https://img.shields.io/badge/features-NLP-orange.svg)](https://github.com/dazexcl/siyuan-skill)
 
 
 `纯node环境` `无需任何依赖` `开箱即用` `agent自动接入` `灵活拔插` `黑白名单` `渐进式披露`
@@ -248,7 +248,9 @@ node siyuan.js notebooks
 
 **说明：** `denseWeight + sparseWeight` 应该等于 1。
 
-### 8. NLP 配置（可选）
+### 8. NLP 配置（可选，实验性）
+
+> ⚠️ **实验性功能**：NLP 功能目前处于实验阶段，API 可能会发生变化。
 
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |---------|------|--------|----------|------|
@@ -404,6 +406,53 @@ siyuan update <docId> "新的文档内容"
 
 ```bash
 siyuan delete <docId>
+```
+
+### 块控制命令
+
+```bash
+# 获取文档中的块列表
+siyuan bg <docId> --mode children
+
+# 插入新块
+siyuan bi "新段落内容" --parent-id <docId>
+
+# 更新块内容
+siyuan bu <blockId> "更新后的内容"
+
+# 删除块
+siyuan bd <blockId>
+
+# 移动块
+siyuan bm <blockId> --previous-id <targetBlockId>
+
+# 管理块属性
+siyuan ba <blockId> --set "key=value"
+siyuan ba <blockId> --get
+
+# 折叠/展开块
+siyuan bf <blockId>      # 折叠
+siyuan buu <blockId>     # 展开
+```
+
+### 向量索引
+
+```bash
+# 增量索引（默认）
+siyuan index
+
+# 强制重建索引
+siyuan index --force
+
+# 索引指定笔记本
+siyuan index --notebook <notebookId>
+```
+
+### NLP 分析（实验性）
+
+```bash
+# 分析文本
+siyuan nlp "这是一段需要分析的文本"
 ```
 
 ## 书写规范

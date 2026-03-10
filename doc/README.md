@@ -15,7 +15,8 @@ doc/
 │   ├── convert.md     # 转换ID和路径命令详解
 │   ├── notebooks.md   # 获取笔记本列表命令详解
 │   ├── index.md       # 索引文档命令详解
-│   └── nlp.md         # NLP分析命令详解
+│   ├── nlp.md         # NLP分析命令详解（实验性）
+│   └── block-control.md # 块控制命令详解
 │
 ├── advanced/          # 高级主题文档
 │   ├── vector-search.md  # 向量搜索配置
@@ -36,6 +37,9 @@ doc/
 - [删除文档](commands/delete.md) - 删除文档
 - [移动文档](commands/move.md) - 移动文档位置
 
+**块控制**
+- [块控制命令](commands/block-control.md) - 插入、更新、删除、移动、获取块，属性管理，折叠展开
+
 **搜索功能**
 - [搜索内容](commands/search.md) - 支持向量搜索、语义搜索、关键词搜索
 
@@ -43,7 +47,7 @@ doc/
 - [获取笔记本列表](commands/notebooks.md) - 查看所有笔记本
 - [转换ID和路径](commands/convert.md) - ID和路径互转
 - [索引文档](commands/index.md) - 向量数据库索引
-- [NLP分析](commands/nlp.md) - 文本分析功能
+- [NLP分析](commands/nlp.md) - 文本分析功能 ⚠️ 实验性
 
 ### 高级主题
 

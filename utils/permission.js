@@ -145,6 +145,78 @@ class Permission {
   }
 
   /**
+   * 检查块权限
+   * @param {SiyuanNotesSkill} skill - 技能实例
+   * @param {string} blockId - 块ID
+   * @returns {Promise<{hasPermission: boolean, notebookId: string|null, error: string|null}>}
+   */
+  static async checkBlockPermission(skill, blockId) {
+    if (!blockId) {
+      return {
+        hasPermission: false,
+        notebookId: null,
+        error: '块ID不能为空'
+      };
+    }
+
+    try {
+      const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id: blockId });
+      
+      console.log('getBlockInfo 响应:', JSON.stringify(blockInfo, null, 2));
+      
+      if (!blockInfo || typeof blockInfo !== 'object') {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: '无法获取块信息'
+        };
+      }
+      
+      const rootId = blockInfo.rootID || blockInfo.root_id || blockInfo.rootChildID;
+      const notebookId = blockInfo.box;
+      
+      if (!rootId && !notebookId) {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: '无法获取块所在的文档ID'
+        };
+      }
+      
+      if (notebookId) {
+        const hasPermission = skill.checkPermission(notebookId);
+        const { permissionMode, notebookList } = skill.config;
+        
+        let errorMessage = null;
+        if (!hasPermission) {
+          if (permissionMode === 'whitelist') {
+            errorMessage = `笔记本 ${notebookId} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
+          } else if (permissionMode === 'blacklist') {
+            errorMessage = `笔记本 ${notebookId} 在黑名单中，禁止访问`;
+          } else {
+            errorMessage = `无权访问笔记本 ${notebookId}`;
+          }
+        }
+        
+        return {
+          hasPermission,
+          notebookId,
+          error: errorMessage
+        };
+      }
+      
+      return this.checkDocumentPermission(skill, rootId);
+    } catch (error) {
+      console.warn('获取块信息失败:', error.message);
+      return {
+        hasPermission: false,
+        notebookId: null,
+        error: '获取块信息失败: ' + error.message
+      };
+    }
+  }
+
+  /**
    * 检查父文档/笔记本权限
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {string} parentId - 父文档/笔记本ID
@@ -285,7 +357,7 @@ class Permission {
    * 权限拦截包装器
    * @param {Function} handler - 处理函数
    * @param {Object} options - 选项
-   * @param {string} options.type - 权限类型 ('document' | 'parent')
+   * @param {string} options.type - 权限类型 ('document' | 'parent' | 'block')
    * @param {string} [options.idParam] - ID参数名
    * @param {string} [options.defaultNotebook] - 默认笔记本ID
    * @returns {Function} 包装后的处理函数
@@ -308,11 +380,21 @@ class Permission {
         } else if (options.type === 'parent') {
           const parentId = args[options.idParam || 'parentId'];
           permissionResult = await this.checkParentPermission(skill, parentId, options.defaultNotebook);
+        } else if (options.type === 'block') {
+          const blockId = args[options.idParam || 'id'];
+          if (!blockId) {
+            return {
+              success: false,
+              error: '缺少必要参数',
+              message: `必须提供 ${options.idParam || 'id'} 参数`
+            };
+          }
+          permissionResult = await this.checkBlockPermission(skill, blockId);
         } else {
           return {
             success: false,
             error: '无效的权限类型',
-            message: '权限类型必须是 document 或 parent'
+            message: '权限类型必须是 document、parent 或 block'
           };
         }
         
@@ -324,7 +406,6 @@ class Permission {
           };
         }
         
-        // 调用原始处理函数，并传入 notebookId
         return await handler(skill, args, permissionResult.notebookId);
       } catch (error) {
         console.error('权限检查失败:', error);
