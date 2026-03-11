@@ -244,19 +244,22 @@ function showCommandHelp(command) {
     'index': {
       aliases: ['index-documents'],
       description: '索引文档到向量数据库（支持增量索引和自动分块）',
-      usage: 'siyuan index [--notebook <id>] [--force] [--no-incremental] [--batch-size <size>]',
+      usage: 'siyuan index [<id>] [--notebook <id>] [--doc-ids <ids>] [--force] [--no-incremental]',
       options: [
+        { name: '<id>', description: '位置参数：笔记本ID或文档ID（自动识别）' },
         { name: '--notebook', description: '索引指定笔记本' },
+        { name: '--doc-ids', description: '索引指定文档ID（逗号分隔）' },
         { name: '--force', description: '强制重建索引（清空所有数据）' },
         { name: '--no-incremental', description: '禁用增量索引，重新索引所有文档' },
-        { name: '--doc-ids', description: '索引指定文档ID（逗号分隔）' },
         { name: '--batch-size', description: '批量大小（默认：10）' }
       ],
       examples: [
-        'siyuan index',
-        'siyuan index --notebook <notebook-id>',
-        'siyuan index --force',
-        'siyuan index --no-incremental',
+        'siyuan index                         # 索引所有笔记本',
+        'siyuan index <notebook-id>          # 索引指定笔记本（自动识别）',
+        'siyuan index <doc-id>               # 索引指定文档（自动识别）',
+        'siyuan index --notebook <id>        # 索引指定笔记本',
+        'siyuan index --doc-ids id1,id2      # 索引多个文档',
+        'siyuan index --force                # 强制重建索引',
         'siyuan index --doc-ids <docId1,docId2,docId3>',
         'siyuan index --batch-size 20'
       ]
@@ -729,6 +732,20 @@ async function main(customArgs = null) {
         
         // 解析参数
         const indexArgs = {};
+        
+        // 支持位置参数：自动识别笔记本或文档
+        if (args.length >= 2 && !args[1].startsWith('--')) {
+          // 获取笔记本列表用于识别
+          const notebooksResponse = await skill.connector.request('/api/notebook/lsNotebooks');
+          const notebooks = notebooksResponse?.notebooks || notebooksResponse || [];
+          const notebookIds = new Set(notebooks.map(n => n.id));
+          
+          if (notebookIds.has(args[1])) {
+            indexArgs.notebookId = args[1];
+          } else {
+            indexArgs.docIds = [args[1]];
+          }
+        }
         for (let i = 1; i < args.length; i++) {
           if (args[i] === '--notebook' && i + 1 < args.length) {
             indexArgs.notebookId = args[++i];

@@ -1,7 +1,7 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 
@@ -438,6 +438,10 @@ siyuan buu <blockId>     # 展开
 ### 向量索引
 
 ```bash
+# 位置参数（自动识别笔记本或文档）
+siyuan index <notebook-id>           # 索引指定笔记本
+siyuan index <doc-id>                # 索引指定文档
+
 # 增量索引（默认）
 siyuan index
 

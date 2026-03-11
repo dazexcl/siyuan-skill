@@ -5,13 +5,14 @@
 ## 命令格式
 
 ```bash
-siyuan index [options]
+siyuan index [<id>] [options]
 ```
 
 ## 参数说明
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
+| `<id>` | string | ❌ | 位置参数：笔记本ID或文档ID（自动识别） |
 | `--notebook <id>` | string | ❌ | 指定笔记本 ID |
 | `--doc-ids <ids>` | string | ❌ | 指定文档 ID 列表（逗号分隔） |
 | `--force` | boolean | ❌ | 强制重建索引（清空所有数据） |
@@ -19,6 +20,16 @@ siyuan index [options]
 | `--batch-size <size>` | number | ❌ | 批处理大小（默认：10） |
 
 ## 使用示例
+
+### 位置参数（自动识别）
+
+```bash
+# 传入笔记本ID → 索引整个笔记本
+siyuan index 20260308012748-i6sgf0p
+
+# 传入文档ID → 只索引该文档
+siyuan index 20260311033146-8o2vury
+```
 
 ### 增量索引（默认）
 ```bash
