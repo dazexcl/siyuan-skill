@@ -10,7 +10,7 @@ const Permission = require('../utils/permission');
  */
 const command = {
   name: 'get-doc-content',
-  description: '获取指定文档的内容，支持 markdown、text、html 格式',
+  description: '获取指定文档的内容，支持 kramdown、markdown、text、html 格式',
   usage: 'get-doc-content --doc-id <docId> [--format <format>] [--raw]',
   
   /**
@@ -18,15 +18,14 @@ const command = {
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 指令参数
    * @param {string} args.docId - 文档ID
-   * @param {string} args.format - 输出格式：markdown、text、html
+   * @param {string} args.format - 输出格式：kramdown、markdown、text、html（默认：kramdown）
    * @param {boolean} args.raw - 是否以纯文本格式返回（移除JSON外部结构）
    * @returns {Promise<Object|string>} 文档内容
    */
   execute: Permission.createPermissionWrapper(async (skill, args, notebookId) => {
-    const { docId, format = 'markdown', raw = false } = args;
+    const { docId, format = 'kramdown', raw = false } = args;
     
-    // 验证格式参数
-    const validFormats = ['markdown', 'text', 'html'];
+    const validFormats = ['kramdown', 'markdown', 'text', 'html'];
     if (!validFormats.includes(format)) {
       return {
         success: false,
@@ -36,8 +35,39 @@ const command = {
     }
     
     try {
+      if (format === 'kramdown') {
+        const kramdownResult = await skill.connector.request('/api/block/getBlockKramdown', { id: docId });
+        
+        if (!kramdownResult || !kramdownResult.kramdown) {
+          return {
+            success: false,
+            error: '文档内容为空',
+            message: '未找到文档 kramdown 内容'
+          };
+        }
+        
+        const content = kramdownResult.kramdown;
+        
+        if (raw) {
+          return content;
+        }
+        
+        return {
+          success: true,
+          data: {
+            id: docId,
+            format: 'kramdown',
+            content: content,
+            length: content.length,
+            metadata: {
+              notebookId,
+              blockId: kramdownResult.id
+            }
+          },
+          timestamp: Date.now()
+        };
+      }
       
-      // 获取原始文档内容
       const result = await skill.connector.request('/api/export/exportMdContent', { id: docId });
       
       if (!result || !result.content) {
@@ -51,14 +81,12 @@ const command = {
       let content = result.content;
       let formattedContent = content;
       
-      // 根据格式处理内容
       if (format === 'text') {
         formattedContent = markdownToText(content);
       } else if (format === 'html') {
         formattedContent = markdownToHtml(content);
       }
       
-      // 如果指定了raw参数，直接返回纯文本内容
       if (raw) {
         return formattedContent;
       }

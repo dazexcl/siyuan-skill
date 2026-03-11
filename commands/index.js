@@ -10,6 +10,7 @@ const searchContent = require('./search-content');
 const createDocument = require('./create-document');
 const updateDocument = require('./update-document');
 const deleteDocument = require('./delete-document');
+const protectDocument = require('./protect-document');
 const moveDocument = require('./move-document');
 const convertPath = require('./convert-path');
 const indexDocuments = require('./index-documents');
@@ -34,6 +35,7 @@ const commands = {
   'create-document': createDocument,
   'update-document': updateDocument,
   'delete-document': deleteDocument,
+  'protect-document': protectDocument,
   'move-document': moveDocument,
   'convert-path': convertPath,
   'index-documents': indexDocuments,

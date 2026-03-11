@@ -1,6 +1,12 @@
 /**
  * 更新文档指令
  * 更新 Siyuan Notes 中的文档内容
+ * 
+ * 设计说明：
+ * 思源笔记中，文档本身也是一种特殊的块（文档块），文档块ID = 文档ID
+ * 因此使用 /api/block/updateBlock 更新文档是符合思源设计理念的
+ * 
+ * 注意：/api/filetree/ 下没有 updateDoc API，官方只提供 createDocWithMd
  */
 
 const Permission = require('../utils/permission');
@@ -10,15 +16,15 @@ const Permission = require('../utils/permission');
  */
 const command = {
   name: 'update-document',
-  description: '更新 Siyuan Notes 中的文档内容',
+  description: '更新 Siyuan Notes 中的文档内容（实际更新文档块）',
   usage: 'update-document --doc-id <docId> --content <content>',
   
   /**
    * 执行指令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 指令参数
-   * @param {string} args.docId - 文档ID
-   * @param {string} args.content - 新的文档内容
+   * @param {string} args.docId - 文档ID（也是文档块ID）
+   * @param {string} args.content - 新的文档内容（Markdown格式）
    * @returns {Promise<Object>} 更新结果
    */
   execute: Permission.createPermissionWrapper(async (skill, args, notebookId) => {
@@ -35,36 +41,16 @@ const command = {
     try {
       console.log('更新文档参数:', { docId, contentLength: content.length });
       
-      // 处理content中的换行符，将字面量\n转换为实际换行
       const normalizedContent = content ? content.replace(/\\n/g, '\n') : '';
       
-      // 尝试使用不同的API参数格式
-      let result;
-      try {
-        // 尝试使用标准格式，指定dataType为markdown
-        result = await skill.connector.request('/api/block/updateBlock', {
-          id: docId,
-          data: normalizedContent,
-          dataType: 'markdown'
-        });
-        console.log('更新API返回结果:', result);
-      } catch (error) {
-        console.error('更新失败:', error.message);
-        
-        // 尝试使用其他API
-        try {
-          result = await skill.connector.request('/api/filetree/updateDoc', {
-            id: docId,
-            content: normalizedContent
-          });
-          console.log('使用updateDoc API成功:', result);
-        } catch (error2) {
-          console.error('updateDoc API也失败:', error2.message);
-          throw error2;
-        }
-      }
+      const result = await skill.connector.request('/api/block/updateBlock', {
+        id: docId,
+        data: normalizedContent,
+        dataType: 'markdown'
+      });
       
-      // 清除缓存
+      console.log('更新文档成功:', result);
+      
       skill.clearCache();
       
       return {

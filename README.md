@@ -1,7 +1,7 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 
@@ -208,7 +208,19 @@ node siyuan.js notebooks
 - `whitelist` - 只允许访问 `notebookList` 中的笔记本
 - `blacklist` - 禁止访问 `notebookList` 中的笔记本
 
-### 4. 功能配置
+### 4. 删除保护配置
+
+| 配置项 | 类型 | 必填 | 默认值 | 说明 |
+|---------|------|--------|----------|------|
+| `deleteProtection.safeMode` | boolean | ❌ | `true` | 安全模式（默认禁止删除） |
+| `deleteProtection.requireConfirmation` | boolean | ❌ | `false` | 删除确认机制 |
+
+**保护层级**：
+1. **全局安全模式** - 默认启用，禁止所有删除操作
+2. **文档保护标记** - 通过 `protect` 命令设置
+3. **删除确认机制** - 需要确认文档标题
+
+### 5. 功能配置
 
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |---------|------|--------|----------|------|
@@ -217,7 +229,7 @@ node siyuan.js notebooks
 | `enableLogging` | boolean | ❌ | `true` | 是否启用日志 |
 | `debugMode` | boolean | ❌ | `false` | 是否启用调试模式 |
 
-### 5. Qdrant 向量数据库配置（可选）
+### 6. Qdrant 向量数据库配置（可选）
 
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |---------|------|--------|----------|------|
@@ -227,7 +239,7 @@ node siyuan.js notebooks
 
 **说明：** 向量搜索功能需要单独部署 Qdrant 服务。如果 Qdrant 不可用，系统会自动回退到 SQL 搜索。
 
-### 6. Embedding 模型配置（可选）
+### 7. Embedding 模型配置（可选）
 
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |---------|------|--------|----------|------|
@@ -238,7 +250,7 @@ node siyuan.js notebooks
 
 **说明：** 当前版本使用 Ollama Embedding 服务，无需下载本地模型文件。
 
-### 7. 混合搜索配置（可选）
+### 8. 混合搜索配置（可选）
 
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |---------|------|--------|----------|------|
@@ -248,7 +260,7 @@ node siyuan.js notebooks
 
 **说明：** `denseWeight + sparseWeight` 应该等于 1。
 
-### 8. NLP 配置（可选，实验性）
+### 9. NLP 配置（可选，实验性）
 
 > ⚠️ **实验性功能**：NLP 功能目前处于实验阶段，API 可能会发生变化。
 
@@ -267,60 +279,67 @@ node siyuan.js notebooks
 ### 基础配置
 
 ```bash
-export SIYUAN_BASE_URL="http://127.0.0.1:6806"
-export SIYUAN_TOKEN="your-api-token-here"
-export SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id-here"
-export SIYUAN_TIMEOUT=10000
-export SIYUAN_DEFAULT_FORMAT="markdown"
+SIYUAN_BASE_URL="http://127.0.0.1:6806"
+SIYUAN_TOKEN="your-api-token-here"
+SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id-here"
+SIYUAN_TIMEOUT=10000
+SIYUAN_DEFAULT_FORMAT="markdown"
 ```
 
 ### 权限配置
 
 ```bash
-export SIYUAN_PERMISSION_MODE="all"
-export SIYUAN_NOTEBOOK_LIST="id1,id2,id3"
+SIYUAN_PERMISSION_MODE="all"
+SIYUAN_NOTEBOOK_LIST="id1,id2,id3"
+```
+
+### 删除保护配置
+
+```bash
+SIYUAN_DELETE_SAFE_MODE="true"
+SIYUAN_DELETE_REQUIRE_CONFIRMATION="false"
 ```
 
 ### 功能配置
 
 ```bash
-export SIYUAN_ENABLE_CACHE="true"
-export SIYUAN_ENABLE_SYNC="false"
-export SIYUAN_ENABLE_LOGGING="true"
-export SIYUAN_DEBUG_MODE="false"
+SIYUAN_ENABLE_CACHE="true"
+SIYUAN_ENABLE_SYNC="false"
+SIYUAN_ENABLE_LOGGING="true"
+SIYUAN_DEBUG_MODE="false"
 ```
 
 ### Qdrant 配置
 
 ```bash
-export QDRANT_URL="http://127.0.0.1:6333"
-export QDRANT_API_KEY=""
-export QDRANT_COLLECTION_NAME="siyuan_notes"
+QDRANT_URL="http://127.0.0.1:6333"
+QDRANT_API_KEY=""
+QDRANT_COLLECTION_NAME="siyuan_notes"
 ```
 
 ### Embedding 配置
 
 ```bash
-export OLLAMA_BASE_URL="http://127.0.0.1:11434"
-export OLLAMA_EMBED_MODEL="nomic-embed-text"
-export EMBEDDING_DIMENSION=768
-export EMBEDDING_BATCH_SIZE=8
+OLLAMA_BASE_URL="http://127.0.0.1:11434"
+OLLAMA_EMBED_MODEL="nomic-embed-text"
+EMBEDDING_DIMENSION=768
+EMBEDDING_BATCH_SIZE=8
 ```
 
 ### 混合搜索配置
 
 ```bash
-export HYBRID_DENSE_WEIGHT=0.7
-export HYBRID_SPARSE_WEIGHT=0.3
-export HYBRID_SEARCH_LIMIT=20
+HYBRID_DENSE_WEIGHT=0.7
+HYBRID_SPARSE_WEIGHT=0.3
+HYBRID_SEARCH_LIMIT=20
 ```
 
 ### NLP 配置
 
 ```bash
-export NLP_LANGUAGE="zh"
-export NLP_EXTRACT_ENTITIES="true"
-export NLP_EXTRACT_KEYWORDS="true"
+NLP_LANGUAGE="zh"
+NLP_EXTRACT_ENTITIES="true"
+NLP_EXTRACT_KEYWORDS="true"
 ```
 
 ## 使用方式
@@ -404,9 +423,49 @@ siyuan update <docId> "新的文档内容"
 
 ### 删除文档
 
+**注意**：默认禁止删除，需在配置中设置 `deleteProtection.safeMode = false`。
+
 ```bash
+# 基本删除（需要关闭安全模式）
 siyuan delete <docId>
+
+# 带确认标题删除（启用确认机制时）
+siyuan delete <docId> --confirm-title "文档标题"
 ```
+
+### 文档保护
+
+```bash
+# 设置保护（防止误删除）
+siyuan protect <docId>
+
+# 设置永久保护（无法通过命令移除）
+siyuan protect <docId> --permanent
+
+# 移除保护
+siyuan protect <docId> --remove
+```
+
+### 获取文档内容
+
+```bash
+# 获取文档内容（默认 kramdown 格式）
+siyuan content <docId>
+
+# 指定格式
+siyuan content <docId> --format markdown
+siyuan content <docId> --format text
+siyuan content <docId> --format html
+
+# 纯文本输出
+siyuan content <docId> --raw
+```
+
+**格式说明**：
+- `kramdown` - 包含块 ID 和属性（默认）
+- `markdown` - 标准 Markdown 格式
+- `text` - 纯文本格式
+- `html` - HTML 格式
 
 ### 块控制命令
 

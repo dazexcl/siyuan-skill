@@ -11,6 +11,7 @@ doc/
 │   ├── create.md      # 创建文档命令详解
 │   ├── update.md      # 更新文档命令详解
 │   ├── delete.md      # 删除文档命令详解
+│   ├── protect.md     # 文档保护命令详解
 │   ├── move.md        # 移动文档命令详解
 │   ├── convert.md     # 转换ID和路径命令详解
 │   ├── notebooks.md   # 获取笔记本列表命令详解
@@ -20,6 +21,7 @@ doc/
 │
 ├── advanced/          # 高级主题文档
 │   ├── vector-search.md  # 向量搜索配置
+│   ├── delete-protection.md # 删除保护机制
 │   └── best-practices.md # 最佳实践
 │
 └── config/            # 配置文档
@@ -34,7 +36,8 @@ doc/
 **文档操作**
 - [创建文档](commands/create.md) - 创建新文档，支持自动换行符处理
 - [更新文档](commands/update.md) - 更新文档内容
-- [删除文档](commands/delete.md) - 删除文档
+- [删除文档](commands/delete.md) - 删除文档（受保护机制约束）
+- [文档保护](commands/protect.md) - 设置/移除文档保护标记
 - [移动文档](commands/move.md) - 移动文档位置
 
 **块控制**
@@ -52,6 +55,7 @@ doc/
 ### 高级主题
 
 - [向量搜索配置](advanced/vector-search.md) - Qdrant 和 Ollama 配置指南
+- [删除保护机制](advanced/delete-protection.md) - 多层删除保护机制说明
 - [最佳实践](advanced/best-practices.md) - 使用建议和注意事项
 
 ### 配置文档

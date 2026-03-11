@@ -1,12 +1,11 @@
 ---
 name: "siyuan-skill"
-version: "1.4.1"
+version: "1.5.0"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
 ---
 # 核心价值
 
 **提供 AI Agent 可快速接入思源笔记的 skill 方案**
-**为 AI Agent 团队提供统一、结构化、可检索的共享知识库**
 
 ## 适用场景
 ✅ 团队规范、项目知识、可复用技能
@@ -18,26 +17,46 @@ description: "思源笔记命令行工具，提供便捷的命令行操作方式
 ❌ 临时笔记、代码版本管理
 ❌ 实时协作编辑
 
-## 关键原则
-- **思源笔记** = 共享知识库
-- **memory 文件** = 私密记录
-- **MEMORY.md** = 长期记忆
-
 ---
 
 # 重要约束
 
-**必须使用 CLI 命令来操作思源笔记**
-**禁止自动修改配置文件与本技能相关环境变量配置**
-**禁止直接调用 API**
-**禁止使用脚本调用、引用 index.js**
-**禁止使用脚本调用、引用指令文件**
+**必须使用 CLI 命令来操作思源笔记** 
+
+**禁止自动修改配置文件与本技能相关环境变量配置** 
+
+**禁止直接调用 API** 
+
+**禁止使用脚本调用、引用 index.js** 
+
+**禁止使用脚本调用、引用指令文件** 
+
+**遇到问题优先查阅文档，禁止直接读取源码**
+
+---
+
+# 问题导向文档导航
+
+> ⚠️ **重要**：遇到以下问题时，请直接查阅对应文档，不要读取源码
+
+| 问题类型 | 查阅文档 | 说明 |
+|----------|----------|------|
+| 如何创建文档 | [doc/commands/create.md](doc/commands/create.md) | 创建命令详解 |
+| 如何更新文档 | [doc/commands/update.md](doc/commands/update.md) | 更新命令详解 |
+| 如何删除文档 | [doc/commands/delete.md](doc/commands/delete.md) | 删除命令详解 |
+| 删除被阻止 | [doc/advanced/delete-protection.md](doc/advanced/delete-protection.md) | 删除保护机制 |
+| 如何保护文档 | [doc/commands/protect.md](doc/commands/protect.md) | 文档保护命令 |
+| 如何搜索内容 | [doc/commands/search.md](doc/commands/search.md) | 搜索命令详解 |
+| 搜索结果不准确 | [doc/advanced/vector-search.md](doc/advanced/vector-search.md) | 向量搜索配置 |
+| 块操作问题 | [doc/commands/block-control.md](doc/commands/block-control.md) | 块控制命令详解 |
+| 配置环境变量 | [doc/config/environment.md](doc/config/environment.md) | 环境变量配置 |
+| 高级配置 | [doc/config/advanced.md](doc/config/advanced.md) | 详细配置选项 |
+| 使用最佳实践 | [doc/advanced/best-practices.md](doc/advanced/best-practices.md) | 最佳实践指南 |
+| 命令参数说明 | `siyuan help <command>` | CLI 帮助命令 |
 
 ---
 
 # 快速开始
-
-## 使用方式
 
 ```bash
 # 方式 1：进入技能目录运行
@@ -58,168 +77,87 @@ node <skills-directory>/siyuan-skill/siyuan.js <command>
 # 查看所有可用命令
 siyuan help
 
-# 查看特定命令的详细帮助
-siyuan help search
-siyuan help create
+# 查看特定命令帮助
+siyuan help <command>
 ```
 
 ---
 
 # 命令列表
 
-使用 `siyuan help` 查看所有可用命令和详细说明。
-
 **常用命令**：
-- `nb` - 获取笔记本列表
-- `new` - 创建文档
-- `edit` - 更新文档
-- `rm` - 删除文档
-- `find` - 搜索内容（支持向量搜索）
-- `mv` - 移动文档
-- `path` - 转换 ID 和路径
-- `index` - 索引文档到向量数据库（支持位置参数自动识别笔记本/文档）
-- `nlp` - NLP 文本分析 [实验性]
+| 命令 | 别名 | 说明 |
+|------|------|------|
+| `notebooks` | `nb` | 获取笔记本列表 |
+| `create` | `new` | 创建文档 |
+| `update` | `edit` | 更新文档 |
+| `delete` | `rm` | 删除文档（受保护） |
+| `protect` | - | 设置/移除文档保护 |
+| `search` | `find` | 搜索内容 |
+| `move` | `mv` | 移动文档 |
+| `convert` | `path` | 转换 ID 和路径 |
+| `index` | - | 索引到向量数据库 |
+| `content` | `cat` | 获取文档内容 |
 
 **块控制命令**：
-- `block-insert`, `bi` - 插入新块
-- `block-update`, `bu` - 更新块内容
-- `block-delete`, `bd` - 删除块
-- `block-move`, `bm` - 移动块
-- `block-get`, `bg` - 获取块信息
-- `block-attrs`, `ba` - 管理块属性
-- `block-fold`, `bf` / `buu` - 折叠/展开块
-- `block-transfer-ref`, `btr` - 转移块引用
-
-详细命令文档请查看 [doc/commands/](doc/commands/) 目录。
+| 命令 | 别名 | 说明 |
+|------|------|------|
+| `block-insert` | `bi` | 插入块 |
+| `block-update` | `bu` | 更新块 |
+| `block-delete` | `bd` | 删除块 |
+| `block-move` | `bm` | 移动块 |
+| `block-get` | `bg` | 获取块信息 |
+| `block-attrs` | `ba` | 管理块属性 |
+| `block-fold` | `bf` | 折叠/展开块 |
 
 ---
 
-# 配置
+# 删除保护
 
-## 环境变量（优先级最高）
-
-```bash
-export SIYUAN_BASE_URL="http://127.0.0.1:6806"
-export SIYUAN_TOKEN="your-api-token"
-export SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id"
-export SIYUAN_PERMISSION_MODE="all"
-export SIYUAN_NOTEBOOK_LIST="notebook-id1,notebook-id2"
-```
-
-## 配置文件
-
-编辑 `config.json` 文件：
+**默认禁止删除**，需在 `config.json` 中配置：
 
 ```json
 {
-  "baseURL": "http://127.0.0.1:6806",
-  "token": "your-api-token",
-  "defaultNotebook": "your-notebook-id",
-  "permissionMode": "all"
+  "deleteProtection": {
+    "safeMode": false,
+    "requireConfirmation": true
+  }
 }
 ```
 
-**获取配置信息**：
-1. 打开思源笔记 → 设置 → 关于 → 复制 API Token
-2. 使用 `siyuan notebooks` 获取笔记本 ID
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `safeMode` | `true` | 禁止所有删除 |
+| `requireConfirmation` | `false` | 删除需确认标题 |
+
+**保护层级**：全局安全模式 → 文档保护标记 → 删除确认机制
+
+---
+
+# 更新方式选择
+
+| 场景 | 推荐方式 |
+|------|----------|
+| 创建/重写文档 | `edit` 全文档更新 |
+| 局部修改 | `bu` 块更新 ✅ |
+| 保留块属性 | `bu` 块更新 ✅ |
+
+**注意**：文档本身也是一种块，`edit` 和 `bu` 本质调用相同 API。
 
 ---
 
 # 注意事项
 
-1. **首次使用**需要配置思源笔记 API 地址和 Token
-2. **权限模式**：`all`（无限制）/ `whitelist`（白名单）/ `blacklist`（黑名单）
-3. **缓存机制**：笔记本列表和文档结构会自动缓存，可使用 `--force-refresh` 强制刷新
-4. **向量搜索**：需要单独部署 Qdrant 和 Ollama 服务，否则会回退到 SQL 搜索
-5. **增量索引**：`index` 命令默认启用增量索引，只索引有变化的文档；使用 `--force` 强制重建或 `--no-incremental` 禁用增量
-
----
-
-# 全文档更新 vs 块更新
-
-## 概述
-
-思源笔记支持两种内容更新方式：
-- **全文档更新**：使用 `edit` 命令，传入完整文档内容
-- **块更新**：使用 `bu` 命令，只更新指定块的内容
-
-## 对比测试结果
-
-| 对比项 | 全文档更新 | 块更新 |
-|--------|-----------|--------|
-| **操作步骤** | 1步 | 2步（需先获取块ID） |
-| **API调用次数** | 1次 | 2次 |
-| **实际操作数** | 全部块重新处理 | 仅目标块 |
-| **数据传输量** | 大（完整文档） | 小（仅修改内容） |
-| **块属性保留** | ❌ 可能丢失 | ✅ 完全保留 |
-| **适用场景** | 大规模重写 | 局部修改 |
-
-## 使用示例
-
-### 全文档更新
-```bash
-# 一步完成，但会重新处理所有块
-siyuan edit <docId> "# 标题\n\n完整文档内容..."
-```
-
-### 块更新
-```bash
-# 步骤1：获取块列表，找到目标块ID
-siyuan bg <docId> --mode children
-
-# 步骤2：更新指定块
-siyuan bu <blockId> "修改后的内容"
-```
-
-## 优缺点分析
-
-### 全文档更新
-
-**优点**：
-- 操作简单，一步完成
-- 不需要知道块ID
-- 适合大规模重写文档
-
-**缺点**：
-- 效率低：所有块都会被重新处理
-- 数据传输量大
-- 可能丢失块属性（自定义属性、折叠状态等）
-
-### 块更新
-
-**优点**：
-- 效率高：只处理需要修改的块
-- 数据传输量小
-- 保留其他块的属性和状态
-- 精确控制修改范围
-
-**缺点**：
-- 需要先获取块ID（多一步操作）
-- 不适合大规模重写
-
-## 使用建议
-
-| 场景 | 推荐方式 |
-|------|----------|
-| 创建新文档 | 全文档更新 |
-| 大规模重写文档 | 全文档更新 |
-| 修改特定段落 | **块更新** ✅ |
-| 保留块属性 | **块更新** ✅ |
-| 高频局部更新 | **块更新** ✅ |
-| 文档结构变化大 | 全文档更新 |
-
-## Agent 操作建议
-
-对于 AI Agent 操作，**推荐优先使用块更新**：
-
-1. **效率更高**：Agent 通常进行局部修改，块更新只处理必要内容
-2. **精确控制**：不会意外影响其他块
-3. **保留属性**：不会丢失块的自定义属性和状态
-4. **可追溯**：每次修改都有明确的块ID记录
+1. **权限模式**：`all` / `whitelist` / `blacklist`
+2. **缓存**：使用 `--force-refresh` 强制刷新
+3. **向量搜索**：需部署 Qdrant + Ollama，否则回退 SQL 搜索
 
 ---
 
 # 参考文档
 
-- [思源笔记 API 文档](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md) - 官方 API 参考文档
-- [思源笔记用户指南](https://github.com/siyuan-note/siyuan/blob/master/README_zh_CN.md) - 官方用户指南
+- [思源笔记 API 文档](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
+- [思源笔记用户指南](https://github.com/siyuan-note/siyuan/blob/master/README_zh_CN.md)
+- [命令详细文档](doc/commands/)
+- [高级功能文档](doc/advanced/)
+- [配置文档](doc/config/)

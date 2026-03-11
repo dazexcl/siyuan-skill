@@ -1,6 +1,6 @@
 {
   "name": "siyuan-skill",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Siyuan Notes connector skill for AI Agents",
   "main": "siyuan.js",
   "bin": {

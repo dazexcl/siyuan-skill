@@ -80,6 +80,12 @@ class ConfigManager {
         language: 'zh',
         extractEntities: true,
         extractKeywords: true
+      },
+      
+      // 删除保护配置
+      deleteProtection: {
+        safeMode: true,
+        requireConfirmation: false
       }
     };
   }
@@ -124,6 +130,12 @@ class ConfigManager {
         ...fileConfig.nlp,
         ...envConfig.nlp,
         ...(this.overrideConfig.nlp || {})
+      },
+      deleteProtection: {
+        ...this.defaultConfig.deleteProtection,
+        ...fileConfig.deleteProtection,
+        ...envConfig.deleteProtection,
+        ...(this.overrideConfig.deleteProtection || {})
       }
     };
     
@@ -272,6 +284,15 @@ class ConfigManager {
       };
     }
     
+    // 删除保护配置
+    if (process.env.SIYUAN_DELETE_SAFE_MODE !== undefined || 
+        process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION !== undefined) {
+      envConfig.deleteProtection = {
+        safeMode: process.env.SIYUAN_DELETE_SAFE_MODE !== 'false',
+        requireConfirmation: process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION === 'true'
+      };
+    }
+    
     return envConfig;
   }
   
@@ -408,6 +429,16 @@ class ConfigManager {
         language: validatedConfig.nlp.language || this.defaultConfig.nlp.language,
         extractEntities: validatedConfig.nlp.extractEntities ?? this.defaultConfig.nlp.extractEntities,
         extractKeywords: validatedConfig.nlp.extractKeywords ?? this.defaultConfig.nlp.extractKeywords
+      };
+    }
+    
+    // 验证删除保护配置
+    if (!validatedConfig.deleteProtection || typeof validatedConfig.deleteProtection !== 'object') {
+      validatedConfig.deleteProtection = { ...this.defaultConfig.deleteProtection };
+    } else {
+      validatedConfig.deleteProtection = {
+        safeMode: validatedConfig.deleteProtection.safeMode ?? this.defaultConfig.deleteProtection.safeMode,
+        requireConfirmation: validatedConfig.deleteProtection.requireConfirmation ?? this.defaultConfig.deleteProtection.requireConfirmation
       };
     }
     

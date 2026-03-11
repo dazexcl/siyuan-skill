@@ -46,7 +46,8 @@ Siyuan Skill CLI - 思源笔记命令行工具
   search, find                     搜索内容
   create, new                      创建文档
   update, edit                      更新文档
-  delete, rm                       删除文档
+  delete, rm                       删除文档（受保护机制约束）
+  protect                          设置/移除文档保护标记
   move, mv                         移动文档
   convert, path                    转换 ID 和路径
   index, index-documents            索引文档到向量数据库
@@ -134,7 +135,7 @@ function showCommandHelp(command) {
       description: '获取文档内容',
       usage: 'siyuan content <docId> [--format <format>] [--raw]',
       options: [
-        { name: '--format', description: '输出格式：markdown、text、html（默认：markdown）' },
+        { name: '--format', description: '输出格式：kramdown、markdown、text、html（默认：kramdown）' },
         { name: '--raw', description: '以纯文本格式返回（移除JSON外部结构）' }
       ],
       examples: [
@@ -195,8 +196,12 @@ function showCommandHelp(command) {
     },
     'update': {
       aliases: ['edit'],
-      description: '更新文档（自动处理换行符）',
+      description: '更新文档内容（实际更新文档块，支持Markdown格式）',
       usage: 'siyuan update <docId> <content>',
+      notes: [
+        '文档本身也是一种特殊的块（文档块），文档块ID = 文档ID',
+        '使用 /api/block/updateBlock API 更新文档'
+      ],
       examples: [
         'siyuan update <doc-id> "新的文档内容"',
         'siyuan update <doc-id> "更新后的第一行\\n更新后的第二行"'
@@ -204,10 +209,34 @@ function showCommandHelp(command) {
     },
     'delete': {
       aliases: ['rm'],
-      description: '删除文档',
-      usage: 'siyuan delete <docId>',
+      description: '删除文档（受多层保护机制约束）',
+      usage: 'siyuan delete <docId> [--confirm-title <title>]',
+      notes: [
+        '删除保护层级：',
+        '  1. 全局安全模式 - 禁止所有删除操作',
+        '  2. 文档保护标记 - 保护文档无法删除',
+        '  3. 删除确认机制 - 需要确认文档标题'
+      ],
+      options: [
+        { name: '--confirm-title', description: '确认标题（启用删除确认时需要）' }
+      ],
       examples: [
-        'siyuan delete <doc-id>'
+        'siyuan delete <doc-id>',
+        'siyuan delete <doc-id> --confirm-title "文档标题"'
+      ]
+    },
+    'protect': {
+      aliases: [],
+      description: '设置或移除文档保护标记',
+      usage: 'siyuan protect <docId> [--remove] [--permanent]',
+      options: [
+        { name: '--remove', description: '移除保护标记' },
+        { name: '--permanent', description: '设置为永久保护（无法通过命令移除）' }
+      ],
+      examples: [
+        'siyuan protect <doc-id>              # 设置保护',
+        'siyuan protect <doc-id> --permanent  # 永久保护',
+        'siyuan protect <doc-id> --remove     # 移除保护'
       ]
     },
     'move': {
@@ -677,14 +706,46 @@ async function main(customArgs = null) {
         }
         if (args.length < 2) {
           console.error('错误: 请提供文档ID');
-          console.log('用法: siyuan delete <docId>');
+          console.log('用法: siyuan delete <docId> [--confirm-title <title>]');
           process.exit(1);
         }
-        console.log('删除文档...');
-        const deleteResult = await skill.executeCommand('delete-document', { 
+        
+        const deleteArgs = {
           docId: args[1]
-        });
+        };
+        
+        for (let i = 2; i < args.length; i++) {
+          if (args[i] === '--confirm-title' && i + 1 < args.length) {
+            deleteArgs.confirmTitle = args[++i];
+          }
+        }
+        
+        console.log('删除文档...');
+        const deleteResult = await skill.executeCommand('delete-document', deleteArgs);
         console.log(JSON.stringify(deleteResult, null, 2));
+        break;
+        
+      case 'protect-document':
+      case 'protect':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('protect');
+          process.exit(0);
+        }
+        if (args.length < 2) {
+          console.error('错误: 请提供文档ID');
+          console.log('用法: siyuan protect <docId> [--remove] [--permanent]');
+          process.exit(1);
+        }
+        
+        const protectArgs = {
+          docId: args[1],
+          remove: args.includes('--remove'),
+          permanent: args.includes('--permanent')
+        };
+        
+        console.log('设置文档保护...');
+        const protectResult = await skill.executeCommand('protect-document', protectArgs);
+        console.log(JSON.stringify(protectResult, null, 2));
         break;
         
       case 'move-document':
