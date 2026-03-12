@@ -15,6 +15,36 @@ if (process.platform === 'win32') {
 const { createSkill } = require('./index');
 
 /**
+ * 命令别名映射（全局）
+ */
+const ALIAS_MAP = {
+  'nb': 'notebooks',
+  'ls': 'structure',
+  'cat': 'content',
+  'find': 'search',
+  'new': 'create',
+  'edit': 'block-update',
+  'update': 'block-update',
+  'rm': 'delete',
+  'mv': 'move',
+  'path': 'convert',
+  'index-documents': 'index',
+  'nlp-analyze': 'nlp',
+  'bi': 'block-insert',
+  'bu': 'block-update',
+  'bd': 'block-delete',
+  'bm': 'block-move',
+  'bg': 'block-get',
+  'ba': 'block-attrs',
+  'attrs': 'block-attrs',
+  'bf': 'block-fold',
+  'buu': 'block-fold',
+  'block-unfold': 'block-fold',
+  'btr': 'block-transfer-ref',
+  'st': 'tags'
+};
+
+/**
  * 显示帮助信息
  * @param {string} [command] - 要显示帮助的命令（可选）
  */
@@ -41,25 +71,27 @@ Siyuan Skill CLI - 思源笔记命令行工具
 
 命令:
   notebooks, nb                    获取所有笔记本列表
-  structure, ls                   获取指定笔记本的文档结构
-  content, cat                    获取文档内容
+  structure, ls                    获取指定笔记本的文档结构
+  content, cat                     获取文档内容
   search, find                     搜索内容
   create, new                      创建文档
-  update, edit                      更新文档
+  update, edit, bu                 更新文档/块内容
   delete, rm                       删除文档（受保护机制约束）
   protect                          设置/移除文档保护标记
   move, mv                         移动文档
+  rename                           重命名文档
   convert, path                    转换 ID 和路径
-  index, index-documents            索引文档到向量数据库
+  index, index-documents           索引文档到向量数据库
   nlp                              NLP 文本分析 [实验性]
   block-insert, bi                 插入新块
   block-update, bu                 更新块内容
   block-delete, bd                 删除块
   block-move, bm                   移动块
   block-get, bg                    获取块信息
-  block-attrs, ba                  管理块属性
+  block-attrs, ba, attrs           管理块/文档属性
   block-fold, bf/buu               折叠/展开块
   block-transfer-ref, btr          转移块引用
+  tags, st                         设置块/文档标签
   help                             显示帮助信息
 
 使用示例:
@@ -76,33 +108,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
  * @param {string} command - 命令名称或别名
  */
 function showCommandHelp(command) {
-  // 创建命令别名映射
-  const aliasMap = {
-    'nb': 'notebooks',
-    'ls': 'structure',
-    'cat': 'content',
-    'find': 'search',
-    'new': 'create',
-    'edit': 'update',
-    'rm': 'delete',
-    'mv': 'move',
-    'path': 'convert',
-    'index-documents': 'index',
-    'nlp-analyze': 'nlp',
-    'bi': 'block-insert',
-    'bu': 'block-update',
-    'bd': 'block-delete',
-    'bm': 'block-move',
-    'bg': 'block-get',
-    'ba': 'block-attrs',
-    'bf': 'block-fold',
-    'buu': 'block-fold',
-    'block-unfold': 'block-fold',
-    'btr': 'block-transfer-ref'
-  };
-  
-  // 将别名转换为主命令名称
-  const mainCommand = aliasMap[command] || command;
+  const mainCommand = ALIAS_MAP[command] || command;
   
   const commandHelps = {
     'notebooks': {
@@ -181,14 +187,14 @@ function showCommandHelp(command) {
       description: '创建文档（自动处理换行符）',
       usage: 'siyuan create <title> [content] [--parent-id <parentId>] [--path <path>] [--force]',
       options: [
-        { name: '--parent-id', description: '父文档/笔记本ID' },
+        { name: '--parent-id, --parent', description: '父文档/笔记本ID' },
         { name: '--path', description: '文档路径（支持绝对路径或相对路径）' },
         { name: '--force', description: '强制创建（忽略重名检测）' }
       ],
       examples: [
         'siyuan create "我的文档"',
         'siyuan create "我的文档" "文档内容"',
-        'siyuan create "子文档" "文档内容" --parent-id <parentId>',
+        'siyuan create "子文档" "文档内容" --parent <parentId>',
         'siyuan create "子文档" "文档内容" --path /AI/openclaw/插件',
         'siyuan create "子文档" "文档内容" --path /AI/openclaw/插件 --force',
         'siyuan create "多行文档" "第一行内容\\n第二行内容\\n第三行内容"'
@@ -251,6 +257,19 @@ function showCommandHelp(command) {
         'siyuan move <doc-id> <target-parent-id> --new-title "新标题"',
         'siyuan move /笔记本/文档路径 /目标笔记本/目标文档路径',
         'siyuan move /AI/test1 /AI/openclaw/更新记录'
+      ]
+    },
+    'rename': {
+      aliases: [],
+      description: '重命名文档',
+      usage: 'siyuan rename <docId> <title>',
+      options: [
+        { name: '<docId>', description: '文档ID（必需，位置参数）' },
+        { name: '<title>', description: '新标题（必需，位置参数）' }
+      ],
+      examples: [
+        'siyuan rename <doc-id> "新标题"',
+        'siyuan rename 20260304051123-doaxgi4 "更新后的标题"'
       ]
     },
     'convert': {
@@ -327,11 +346,11 @@ function showCommandHelp(command) {
       ]
     },
     'block-update': {
-      aliases: ['bu'],
-      description: '更新块内容',
+      aliases: ['bu', 'update', 'edit'],
+      description: '更新块/文档内容（文档也是一种特殊的块）',
       usage: 'siyuan block-update <blockId> <content> [--data-type <type>]',
       options: [
-        { name: '<blockId>', description: '块ID（必需，位置参数）' },
+        { name: '<blockId>', description: '块ID/文档ID（必需，位置参数）' },
         { name: '<content>', description: '新内容（必需，位置参数）' },
         { name: '--id', description: '块ID（可选，等同于位置参数）' },
         { name: '--data', description: '新内容（可选，等同于位置参数）' },
@@ -340,7 +359,10 @@ function showCommandHelp(command) {
       examples: [
         'siyuan bu <blockId> "更新后的内容"',
         'siyuan block-update <blockId> "更新后的内容"',
-        'siyuan bu --id <blockId> --data "更新后的内容"'
+        'siyuan update <docId> "更新文档内容"',
+        'siyuan edit <docId> "编辑文档内容"',
+        'siyuan bu --id <blockId> --data "更新后的内容"',
+        'siyuan bu <blockId> "内容" --data-type dom'
       ]
     },
     'block-delete': {
@@ -388,22 +410,6 @@ function showCommandHelp(command) {
         'siyuan bg --id <blockId>'
       ]
     },
-    'block-attrs': {
-      aliases: ['ba'],
-      description: '管理块属性',
-      usage: 'siyuan block-attrs <blockId> [--set <attrs>] [--get <key>]',
-      options: [
-        { name: '<blockId>', description: '块ID（必需，位置参数）' },
-        { name: '--id', description: '块ID（可选，等同于位置参数）' },
-        { name: '--set', description: '设置属性（key=value格式，多个用逗号分隔）' },
-        { name: '--get', description: '获取指定属性键' }
-      ],
-      examples: [
-        'siyuan ba <blockId> --set "key1=value1,key2=value2"',
-        'siyuan block-attrs <blockId> --get "custom-attr"',
-        'siyuan ba --id <blockId>'
-      ]
-    },
     'block-fold': {
       aliases: ['bf', 'block-unfold', 'buu'],
       description: '折叠或展开块',
@@ -433,6 +439,42 @@ function showCommandHelp(command) {
         'siyuan btr --from-id <fromId> --to-id <toId>',
         'siyuan block-transfer-ref --from-id <fromId> --to-id <toId> --ref-ids "ref1,ref2,ref3"',
         'siyuan btr --from-id <fromId> --to-id <toId>'
+      ]
+    },
+    'block-attrs': {
+      aliases: ['ba', 'attrs'],
+      description: '设置块/文档属性（默认自动添加 custom- 前缀）',
+      usage: 'siyuan block-attrs <id> --set <attrs> [--get [key]] [--hide]',
+      options: [
+        { name: '<id>', description: '块ID/文档ID（必需，位置参数）' },
+        { name: '--set', description: '设置属性（key=value格式，多个用逗号分隔）' },
+        { name: '--get', description: '获取属性（不带参数取所有，带参数取指定属性）' },
+        { name: '--hide', description: '设置隐藏属性（不带 custom- 前缀）' }
+      ],
+      examples: [
+        'siyuan attrs <id> --set "status=draft,priority=high"',
+        'siyuan attrs <id> --set "internal=true" --hide',
+        'siyuan attrs <id> --get',
+        'siyuan attrs <id> --get "status"',
+        'siyuan attrs <id> --get "internal" --hide'
+      ]
+    },
+    'tags': {
+      description: '设置块/文档标签',
+      usage: 'siyuan tags <id> --tags <tags> [--add] [--remove] [--get]',
+      options: [
+        { name: '<id>', description: '块ID/文档ID（必需，位置参数）' },
+        { name: '--id', description: '块ID/文档ID（可选，等同于位置参数）' },
+        { name: '--tags', description: '标签内容（逗号分隔多个标签）' },
+        { name: '--add', description: '添加标签（追加模式）' },
+        { name: '--remove', description: '移除指定标签' },
+        { name: '--get', description: '获取当前标签' }
+      ],
+      examples: [
+        'siyuan tags <id> --tags "标签1,标签2"',
+        'siyuan tags <id> --tags "新标签" --add',
+        'siyuan tags <id> --tags "旧标签" --remove',
+        'siyuan tags <id> --get'
       ]
     }
   };
@@ -495,7 +537,9 @@ async function main(customArgs = null) {
       initNLP: needsNLP
     });
     
-    switch (command) {
+    const mainCommand = ALIAS_MAP[command] || command;
+    
+    switch (mainCommand) {
       case 'get-notebooks':
       case 'notebooks':
       case 'nb':
@@ -630,17 +674,20 @@ async function main(customArgs = null) {
         let path = '';
         let force = false;
         
-        // 解析参数 - 收集所有非 -- 参数作为内容
+        // 已知的参数选项（用于排除）
+        const knownOptions = ['--parent-id', '--parent', '--path', '--force'];
+        
+        // 解析参数 - 收集所有非选项参数作为内容
         let contentParts = [];
         for (let i = 2; i < args.length; i++) {
-          if (args[i] === '--parent-id' && i + 1 < args.length) {
+          if ((args[i] === '--parent-id' || args[i] === '--parent') && i + 1 < args.length) {
             parentId = args[++i];
           } else if (args[i] === '--path' && i + 1 < args.length) {
             path = args[++i];
           } else if (args[i] === '--force') {
             force = true;
-          } else if (args[i] !== '--parent-id' && args[i] !== '--path' && args[i] !== '--force') {
-            // 只排除已知的参数选项，其他都作为内容
+          } else if (!knownOptions.includes(args[i]) && !args[i].startsWith('--parent-id') && !args[i].startsWith('--parent')) {
+            // 排除已知选项及其值，其他都作为内容
             contentParts.push(args[i]);
           }
         }
@@ -681,19 +728,31 @@ async function main(customArgs = null) {
       case 'update':
       case 'edit':
         if (args.includes('--help') || args.includes('-h')) {
-          showHelp('update');
+          showHelp('block-update');
           process.exit(0);
         }
         if (args.length < 3) {
-          console.error('错误: 请提供文档ID和内容');
-          console.log('用法: siyuan update <docId> <content>');
+          console.error('错误: 请提供块/文档 ID 和内容');
+          console.log('用法: siyuan update <blockId> <content> [--data-type <type>]');
           process.exit(1);
         }
-        console.log('更新文档...');
-        const updateResult = await skill.executeCommand('update-document', { 
-          docId: args[1],
-          content: args[2]
-        });
+        console.log('更新块/文档...');
+        const updateArgs = {
+          id: args[1],
+          data: args[2]
+        };
+        
+        for (let i = 1; i < args.length; i++) {
+          if (args[i] === '--id' && i + 1 < args.length) {
+            updateArgs.id = args[++i];
+          } else if (args[i] === '--data' && i + 1 < args.length) {
+            updateArgs.data = args[++i];
+          } else if (args[i] === '--data-type' && i + 1 < args.length) {
+            updateArgs.dataType = args[++i];
+          }
+        }
+        
+        const updateResult = await skill.executeCommand('block-update', updateArgs);
         console.log(JSON.stringify(updateResult, null, 2));
         break;
         
@@ -906,7 +965,7 @@ async function main(customArgs = null) {
         console.log(JSON.stringify(nlpResult, null, 2));
         break;
         
-      case 'insert-block':
+      case 'block-insert':
       case 'bi':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-insert');
@@ -930,17 +989,19 @@ async function main(customArgs = null) {
             insertBlockArgs.nextId = args[++i];
           }
         }
-        const insertBlockResult = await skill.executeCommand('insert-block', insertBlockArgs);
+        const insertBlockResult = await skill.executeCommand('block-insert', insertBlockArgs);
         console.log(JSON.stringify(insertBlockResult, null, 2));
         break;
         
-      case 'update-block':
+      case 'block-update':
       case 'bu':
+      case 'update':
+      case 'edit':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-update');
           process.exit(0);
         }
-        console.log('更新块...');
+        console.log('更新块/文档...');
         const updateBlockArgs = {};
         for (let i = 1; i < args.length; i++) {
           if (args[i] === '--id' && i + 1 < args.length) {
@@ -949,17 +1010,21 @@ async function main(customArgs = null) {
             updateBlockArgs.data = args[++i];
           } else if (args[i] === '--data-type' && i + 1 < args.length) {
             updateBlockArgs.dataType = args[++i];
+          } else if (args[i] === '--content' && i + 1 < args.length) {
+            updateBlockArgs.data = args[++i];
+          } else if (args[i] === '--doc-id' && i + 1 < args.length) {
+            updateBlockArgs.id = args[++i];
           } else if (i === 1 && !args[i].startsWith('--')) {
             updateBlockArgs.id = args[i];
           } else if (i === 2 && !args[i].startsWith('--')) {
             updateBlockArgs.data = args[i];
           }
         }
-        const updateBlockResult = await skill.executeCommand('update-block', updateBlockArgs);
+        const updateBlockResult = await skill.executeCommand('block-update', updateBlockArgs);
         console.log(JSON.stringify(updateBlockResult, null, 2));
         break;
         
-      case 'delete-block':
+      case 'block-delete':
       case 'bd':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-delete');
@@ -976,11 +1041,11 @@ async function main(customArgs = null) {
             }
           }
         }
-        const deleteBlockResult = await skill.executeCommand('delete-block', deleteBlockArgs);
+        const deleteBlockResult = await skill.executeCommand('block-delete', deleteBlockArgs);
         console.log(JSON.stringify(deleteBlockResult, null, 2));
         break;
         
-      case 'move-block':
+      case 'block-move':
       case 'bm':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-move');
@@ -1000,11 +1065,11 @@ async function main(customArgs = null) {
             moveBlockArgs.previousId = args[++i];
           }
         }
-        const moveBlockResult = await skill.executeCommand('move-block', moveBlockArgs);
+        const moveBlockResult = await skill.executeCommand('block-move', moveBlockArgs);
         console.log(JSON.stringify(moveBlockResult, null, 2));
         break;
         
-      case 'get-block':
+      case 'block-get':
       case 'bg':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-get');
@@ -1022,36 +1087,8 @@ async function main(customArgs = null) {
             getBlockArgs.mode = args[++i];
           }
         }
-        const getBlockResult = await skill.executeCommand('get-block', getBlockArgs);
+        const getBlockResult = await skill.executeCommand('block-get', getBlockArgs);
         console.log(JSON.stringify(getBlockResult, null, 2));
-        break;
-        
-      case 'block-attributes':
-      case 'ba':
-        if (args.includes('--help') || args.includes('-h')) {
-          showHelp('block-attrs');
-          process.exit(0);
-        }
-        console.log('管理块属性...');
-        const blockAttrsArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          blockAttrsArgs.id = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            blockAttrsArgs.id = args[++i];
-          } else if (args[i] === '--set' && i + 1 < args.length) {
-            blockAttrsArgs.set = args[++i];
-          } else if (args[i] === '--get') {
-            if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-              blockAttrsArgs.get = args[++i];
-            } else {
-              blockAttrsArgs.get = 'all';
-            }
-          }
-        }
-        const blockAttrsResult = await skill.executeCommand('block-attributes', blockAttrsArgs);
-        console.log(JSON.stringify(blockAttrsResult, null, 2));
         break;
         
       case 'block-fold':
@@ -1098,6 +1135,97 @@ async function main(customArgs = null) {
         }
         const transferBlockRefResult = await skill.executeCommand('transfer-block-ref', transferBlockRefArgs);
         console.log(JSON.stringify(transferBlockRefResult, null, 2));
+        break;
+        
+      case 'rename-document':
+      case 'rename':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('rename');
+          process.exit(0);
+        }
+        if (args.length < 3) {
+          console.error('错误：请提供文档 ID 和新标题');
+          console.log('用法：siyuan rename <docId> <title>');
+          process.exit(1);
+        }
+        console.log('重命名文档...');
+        const renameArgs = {
+          docId: args[1],
+          title: args[2]
+        };
+        console.log('文档 ID:', renameArgs.docId);
+        console.log('新标题:', renameArgs.title);
+        const renameResult = await skill.executeCommand('rename-document', renameArgs);
+        console.log(JSON.stringify(renameResult, null, 2));
+        break;
+        
+      case 'block-attrs':
+      case 'ba':
+      case 'attrs':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('block-attrs');
+          process.exit(0);
+        }
+        if (args.length < 2) {
+          console.error('错误：请提供块/文档 ID');
+          console.log('用法：siyuan block-attrs <id> --set <attrs> [--get [key]] [--hide]');
+          process.exit(1);
+        }
+        console.log('设置属性...');
+        const setAttrsArgs = {};
+        if (args.length >= 2 && !args[1].startsWith('--')) {
+          setAttrsArgs.id = args[1];
+        }
+        for (let i = 1; i < args.length; i++) {
+          if (args[i] === '--id' && i + 1 < args.length) {
+            setAttrsArgs.id = args[++i];
+          } else if (args[i] === '--attrs' && i + 1 < args.length) {
+            setAttrsArgs.attrs = args[++i];
+          } else if (args[i] === '--set' && i + 1 < args.length) {
+            setAttrsArgs.attrs = args[++i];
+          } else if (args[i] === '--get') {
+            if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
+              setAttrsArgs.key = args[++i];
+            }
+            setAttrsArgs.get = true;
+          } else if (args[i] === '--hide') {
+            setAttrsArgs.hide = true;
+          }
+        }
+        const setAttrsResult = await skill.executeCommand('block-attrs', setAttrsArgs);
+        console.log(JSON.stringify(setAttrsResult, null, 2));
+        break;
+        
+      case 'tags':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('tags');
+          process.exit(0);
+        }
+        if (args.length < 2) {
+          console.error('错误：请提供块/文档 ID');
+          console.log('用法：siyuan tags <id> --tags <tags> [--add] [--remove] [--get]');
+          process.exit(1);
+        }
+        console.log('设置标签...');
+        const tagsArgs = {};
+        if (args.length >= 2 && !args[1].startsWith('--')) {
+          tagsArgs.id = args[1];
+        }
+        for (let i = 1; i < args.length; i++) {
+          if (args[i] === '--id' && i + 1 < args.length) {
+            tagsArgs.id = args[++i];
+          } else if (args[i] === '--tags' && i + 1 < args.length) {
+            tagsArgs.tags = args[++i];
+          } else if (args[i] === '--add') {
+            tagsArgs.add = true;
+          } else if (args[i] === '--remove') {
+            tagsArgs.remove = true;
+          } else if (args[i] === '--get') {
+            tagsArgs.get = true;
+          }
+        }
+        const tagsResult = await skill.executeCommand('tags', tagsArgs);
+        console.log(JSON.stringify(tagsResult, null, 2));
         break;
         
       default:

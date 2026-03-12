@@ -17,7 +17,7 @@ const command = {
    * 执行命令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 命令参数
-   * @param {string} args.id - 块ID
+   * @param {string} args.id - 要移动的块ID
    * @param {string} args.parentId - 目标父块ID
    * @param {string} args.previousId - 目标前一个块ID
    * @returns {Promise<Object>} 移动结果
@@ -49,30 +49,25 @@ const command = {
           previousID: previousId || ''
         };
         
+        console.log('移动块请求参数:', JSON.stringify(requestData, null, 2));
+        
         const result = await skill.connector.request('/api/block/moveBlock', requestData);
         
         console.log('API 响应:', JSON.stringify(result, null, 2));
         
-        if (result === null || result === true || (result && result.code === 0)) {
-          skill.clearCache();
-          
-          return {
-            success: true,
-            data: {
-              id,
-              operation: 'move',
-              timestamp: Date.now(),
-              notebookId
-            },
-            message: '块移动成功'
-          };
-        } else {
-          return {
-            success: false,
-            error: result?.msg || '块移动失败',
-            message: '块移动失败'
-          };
-        }
+        // 思源 API 返回 null 表示成功
+        skill.clearCache();
+        
+        return {
+          success: true,
+          data: {
+            id,
+            operation: 'move',
+            timestamp: Date.now(),
+            notebookId
+          },
+          message: '块移动成功'
+        };
       } catch (error) {
         console.error('移动块失败:', error);
         return {

@@ -20,7 +20,9 @@ siyuan search <query> [options]
 | `--sort-by <sortBy>` | string | 排序方式（relevance/date） | `--sort-by date` |
 | `--limit <limit>` | number | 结果数量限制 | `--limit 5` |
 | `--path <path>` | string | 搜索路径（仅搜索指定路径下的内容） | `--path /AI/openclaw` |
+| `--notebook <notebookId>` | string | 指定笔记本ID | `--notebook 20260227231831-yq1lxq2` |
 | `--sql <sql>` | string | 自定义SQL查询条件 | `--sql "length(content) > 100 AND updated > '20260101000000'"` |
+| `--sql-weight <weight>` | number | SQL搜索权重（混合搜索时） | `--sql-weight 0.2` |
 | `--dense-weight <weight>` | number | 语义搜索权重（混合搜索时，默认 0.7） | `--dense-weight 0.8` |
 | `--sparse-weight <weight>` | number | 关键词搜索权重（混合搜索时，默认 0.3） | `--sparse-weight 0.2` |
 | `--threshold <score>` | number | 相似度阈值（0-1） | `--threshold 0.5` |

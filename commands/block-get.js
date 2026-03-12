@@ -9,9 +9,9 @@ const Permission = require('../utils/permission');
  * 命令配置
  */
 const command = {
-  name: 'get-block',
+  name: 'block-get',
   description: '在 Siyuan Notes 中获取块信息',
-  usage: 'get-block --id <blockId> --mode <mode>',
+  usage: 'block-get --id <blockId> --mode <mode>',
   
   /**
    * 执行命令

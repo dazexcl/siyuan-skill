@@ -1,17 +1,17 @@
 # Siyuan Skill
 
-[![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/dazexcl/siyuan-skill)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Node](https://img.shields.io/badge/node->14-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[!\[GitHub\](https://img.shields.io/badge/GitHub-Source-green.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Version\](https://img.shields.io/badge/version-1.6.0-blue.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[License\](https://img.shields.io/badge/license-MIT-green.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Node\](https://img.shields.io/badge/node->14-green.svg null)](https://github.com/dazexcl/siyuan-skill)
 
 > **Siyuan Notes 命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能。**
 
-[![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Features](https://img.shields.io/badge/features-NLP-orange.svg)](https://github.com/dazexcl/siyuan-skill)
-
+[!\[Features\](https://img.shields.io/badge/features-Vector%20Search-blue.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Features\](https://img.shields.io/badge/features-NLP-orange.svg null)](https://github.com/dazexcl/siyuan-skill)
 
 `纯node环境` `无需任何依赖` `开箱即用` `agent自动接入` `灵活拔插` `黑白名单` `渐进式披露`
+
 ## 核心价值
 
 **提供ai agent可快速接入siyuan笔记的的skill方案**
@@ -20,15 +20,15 @@
 
 ### 适用场景
 
-✅ 团队规范、项目知识、可复用技能  
-✅ 需要多 Agent 共享的知识  
-✅ 需要长期存储和检索的内容  
+✅ 团队规范、项目知识、可复用技能\
+✅ 需要多 Agent 共享的知识\
+✅ 需要长期存储和检索的内容
 
 ### 不适用场景
 
-❌ 日常互动记录、个人学习反思  
-❌ 临时笔记、代码版本管理  
-❌ 实时协作编辑  
+❌ 日常互动记录、个人学习反思\
+❌ 临时笔记、代码版本管理\
+❌ 实时协作编辑
 
 ### 关键原则
 
@@ -36,7 +36,7 @@
 - **memory 文件** = 私密记录
 - **MEMORY.md** = 长期记忆
 
-##  目录
+## 目录
 
 - [核心价值](#核心价值)
 - [快速开始](#快速开始)
@@ -49,7 +49,7 @@
 - [故障排除](#故障排除)
 - [贡献](#贡献)
 
----
+***
 
 ## 快速开始
 
@@ -96,6 +96,7 @@ export SIYUAN_DEFAULT_NOTEBOOK="默认笔记本 ID"
 ```
 
 #### 方式 2：直接编辑 config.json
+
 **复制配置文件**
 
 ```bash
@@ -179,84 +180,87 @@ node siyuan.js notebooks
 
 ### 1. 基础连接配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `baseURL` | string | ✅ | `http://127.0.0.1:6806` | 思源笔记 API 地址 |
-| `token` | string | ✅ | `""` | API 认证令牌 |
-| `timeout` | number | ❌ | `10000` | 请求超时时间（毫秒） |
+| 配置项       | 类型     | 必填 | 默认值                     | 说明          |
+| --------- | ------ | -- | ----------------------- | ----------- |
+| `baseURL` | string | ✅  | `http://127.0.0.1:6806` | 思源笔记 API 地址 |
+| `token`   | string | ✅  | `""`                    | API 认证令牌    |
+| `timeout` | number | ❌  | `10000`                 | 请求超时时间（毫秒）  |
 
 **获取方式：**
+
 1. 打开思源笔记 → 设置 → 关于 → 复制 API Token
 2. 使用 `node siyuan.js notebooks` 获取笔记本 ID
 
 ### 2. 默认值配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `defaultNotebook` | string | ❌ | `null` | 默认笔记本 ID |
-| `defaultFormat` | string | ❌ | `markdown` | 默认输出格式（markdown/text/html） |
+| 配置项               | 类型     | 必填 | 默认值        | 说明                         |
+| ----------------- | ------ | -- | ---------- | -------------------------- |
+| `defaultNotebook` | string | ❌  | `null`     | 默认笔记本 ID                   |
+| `defaultFormat`   | string | ❌  | `markdown` | 默认输出格式（markdown/text/html） |
 
 ### 3. 权限配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `permissionMode` | string | ❌ | `all` | 权限模式：`all`（无限制）/`whitelist`（白名单）/`blacklist`（黑名单） |
-| `notebookList` | array | ❌ | `[]` | 笔记本 ID 列表（配合 whitelist/blacklist 使用） |
+| 配置项              | 类型     | 必填 | 默认值   | 说明                                                |
+| ---------------- | ------ | -- | ----- | ------------------------------------------------- |
+| `permissionMode` | string | ❌  | `all` | 权限模式：`all`（无限制）/`whitelist`（白名单）/`blacklist`（黑名单） |
+| `notebookList`   | array  | ❌  | `[]`  | 笔记本 ID 列表（配合 whitelist/blacklist 使用）              |
 
 **权限模式说明：**
+
 - `all` - 无限制访问所有笔记本
 - `whitelist` - 只允许访问 `notebookList` 中的笔记本
 - `blacklist` - 禁止访问 `notebookList` 中的笔记本
 
 ### 4. 删除保护配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `deleteProtection.safeMode` | boolean | ❌ | `true` | 安全模式（默认禁止删除） |
-| `deleteProtection.requireConfirmation` | boolean | ❌ | `false` | 删除确认机制 |
+| 配置项                                    | 类型      | 必填 | 默认值     | 说明           |
+| -------------------------------------- | ------- | -- | ------- | ------------ |
+| `deleteProtection.safeMode`            | boolean | ❌  | `true`  | 安全模式（默认禁止删除） |
+| `deleteProtection.requireConfirmation` | boolean | ❌  | `false` | 删除确认机制       |
 
 **保护层级**：
+
 1. **全局安全模式** - 默认启用，禁止所有删除操作
 2. **文档保护标记** - 通过 `protect` 命令设置
 3. **删除确认机制** - 需要确认文档标题
 
 ### 5. 功能配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `enableCache` | boolean | ❌ | `true` | 是否启用缓存 |
-| `enableSync` | boolean | ❌ | `false` | 是否启用同步 |
-| `enableLogging` | boolean | ❌ | `true` | 是否启用日志 |
-| `debugMode` | boolean | ❌ | `false` | 是否启用调试模式 |
+| 配置项             | 类型      | 必填 | 默认值     | 说明       |
+| --------------- | ------- | -- | ------- | -------- |
+| `enableCache`   | boolean | ❌  | `true`  | 是否启用缓存   |
+| `enableSync`    | boolean | ❌  | `false` | 是否启用同步   |
+| `enableLogging` | boolean | ❌  | `true`  | 是否启用日志   |
+| `debugMode`     | boolean | ❌  | `false` | 是否启用调试模式 |
 
 ### 6. Qdrant 向量数据库配置（可选）
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `qdrant.url` | string | ❌ | `null` | Qdrant 服务地址 |
-| `qdrant.apiKey` | string | ❌ | `""` | Qdrant API 密钥 |
-| `qdrant.collectionName` | string | ❌ | `siyuan_notes` | 集合名称 |
+| 配置项                     | 类型     | 必填 | 默认值            | 说明            |
+| ----------------------- | ------ | -- | -------------- | ------------- |
+| `qdrant.url`            | string | ❌  | `null`         | Qdrant 服务地址   |
+| `qdrant.apiKey`         | string | ❌  | `""`           | Qdrant API 密钥 |
+| `qdrant.collectionName` | string | ❌  | `siyuan_notes` | 集合名称          |
 
 **说明：** 向量搜索功能需要单独部署 Qdrant 服务。如果 Qdrant 不可用，系统会自动回退到 SQL 搜索。
 
 ### 7. Embedding 模型配置（可选）
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `embedding.model` | string | ❌ | `nomic-embed-text` | Embedding 模型名称 |
-| `embedding.dimension` | number | ❌ | `768` | 向量维度 |
-| `embedding.batchSize` | number | ❌ | `8` | 批处理大小 |
-| `embedding.baseUrl` | string | ❌ | `null` | Embedding 服务地址 |
+| 配置项                   | 类型     | 必填 | 默认值                | 说明             |
+| --------------------- | ------ | -- | ------------------ | -------------- |
+| `embedding.model`     | string | ❌  | `nomic-embed-text` | Embedding 模型名称 |
+| `embedding.dimension` | number | ❌  | `768`              | 向量维度           |
+| `embedding.batchSize` | number | ❌  | `8`                | 批处理大小          |
+| `embedding.baseUrl`   | string | ❌  | `null`             | Embedding 服务地址 |
 
 **说明：** 当前版本使用 Ollama Embedding 服务，无需下载本地模型文件。
 
 ### 8. 混合搜索配置（可选）
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `hybridSearch.denseWeight` | number | ❌ | `0.7` | 语义搜索权重（0-1） |
-| `hybridSearch.sparseWeight` | number | ❌ | `0.3` | 关键词搜索权重（0-1） |
-| `hybridSearch.limit` | number | ❌ | `20` | 搜索结果数量限制 |
+| 配置项                         | 类型     | 必填 | 默认值   | 说明           |
+| --------------------------- | ------ | -- | ----- | ------------ |
+| `hybridSearch.denseWeight`  | number | ❌  | `0.7` | 语义搜索权重（0-1）  |
+| `hybridSearch.sparseWeight` | number | ❌  | `0.3` | 关键词搜索权重（0-1） |
+| `hybridSearch.limit`        | number | ❌  | `20`  | 搜索结果数量限制     |
 
 **说明：** `denseWeight + sparseWeight` 应该等于 1。
 
@@ -264,11 +268,11 @@ node siyuan.js notebooks
 
 > ⚠️ **实验性功能**：NLP 功能目前处于实验阶段，API 可能会发生变化。
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|---------|------|--------|----------|------|
-| `nlp.language` | string | ❌ | `zh` | NLP 语言（zh/en） |
-| `nlp.extractEntities` | boolean | ❌ | `true` | 是否提取实体 |
-| `nlp.extractKeywords` | boolean | ❌ | `true` | 是否提取关键词 |
+| 配置项                   | 类型      | 必填 | 默认值    | 说明            |
+| --------------------- | ------- | -- | ------ | ------------- |
+| `nlp.language`        | string  | ❌  | `zh`   | NLP 语言（zh/en） |
+| `nlp.extractEntities` | boolean | ❌  | `true` | 是否提取实体        |
+| `nlp.extractKeywords` | boolean | ❌  | `true` | 是否提取关键词       |
 
 **说明：** NLP 功能完全本地实现，无外部依赖。
 
@@ -462,6 +466,7 @@ siyuan content <docId> --raw
 ```
 
 **格式说明**：
+
 - `kramdown` - 包含块 ID 和属性（默认）
 - `markdown` - 标准 Markdown 格式
 - `text` - 纯文本格式
@@ -476,7 +481,7 @@ siyuan bg <docId> --mode children
 # 插入新块
 siyuan bi "新段落内容" --parent-id <docId>
 
-# 更新块内容
+# 更新块内容（同 update 命令）
 siyuan bu <blockId> "更新后的内容"
 
 # 删除块
@@ -488,10 +493,34 @@ siyuan bm <blockId> --previous-id <targetBlockId>
 # 管理块属性
 siyuan ba <blockId> --set "key=value"
 siyuan ba <blockId> --get
+siyuan attrs <blockId> --set "key=value"  # attrs 是 ba 的别名
+
+# 设置块标签
+siyuan tags <blockId> --tags "标签1,标签2"
+siyuan st <blockId> --tags "新标签" --add  # st 是 tags 的别名
+siyuan tags <blockId> --get
 
 # 折叠/展开块
 siyuan bf <blockId>      # 折叠
 siyuan buu <blockId>     # 展开
+
+# 转移块引用
+siyuan btr --from-id <fromId> --to-id <toId>
+```
+
+### 文档操作命令
+
+```bash
+# 重命名文档
+siyuan rename <docId> "新标题"
+
+# 移动文档
+siyuan mv <docId> <targetParentId>
+siyuan mv <docId> <targetParentId> --new-title "新标题"
+
+# 文档保护
+siyuan protect <docId>           # 设置保护
+siyuan protect <docId> --remove  # 移除保护
 ```
 
 ### 向量索引
@@ -516,6 +545,15 @@ siyuan index --notebook <notebookId>
 ```bash
 # 分析文本
 siyuan nlp "这是一段需要分析的文本"
+
+# 指定分析任务
+siyuan nlp "文本内容" --tasks tokenize,entities,keywords
+
+# 进行所有分析
+siyuan nlp "文本内容" --tasks all
+
+# 限制关键词数量
+siyuan nlp "文本内容" --tasks keywords --top-n 5
 ```
 
 ## 书写规范
@@ -525,27 +563,32 @@ siyuan nlp "这是一段需要分析的文本"
 在思源笔记中，推荐使用内部链接来引用其他文档。
 
 **推荐写法：**
+
 ```
 ((docId '标题'))
 ```
 
 **示例：**
+
 ```
 ((20260304051123-doaxgi4 '我的文档'))
 ```
 
 **特性说明：**
+
 - 在思源笔记中会被渲染成可点击的链接
 - 导出时会显示为文档标题
 - 支持使用文档 ID 进行精确链接
 - 不使用标准 Markdown 链接写法（如 `[标题](docId)`）
 
 **为什么推荐使用这种写法：**
+
 1. **更好的兼容性**：思源笔记会自动处理这种链接格式
 2. **导出友好**：导出时会自动显示为文档标题，而不是原始链接
 3. **可维护性**：使用文档 ID 可以避免文档重命名后链接失效
 
 **不推荐的写法：**
+
 ```markdown
 # 不推荐：标准 Markdown 链接
 [我的文档](20260304051123-doaxgi4)
@@ -585,18 +628,21 @@ siyuan nlp "这是一段需要分析的文本"
 ### 常见问题
 
 **问题 1：连接失败**
+
 ```
 错误: 无法连接到 Siyuan Notes
 解决: 检查 baseURL 和 token 是否正确
 ```
 
 **问题 2：权限不足**
+
 ```
 错误: 无权操作文档
 解决: 检查 permissionMode 和 notebookList 配置
 ```
 
 **问题 3：Qdrant 连接失败**
+
 ```
 错误: Qdrant API 错误: 409 Conflict
 解决: 集合已存在，系统会继续使用现有集合

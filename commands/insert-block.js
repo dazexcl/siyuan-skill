@@ -55,6 +55,10 @@ const command = {
       };
     }
     
+    // 确定用于权限检查的 ID（优先 parentId，其次 previousId，最后 nextId）
+    const idForPermission = parentId || previousId || nextId;
+    const permissionType = parentId ? 'parent' : 'block';
+    
     // 使用权限包装器
     const permissionHandler = Permission.createPermissionWrapper(async (skill, args, notebookId) => {
       try {
@@ -75,32 +79,27 @@ const command = {
         const result = await skill.connector.request('/api/block/insertBlock', requestData);
         console.log('API 响应:', JSON.stringify(result, null, 2));
         
-        // 处理响应 - API 返回的是数组格式
+        // 清除缓存
+        skill.clearCache();
+        
+        // 尝试从响应中提取块 ID
+        let blockId = null;
         if (result && Array.isArray(result) && result.length > 0) {
           const operation = result[0]?.doOperations?.[0];
-          const blockId = operation?.id;
-          
-          if (blockId) {
-            // 清除缓存
-            skill.clearCache();
-            
-            return {
-              success: true,
-              data: {
-                id: blockId,
-                operation: 'insert',
-                timestamp: Date.now(),
-                notebookId
-              },
-              message: '块插入成功'
-            };
-          }
+          blockId = operation?.id;
         }
         
+        // 思源 API 返回 null 或空响应也可能表示成功
+        // 如果没有错误抛出，认为操作成功
         return {
-          success: false,
-          error: '块插入失败',
-          message: '块插入失败'
+          success: true,
+          data: {
+            id: blockId,
+            operation: 'insert',
+            timestamp: Date.now(),
+            notebookId
+          },
+          message: blockId ? '块插入成功' : '块插入成功（未返回块ID）'
         };
       } catch (error) {
         console.error('插入块失败:', error);
@@ -111,12 +110,12 @@ const command = {
         };
       }
     }, {
-      type: 'parent',
-      idParam: 'parentId',
+      type: permissionType,
+      idParam: parentId ? 'parentId' : (previousId ? 'previousId' : 'nextId'),
       defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
     });
     
-    return permissionHandler(skill, args);
+    return permissionHandler(skill, { ...args, idForPermission: idForPermission });
   }
 };
 

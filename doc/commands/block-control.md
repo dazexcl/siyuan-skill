@@ -11,7 +11,8 @@
 | `block-delete` | `bd` | 删除块 |
 | `block-move` | `bm` | 移动块 |
 | `block-get` | `bg` | 获取块信息 |
-| `block-attrs` | `ba` | 管理块属性 |
+| `block-attrs` | `ba`, `attrs` | 管理块属性 |
+| `tags` | `st` | 设置块/文档标签 |
 | `block-fold` | `bf` | 折叠/展开块 |
 | `block-transfer-ref` | `btr` | 转移块引用 |
 
@@ -211,14 +212,18 @@ siyuan bg <docId> --mode children
 
 ---
 
-## block-attrs (ba)
+## block-attrs (ba, attrs)
 
 管理块属性，支持设置和获取属性。
+
+**重要说明**：
+- 默认情况下，属性会自动添加 `custom-` 前缀（在思源笔记界面可见）
+- 使用 `--hide` 标记可以设置隐藏属性（不带 `custom-` 前缀）
 
 ### 命令格式
 
 ```bash
-siyuan block-attrs <blockId> [--set <attrs>] [--get [key]]
+siyuan block-attrs <blockId> --set <attrs> [--get [key]] [--hide]
 ```
 
 ### 参数说明
@@ -227,19 +232,26 @@ siyuan block-attrs <blockId> [--set <attrs>] [--get [key]]
 |-----|------|------|------|
 | `<blockId>` | string | ✅ | 块ID（位置参数） |
 | `--set` | string | ❌ | 设置属性（key=value格式，多个用逗号分隔） |
-| `--get` | string | ❌ | 获取指定属性键，不指定则获取所有属性 |
+| `--get` | string | ❌ | 获取属性（不带参数取所有，带参数取指定属性） |
+| `--hide` | boolean | ❌ | 设置隐藏属性（不带 custom- 前缀） |
 
 ### 使用示例
 
 ```bash
-# 设置属性
-siyuan ba <blockId> --set "key1=value1,key2=value2"
+# 设置可见属性（自动添加 custom- 前缀）
+siyuan attrs <blockId> --set "status=draft,priority=high"
 
-# 获取所有属性
-siyuan ba <blockId> --get
+# 设置隐藏属性（不带 custom- 前缀）
+siyuan attrs <blockId> --set "internal=true" --hide
+
+# 获取所有属性（自动移除 custom- 前缀显示）
+siyuan attrs <blockId> --get
 
 # 获取指定属性
-siyuan ba <blockId> --get custom-attr
+siyuan attrs <blockId> --get "status"
+
+# 获取隐藏属性
+siyuan attrs <blockId> --get "internal" --hide
 ```
 
 ---
@@ -445,5 +457,6 @@ siyuan bu <blockId3> "更新内容3"
 ## 相关文档
 
 - [更新文档命令](update.md) - 全文档更新
+- [标签命令](tags.md) - 标签详细文档
 - [最佳实践](../advanced/best-practices.md) - 使用建议
 - [SKILL.md](../../SKILL.md#全文档更新-vs-块更新) - 全文档更新 vs 块更新详细对比

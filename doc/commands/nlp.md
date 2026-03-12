@@ -33,7 +33,13 @@ siyuan nlp "这是一段需要分析的文本内容"
 siyuan nlp "文本内容" --tasks tokenize
 
 # 进行所有分析
+siyuan nlp "文本内容" --tasks all
+
+# 指定多个分析任务
 siyuan nlp "文本内容" --tasks tokenize,entities,keywords,summary
+
+# 限制关键词数量
+siyuan nlp "文本内容" --tasks keywords --top-n 5
 ```
 
 ## NLP 功能特点

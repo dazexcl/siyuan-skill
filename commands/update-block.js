@@ -1,6 +1,11 @@
 /**
  * 块更新命令
  * 在 Siyuan Notes 中更新块内容
+ * 
+ * 兼容说明：
+ * - 支持 id/data 参数（块操作）
+ * - 支持 docId/content 参数（文档操作，兼容旧命令）
+ * - 文档本身也是一种特殊的块，文档块ID = 文档ID
  */
 
 const Permission = require('../utils/permission');
@@ -19,20 +24,23 @@ function processContent(content) {
  */
 const command = {
   name: 'update-block',
-  description: '在 Siyuan Notes 中更新块内容',
+  description: '在 Siyuan Notes 中更新块/文档内容',
   usage: 'update-block --id <blockId> --data <content> [--data-type <dataType>]',
   
   /**
    * 执行命令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 命令参数
-   * @param {string} args.id - 块ID
-   * @param {string} args.data - 新内容
-   * @param {string} args.dataType - 数据类型（markdown/dom）
+   * @param {string} args.id - 块ID（或使用 docId 兼容旧命令）
+   * @param {string} args.data - 新内容（或使用 content 兼容旧命令）
+   * @param {string} args.dataType - 数据类型（markdown/dom，默认 markdown）
    * @returns {Promise<Object>} 更新结果
    */
   execute: async (skill, args = {}) => {
-    const { id, data, dataType = 'markdown' } = args;
+    // 兼容旧参数：docId -> id, content -> data
+    const id = args.id || args.docId;
+    const data = args.data || args.content;
+    const dataType = args.dataType || args['data-type'] || 'markdown';
     
     if (!id) {
       return {
@@ -42,7 +50,7 @@ const command = {
       };
     }
     
-    if (!data) {
+    if (data === undefined) {
       return {
         success: false,
         error: '缺少必要参数',
@@ -60,7 +68,11 @@ const command = {
           data: processedData
         };
         
+        console.log('更新块参数:', { id, dataType, dataLength: processedData.length });
+        
         const result = await skill.connector.request('/api/block/updateBlock', requestData);
+        
+        console.log('更新块成功:', result);
         
         // 处理响应 - API 返回的是数组格式
         if (result && Array.isArray(result) && result.length > 0) {
@@ -74,12 +86,30 @@ const command = {
               data: {
                 id,
                 operation: 'update',
+                contentLength: data.length,
                 timestamp: Date.now(),
                 notebookId
               },
               message: '块更新成功'
             };
           }
+        }
+        
+        // 兼容旧版 API 响应格式
+        if (result === null || (result && result.code === 0)) {
+          skill.clearCache();
+          
+          return {
+            success: true,
+            data: {
+              id,
+              operation: 'update',
+              contentLength: data.length,
+              timestamp: Date.now(),
+              notebookId
+            },
+            message: '块更新成功'
+          };
         }
         
         return {

@@ -14,7 +14,7 @@ siyuan convert [options]
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `--id <docId>` | string | ❌ | 文档 ID，格式：15 位数字 + 短横线 + 5 位字母数字 |
+| `--id <docId>` | string | ❌ | 文档 ID，格式：14 位数字 + 短横线 + 7 位字母数字 |
 | `--path <hPath>` | string | ❌ | 人类可读路径，例如：`/AI/openclaw/更新记录` |
 | `--force` | boolean | ❌ | 强制操作（创建时忽略重名检测，转换时返回第一个匹配结果） |
 
