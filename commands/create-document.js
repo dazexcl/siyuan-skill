@@ -155,42 +155,26 @@ const command = {
     }
     
     // 使用权限包装器处理权限检查（提升到方法开头，确保所有操作都在权限检查后执行）
+    // 将 effectiveParentId 保存到闭包中供权限包装器使用
+    const savedParentId = effectiveParentId;
+    
     const permissionHandler = Permission.createPermissionWrapper(async (skill, args, notebookId) => {
-      const { title, content = '', force = false } = args;
+      const { title, content = '', force = false, targetParentId } = args;
       
       // 重名检测（权限检查通过后执行）
       if (!force) {
-        try {
-          // 使用 /api/file/readDir 接口获取笔记本目录下的文件列表
-          const notebookPath = `/data/${notebookId}`;
-          const files = await skill.connector.request('/api/file/readDir', { path: notebookPath });
-          
-          if (files && Array.isArray(files)) {
-            // 检查是否存在同名文档文件
-            for (const file of files) {
-              if (!file.isDir && file.name.endsWith('.sy')) {
-                const docName = file.name.replace('.sy', '');
-                
-                // 尝试获取文档标题
-                try {
-                  // 构建文档ID（假设文件名就是文档ID）
-                  const docId = docName;
-                  const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
-                  if (attrs && attrs.title === title) {
-                    return {
-                      success: false,
-                      error: '文档已存在',
-                      message: `已存在标题为"${title}"的文档，请使用 --force 参数强制创建`
-                    };
-                  }
-                } catch (error) {
-                  // 忽略错误
-                }
-              }
-            }
-          }
-        } catch (error) {
-          // 检测失败不阻止创建，继续执行
+        const existingDoc = await skill.documentManager.checkDocumentExists(
+          notebookId, 
+          targetParentId || notebookId, 
+          title
+        );
+        
+        if (existingDoc) {
+          return {
+            success: false,
+            error: '文档已存在',
+            message: `在目标位置已存在标题为"${title}"的文档（ID: ${existingDoc.id}），请使用 --force 参数强制创建`
+          };
         }
       }
       
@@ -327,7 +311,7 @@ const command = {
       defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
     });
     
-    return permissionHandler(skill, { ...args, parentId: effectiveParentId });
+    return permissionHandler(skill, { ...args, parentId: effectiveParentId, targetParentId: savedParentId });
   }
 };
 

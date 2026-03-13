@@ -2,126 +2,257 @@
 
 使用思源笔记命令行工具的最佳实践和注意事项。
 
-## 文档创建最佳实践
+## 内容操作最佳实践
 
-### 1. 内容长度控制
-- **单次创建**：建议不超过 4000 字符
-- **超长内容**：使用两步法（先创建空文档，再更新内容）
-- **文件导入**：使用 `$(cat file.md)` 方式
+### 文档创建
 
-### 2. Front Matter 使用
-- **手动添加**：系统不会自动添加 Front Matter
-- **格式规范**：使用标准 YAML 格式
-- **字段建议**：title, date, tags, author, category
+**推荐方式：直接创建并填充内容**
 
-### 3. 路径规划
-- **层级清晰**：建议不超过 3 层嵌套
-- **命名规范**：使用有意义的文档名称
-- **路径一致性**：保持路径结构的一致性
+```bash
+siyuan create "文档标题" "第一段内容\n\n## 二级标题\n第二段内容"
+```
+
+**超长内容处理：两步法**
+
+```bash
+siyuan create "长文档标题" ""
+siyuan update <docId> "$(cat long-content.md)"
+```
+
+**注意事项：**
+- 单次内容建议不超过 4000 字符
+- 使用 `\n` 表示换行，`\n\n` 表示段落分隔
+- 标题通过命令参数指定，内容从正文开始
+
+### 文档更新
+
+**推荐：直接更新**
+
+```bash
+siyuan update <docId> "新内容"
+```
+
+**不推荐：删除后重建**
+
+```bash
+siyuan rm <docId>
+siyuan create "标题" "内容"
+```
+
+> 删除后重建会丢失：文档属性、标签、引用关系、块 ID
+
+### 块级操作
+
+**精确更新单个块：**
+
+```bash
+siyuan bu <blockId> "新的块内容"
+```
+
+**在指定位置插入块：**
+
+```bash
+siyuan bi <parentId> "插入的内容" --position first
+```
+
+## 属性设置最佳实践
+
+### 使用命令设置属性（推荐）
+
+```bash
+siyuan ba <docId> --set "status=published"
+siyuan ba <docId> --set "priority=high" --set "due=2024-12-31"
+```
+
+### 使用命令设置标签（推荐）
+
+```bash
+siyuan st <docId> --tags "重要,待审核,项目A"
+```
+
+> 标签支持中英文逗号分隔
+
+### 不推荐：在内容中添加 Front Matter
+
+思源笔记不使用 Front Matter 管理元数据，应使用专门的属性和标签命令。
 
 ## 搜索最佳实践
 
-### 1. 搜索模式选择
-- **默认使用混合搜索**：适用于大多数场景
-- **语义搜索**：用于概念查找
-- **关键词搜索**：用于精确匹配
-- **SQL 搜索**：用于复杂查询
+### 搜索模式选择
 
-### 2. 性能优化
-- **合理设置 limit**：避免返回过多结果
-- **使用路径限制**：缩小搜索范围
-- **类型过滤**：指定文档类型提高准确性
+| 模式 | 命令 | 适用场景 |
+|------|------|----------|
+| 关键词 | `siyuan search "关键词"` | 精确匹配 |
+| SQL | `siyuan search --sql "SELECT *"` | 复杂查询 |
+| 语义 | `siyuan search --semantic "概念描述"` | 概念查找（需向量服务） |
+| 混合 | `siyuan search --hybrid "查询"` | 综合搜索（需向量服务） |
 
-### 3. 结果处理
-- **相似度阈值**：设置合理的 threshold
-- **权重调整**：根据需求调整 dense/sparse 权重
-- **结果排序**：使用 --sort-by 排序
+### 性能优化
+
+```bash
+siyuan search "关键词" --limit 10 --path "/笔记本/目录"
+```
+
+- 使用 `--limit` 限制返回数量
+- 使用 `--path` 缩小搜索范围
+- 使用 `--type` 指定内容类型
+
+### 结果处理
+
+```bash
+siyuan search --semantic "查询内容" --threshold 0.7 --sort-by score
+```
+
+- `--threshold`：相似度阈值（0-1），过滤低质量结果
+- `--sort-by`：按相关度排序
 
 ## 权限管理最佳实践
 
-### 1. 权限模式选择
-- **开发环境**：使用 `all` 模式
-- **生产环境**：使用 `whitelist` 或 `blacklist`
-- **团队协作**：使用思源笔记自身权限系统
+### 权限模式选择
 
-### 2. 笔记本管理
-- **分类管理**：按项目或团队分类
-- **访问控制**：合理设置访问权限
-- **定期审查**：定期检查权限配置
+| 环境 | 推荐模式 | 配置 |
+|------|----------|------|
+| 开发/测试 | `all` | `SIYUAN_PERMISSION_MODE=all` |
+| 生产环境 | `whitelist` | `SIYUAN_PERMISSION_MODE=whitelist` |
+| 受限访问 | `blacklist` | `SIYUAN_PERMISSION_MODE=blacklist` |
+
+### 白名单配置
+
+```json
+{
+  "permissionMode": "whitelist",
+  "notebookList": ["notebook-id-1", "notebook-id-2"]
+}
+```
+
+或环境变量：
+
+```bash
+SIYUAN_PERMISSION_MODE=whitelist
+SIYUAN_NOTEBOOK_LIST=notebook-id-1,notebook-id-2
+```
+
+## 删除保护最佳实践
+
+### 保护层级
+
+```
+全局安全模式 → 文档保护标记 → 删除确认机制
+```
+
+### 配置示例
+
+```json
+{
+  "deleteProtection": {
+    "safeMode": false,
+    "requireConfirmation": true,
+    "protectedNotebooks": ["重要笔记本ID"],
+    "protectedPaths": ["/系统文档", "/配置"]
+  }
+}
+```
+
+### 设置文档保护
+
+```bash
+siyuan protect <docId> --enable
+siyuan protect <docId> --disable
+```
 
 ## 缓存管理最佳实践
 
-### 1. 缓存策略
-- **默认缓存**：笔记本列表和文档结构自动缓存
-- **强制刷新**：使用 `--force-refresh` 刷新缓存
-- **缓存时间**：默认 5 分钟，可根据需求调整
+### 缓存策略
 
-### 2. 性能优化
-- **合理使用缓存**：避免频繁强制刷新
-- **批量操作**：减少 API 调用次数
-- **并发控制**：避免同时执行多个命令
+- 笔记本列表和文档结构自动缓存（默认 5 分钟）
+- 内容读取不缓存，保证实时性
+
+### 强制刷新
+
+```bash
+siyuan nb --force-refresh
+siyuan ls --force-refresh
+```
+
+### 建议
+
+- 批量操作时避免频繁刷新缓存
+- 文档结构变更后使用 `--force-refresh`
 
 ## 向量搜索最佳实践
 
-### 1. 服务部署
-- **Qdrant 部署**：使用 Docker 部署
-- **Ollama 配置**：下载 nomic-embed-text 模型
-- **资源分配**：确保足够的内存和存储空间
+### 服务部署
 
-### 2. 索引管理
-- **首次索引**：在低峰期进行
-- **增量更新**：定期更新索引
-- **索引监控**：监控索引状态和性能
+**Qdrant（向量数据库）：**
 
-### 3. 搜索优化
-- **混合搜索**：默认使用混合搜索
-- **权重调整**：根据实际效果调整权重
-- **阈值设置**：设置合理的相似度阈值
+```bash
+docker run -d -p 6333:6333 qdrant/qdrant
+```
+
+**Ollama（嵌入模型）：**
+
+```bash
+ollama pull nomic-embed-text
+```
+
+### 配置
+
+```bash
+QDRANT_URL=http://localhost:6333
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_EMBED_MODEL=nomic-embed-text
+```
+
+### 索引管理
+
+- 首次索引在低峰期进行
+- 大量文档建议分批索引
+- 定期检查索引状态
 
 ## 错误处理最佳实践
 
-### 1. 错误预防
-- **参数验证**：执行前验证参数
-- **权限检查**：确保有足够的权限
-- **连接测试**：定期测试 API 连接
+### 常见错误
 
-### 2. 错误处理
-- **错误日志**：记录详细的错误信息
-- **重试机制**：对于临时错误进行重试
-- **降级策略**：向量搜索失败时使用 SQL 搜索
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| `ECONNREFUSED` | 服务未启动 | 检查思源笔记是否运行 |
+| `401 Unauthorized` | Token 无效 | 检查 `SIYUAN_TOKEN` |
+| `404 Not Found` | 文档不存在 | 检查 ID 或路径 |
+| `403 Forbidden` | 权限不足 | 检查权限模式配置 |
 
-### 3. 监控告警
-- **性能监控**：监控命令执行时间
-- **错误告警**：设置错误告警机制
-- **日志分析**：定期分析错误日志
+### 降级策略
 
-## 团队协作最佳实践
+```bash
+if ! siyuan search --semantic "查询" --quiet 2>/dev/null; then
+  siyuan search "关键词"
+fi
+```
 
-### 1. 文档规范
-- **命名规范**：统一的文档命名规范
-- **格式规范**：统一的文档格式
-- **内容规范**：统一的内容组织方式
+向量搜索失败时自动降级为关键词搜索。
 
-### 2. 协作流程
-- **权限分配**：合理分配访问权限
-- **变更管理**：建立变更管理流程
-- **版本控制**：重要文档定期备份
+## 安全最佳实践
 
-### 3. 知识管理
-- **知识分类**：建立清晰的知识分类体系
-- **知识更新**：定期更新和维护知识库
-- **知识共享**：促进团队成员间的知识共享
+### 连接安全
 
-## 注意事项
+- 仅连接本地实例：`http://localhost:6806`
+- 生产环境启用 TLS
+- 不禁用证书验证
 
-1. **首次使用**：需要配置 API 地址和 Token
-2. **权限模式**：根据实际需求选择合适的权限模式
-3. **缓存机制**：合理使用缓存，避免频繁刷新
-4. **向量搜索**：需要单独部署 Qdrant 和 Ollama
-5. **错误处理**：建立完善的错误处理机制
-6. **团队协作**：建立清晰的协作流程和规范
+### Token 管理
+
+- Token 在日志中自动脱敏
+- 不在命令行参数中传递 Token
+- 定期更换 Token
+
+### 权限最小化
+
+- 使用 `whitelist` 模式限制访问范围
+- 仅授权必要的笔记本
 
 ## 相关文档
-- [向量搜索配置](vector-search.md)
+
+- [命令详细文档](../commands/)
 - [环境变量配置](../config/environment.md)
-- [权限管理](../advanced/permission.md)
+- [高级配置](../config/advanced.md)
+- [权限管理](permission.md)
+- [向量搜索](vector-search.md)

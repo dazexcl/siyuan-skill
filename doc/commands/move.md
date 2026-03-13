@@ -48,6 +48,29 @@ siyuan move /AI/test1 /AI/openclaw/更新记录
 - 后续部分为文档路径
 - 支持中文文档名称
 
+## 重名检测
+
+移动文档前会自动检测目标位置是否存在同名文档：
+
+- **检测范围**：目标父文档下的所有子文档
+- **排除自身**：移动时排除当前文档自身（不会因为自己而产生冲突）
+- **冲突处理**：返回错误信息，提示使用 `--new-title` 参数
+
+```bash
+# 检测到重名时的返回
+# {
+#   "success": false,
+#   "error": "目标位置已存在同名文档",
+#   "message": "在目标位置已存在标题为"xxx"的文档（ID: xxx），无法移动。请使用 --new-title 参数指定新标题"
+# }
+
+# 正常移动（检测重名）
+siyuan mv <docId> <targetParentId>
+
+# 移动并重命名（解决冲突）
+siyuan mv <docId> <targetParentId> --new-title "新标题"
+```
+
 ## 返回格式
 
 ```json
@@ -75,4 +98,5 @@ siyuan move /AI/test1 /AI/openclaw/更新记录
 ## 相关文档
 - [转换 ID 和路径命令](convert.md)
 - [创建文档命令](create.md)
-- [最佳实践](../advanced/best-practices.md)
+- [重命名文档命令](rename.md)
+- [检查文档是否存在](check-exists.md)

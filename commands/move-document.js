@@ -168,6 +168,22 @@ const command = {
         }
       }
       
+      // 重名检测：检查目标位置是否已存在同名文档（排除自身）
+      const existingDoc = await skill.documentManager.checkDocumentExists(
+        targetPermission.notebookId,
+        targetParentId,
+        titleToUse,
+        docId
+      );
+      
+      if (existingDoc) {
+        return {
+          success: false,
+          error: '目标位置已存在同名文档',
+          message: `在目标位置已存在标题为"${titleToUse}"的文档（ID: ${existingDoc.id}），无法移动。请使用 --new-title 参数指定新标题`
+        };
+      }
+      
       console.log('移动文档:', {
         docId: docId,
         from: originalDocPath || docId,

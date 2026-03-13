@@ -1,127 +1,90 @@
 # 环境变量配置
 
-环境变量配置优先级最高，可以覆盖配置文件中的设置。
+环境变量配置优先级最高，可覆盖 `config.json` 中的设置。
 
-## 概述
+## 必需环境变量
 
-### 基础连接配置
-
-| 环境变量 | 说明 | 示例 |
-|---------|------|------|
-| `SIYUAN_BASE_URL` | 思源笔记 API 地址 | `http://127.0.0.1:6806` |
-| `SIYUAN_TOKEN` | API 认证令牌 | `your-api-token` |
-| `SIYUAN_TIMEOUT` | 请求超时时间（毫秒） | `10000` |
-
-### 默认值配置
-
-| 环境变量 | 说明 | 示例 |
-|---------|------|------|
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `SIYUAN_BASE_URL` | 思源笔记 API 地址 | `http://localhost:6806` |
+| `SIYUAN_TOKEN` | API 认证令牌 | 从思源设置中获取 |
 | `SIYUAN_DEFAULT_NOTEBOOK` | 默认笔记本 ID | `20260227231831-yq1lxq2` |
-| `SIYUAN_DEFAULT_FORMAT` | 默认输出格式 | `markdown` |
 
-### 权限配置
+## 可选环境变量
 
-| 环境变量 | 说明 | 可选值 |
-|---------|------|--------|
+### 权限控制
+
+| 变量 | 说明 | 可选值 |
+|------|------|--------|
 | `SIYUAN_PERMISSION_MODE` | 权限模式 | `all` / `whitelist` / `blacklist` |
-| `SIYUAN_NOTEBOOK_LIST` | 笔记本 ID 列表 | `id1,id2,id3` 或 `["id1","id2"]` |
+| `SIYUAN_NOTEBOOK_LIST` | 笔记本 ID 列表 | `id1,id2,id3` |
 
-### 功能配置
+### 功能开关
 
-| 环境变量 | 说明 | 示例 |
-|---------|------|------|
-| `SIYUAN_ENABLE_CACHE` | 是否启用缓存 | `true` / `false` |
-| `SIYUAN_ENABLE_SYNC` | 是否启用同步 | `true` / `false` |
-| `SIYUAN_ENABLE_LOGGING` | 是否启用日志 | `true` / `false` |
-| `SIYUAN_DEBUG_MODE` | 是否启用调试模式 | `true` / `false` |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `SIYUAN_ENABLE_CACHE` | 启用缓存 | `true` |
 | `SIYUAN_CACHE_EXPIRY` | 缓存过期时间（毫秒） | `300000` |
+| `SIYUAN_DEBUG_MODE` | 调试模式 | `false` |
 
-### 向量搜索配置
+### 删除保护
 
-| 环境变量 | 说明 | 示例 |
-|---------|------|------|
-| `QDRANT_URL` | Qdrant 服务地址 | `http://127.0.0.1:6333` |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `SIYUAN_DELETE_SAFE_MODE` | 安全模式（禁止删除） | `true` |
+| `SIYUAN_DELETE_REQUIRE_CONFIRMATION` | 删除确认 | `false` |
+
+### TLS 安全
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `SIYUAN_TLS_ALLOW_SELF_SIGNED` | 允许自签名证书 | `false` |
+| `SIYUAN_TLS_ALLOWED_HOSTS` | 允许自签名证书的主机 | `localhost` |
+
+### 向量搜索（可选）
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `QDRANT_URL` | Qdrant 服务地址 | `http://localhost:6333` |
 | `QDRANT_API_KEY` | Qdrant API 密钥 | `your-api-key` |
-| `QDRANT_COLLECTION_NAME` | 集合名称 | `siyuan_notes` |
-| `OLLAMA_BASE_URL` | Ollama 服务地址 | `http://127.0.0.1:11434` |
-| `OLLAMA_EMBED_MODEL` | Embedding 模型名称 | `nomic-embed-text` |
+| `OLLAMA_BASE_URL` | Ollama 服务地址 | `http://localhost:11434` |
+| `OLLAMA_EMBED_MODEL` | Embedding 模型 | `nomic-embed-text` |
 
 ## 配置示例
 
 ### Bash / Zsh
 
 ```bash
-# 基础配置
-export SIYUAN_BASE_URL="http://127.0.0.1:6806"
+# 必需配置
+export SIYUAN_BASE_URL="http://localhost:6806"
 export SIYUAN_TOKEN="your-api-token"
 export SIYUAN_DEFAULT_NOTEBOOK="20260227231831-yq1lxq2"
 
 # 权限配置（白名单模式）
 export SIYUAN_PERMISSION_MODE="whitelist"
-export SIYUAN_NOTEBOOK_LIST="20260227231831-yq1lxq2,20260308012748-i6sgf0p"
-
-# 向量搜索配置
-export QDRANT_URL="http://127.0.0.1:6333"
-export OLLAMA_BASE_URL="http://127.0.0.1:11434"
-export OLLAMA_EMBED_MODEL="nomic-embed-text"
+export SIYUAN_NOTEBOOK_LIST="20260227231831-yq1lxq2"
 ```
 
 ### PowerShell
 
 ```powershell
-# 基础配置
-$env:SIYUAN_BASE_URL="http://127.0.0.1:6806"
+$env:SIYUAN_BASE_URL="http://localhost:6806"
 $env:SIYUAN_TOKEN="your-api-token"
 $env:SIYUAN_DEFAULT_NOTEBOOK="20260227231831-yq1lxq2"
-
-# 权限配置（白名单模式）
-$env:SIYUAN_PERMISSION_MODE="whitelist"
-$env:SIYUAN_NOTEBOOK_LIST="20260227231831-yq1lxq2,20260308012748-i6sgf0p"
-```
-
-### 配置文件（config.json）
-
-```json
-{
-  "baseURL": "http://127.0.0.1:6806",
-  "token": "your-api-token",
-  "timeout": 10000,
-  "defaultNotebook": "20260227231831-yq1lxq2",
-  "defaultFormat": "markdown",
-  "permissionMode": "whitelist",
-  "notebookList": ["20260227231831-yq1lxq2"],
-  "enableCache": true,
-  "enableSync": false,
-  "enableLogging": true,
-  "debugMode": false,
-  "qdrant": {
-    "url": "http://127.0.0.1:6333",
-    "apiKey": "",
-    "collectionName": "siyuan_notes"
-  },
-  "embedding": {
-    "model": "nomic-embed-text",
-    "dimension": 768,
-    "batchSize": 10,
-    "baseUrl": "http://127.0.0.1:11434"
-  }
-}
 ```
 
 ## 配置优先级
 
-1. **环境变量**（最高）- `SIYUAN_*` 系列环境变量
-2. **配置文件** - `config.json`
-3. **默认配置**（最低）- 代码中的默认值
+1. **环境变量**（最高）
+2. **config.json 配置文件**
+3. **代码默认值**（最低）
 
 ## 获取配置信息
 
-1. 打开思源笔记 → 设置 → 关于 → 复制 API Token
-2. 使用 `siyuan notebooks` 获取笔记本 ID
+1. API Token：思源笔记 → 设置 → 关于 → API Token
+2. 笔记本 ID：`siyuan notebooks`
 
-## SIYUAN_NOTEBOOK_LIST 格式说明
-
-支持多种格式：
+## SIYUAN_NOTEBOOK_LIST 格式
 
 ```bash
 # 逗号分隔（推荐）

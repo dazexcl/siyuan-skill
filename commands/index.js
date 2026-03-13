@@ -24,6 +24,7 @@ const blockFold = require('./block-fold');
 const transferBlockRef = require('./transfer-block-ref');
 const blockAttrs = require('./block-attrs');
 const tags = require('./tags');
+const checkExists = require('./check-exists');
 
 /**
  * 所有可用命令的映射
@@ -53,7 +54,8 @@ const commands = {
   'fold-block': blockFold,
   'unfold-block': blockFold,
   'transfer-block-ref': transferBlockRef,
-  'tags': tags
+  'tags': tags,
+  'check-exists': checkExists
 };
 
 module.exports = commands;

@@ -41,7 +41,9 @@ const ALIAS_MAP = {
   'buu': 'block-fold',
   'block-unfold': 'block-fold',
   'btr': 'block-transfer-ref',
-  'st': 'tags'
+  'st': 'tags',
+  'check': 'exists',
+  'check-exists': 'exists'
 };
 
 /**
@@ -73,13 +75,14 @@ Siyuan Skill CLI - 思源笔记命令行工具
   notebooks, nb                    获取所有笔记本列表
   structure, ls                    获取指定笔记本的文档结构
   content, cat                     获取文档内容
-  search, find                     搜索内容
-  create, new                      创建文档
+  create, new                      创建文档（自动重名检测）
   update, edit, bu                 更新文档/块内容
   delete, rm                       删除文档（受保护机制约束）
   protect                          设置/移除文档保护标记
-  move, mv                         移动文档
-  rename                           重命名文档
+  move, mv                         移动文档（自动重名检测）
+  rename                           重命名文档（自动重名检测）
+  exists, check                    检查文档是否存在
+  search, find                     搜索内容
   convert, path                    转换 ID 和路径
   index, index-documents           索引文档到向量数据库
   nlp                              NLP 文本分析 [实验性]
@@ -262,14 +265,16 @@ function showCommandHelp(command) {
     'rename': {
       aliases: [],
       description: '重命名文档',
-      usage: 'siyuan rename <docId> <title>',
+      usage: 'siyuan rename <docId> <title> [--force]',
       options: [
         { name: '<docId>', description: '文档ID（必需，位置参数）' },
-        { name: '<title>', description: '新标题（必需，位置参数）' }
+        { name: '<title>', description: '新标题（必需，位置参数）' },
+        { name: '--force', description: '强制重命名（忽略重名检测）' }
       ],
       examples: [
         'siyuan rename <doc-id> "新标题"',
-        'siyuan rename 20260304051123-doaxgi4 "更新后的标题"'
+        'siyuan rename 20260304051123-doaxgi4 "更新后的标题"',
+        'siyuan rename <doc-id> "已存在的标题" --force'
       ]
     },
     'convert': {
@@ -476,6 +481,23 @@ function showCommandHelp(command) {
         'siyuan tags <id> --tags "旧标签" --remove',
         'siyuan tags <id> --get'
       ]
+    },
+    'exists': {
+      aliases: ['check', 'check-exists'],
+      description: '检查文档是否存在',
+      usage: 'siyuan exists --title <title> [--parent-id <parentId>] [--notebook-id <notebookId>]\n       siyuan exists --path <path> [--notebook-id <notebookId>]',
+      options: [
+        { name: '--title, -t', description: '文档标题（与 --path 二选一）' },
+        { name: '--path', description: '文档完整路径（如 /目录/子文档）' },
+        { name: '--parent-id, -p', description: '父文档ID（可选，不指定则检查笔记本根目录）' },
+        { name: '--notebook-id, -n', description: '笔记本ID（可选，不指定则使用默认笔记本）' }
+      ],
+      examples: [
+        'siyuan exists --title "我的文档"',
+        'siyuan exists --title "子文档" --parent-id <父文档ID>',
+        'siyuan exists --path "/测试目录/子文档A"',
+        'siyuan check "文档标题"'
+      ]
     }
   };
 
@@ -605,6 +627,30 @@ async function main(customArgs = null) {
         } else {
           console.log(JSON.stringify(content, null, 2));
         }
+        break;
+        
+      case 'check-exists':
+      case 'exists':
+      case 'check':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('exists');
+          process.exit(0);
+        }
+        console.log('检查文档是否存在...');
+        const existsArgs = {};
+        for (let i = 1; i < args.length; i++) {
+          if ((args[i] === '--title' || args[i] === '-t') && i + 1 < args.length) {
+            existsArgs.title = args[++i];
+          } else if ((args[i] === '--parent-id' || args[i] === '-p') && i + 1 < args.length) {
+            existsArgs.parentId = args[++i];
+          } else if ((args[i] === '--notebook-id' || args[i] === '-n') && i + 1 < args.length) {
+            existsArgs.notebookId = args[++i];
+          } else if (args[i] === '--path' && i + 1 < args.length) {
+            existsArgs.path = args[++i];
+          }
+        }
+        const existsResult = await skill.executeCommand('check-exists', existsArgs);
+        console.log(JSON.stringify(existsResult, null, 2));
         break;
         
       case 'search-content':
@@ -1145,13 +1191,14 @@ async function main(customArgs = null) {
         }
         if (args.length < 3) {
           console.error('错误：请提供文档 ID 和新标题');
-          console.log('用法：siyuan rename <docId> <title>');
+          console.log('用法：siyuan rename <docId> <title> [--force]');
           process.exit(1);
         }
         console.log('重命名文档...');
         const renameArgs = {
           docId: args[1],
-          title: args[2]
+          title: args[2],
+          force: args.includes('--force')
         };
         console.log('文档 ID:', renameArgs.docId);
         console.log('新标题:', renameArgs.title);
