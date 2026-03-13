@@ -27,8 +27,8 @@ async function checkExists(skill, args) {
       // 尝试从父文档获取笔记本ID
       try {
         const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: parentId });
-        if (pathInfo && pathInfo.box) {
-          targetNotebookId = pathInfo.box;
+        if (pathInfo && pathInfo.notebook) {
+          targetNotebookId = pathInfo.notebook;
         }
       } catch (e) {
         // 可能是笔记本ID
