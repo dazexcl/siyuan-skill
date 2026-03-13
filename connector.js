@@ -13,7 +13,7 @@ const https = require('https');
  */
 const DEFAULT_TLS_CONFIG = {
   allowSelfSignedCerts: false,
-  allowedHosts: ['localhost', '127.0.0.1', '::1']
+  allowedHosts: ['localhost']
 };
 
 /**
@@ -34,7 +34,7 @@ class SiyuanConnector {
    * @param {string[]} options.tls.allowedHosts - 允许自签名证书的主机列表
    */
   constructor(options = {}) {
-    this.baseURL = options.baseURL || 'http://127.0.0.1:6806';
+    this.baseURL = options.baseURL || 'http://localhost:6806';
     this.token = options.token || '';
     this.timeout = options.timeout || 10000;
     this.maxRetries = options.maxRetries || 3;

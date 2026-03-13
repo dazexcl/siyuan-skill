@@ -1,6 +1,6 @@
 {
   "name": "siyuan-skill",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Siyuan Notes connector skill for AI Agents",
   "main": "siyuan.js",
   "bin": {
@@ -17,8 +17,7 @@
   ],
   "author": "Siyuan Skills",
   "license": "MIT",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "jest": "^29.7.0"
   },
@@ -38,7 +37,7 @@
   "engines": {
     "node": ">=14.0.0"
   },
-  "siyuan": {
+  "config": {
     "requiredEnvVars": [
       "SIYUAN_BASE_URL",
       "SIYUAN_TOKEN",
@@ -53,8 +52,58 @@
       "OLLAMA_EMBED_MODEL",
       "SIYUAN_TLS_ALLOW_SELF_SIGNED",
       "SIYUAN_TLS_ALLOWED_HOSTS"
-    ],
+    ]
+  },
+  "skill": {
+    "skillType": "cli",
+    "installType": "executable",
     "runtime": "node",
-    "runtimeVersion": ">=14.0.0"
+    "runtimeVersion": ">=14.0.0",
+    "requiredEnvVars": [
+      {
+        "name": "SIYUAN_BASE_URL",
+        "description": "思源笔记 API 地址（建议使用 localhost）",
+        "required": true
+      },
+      {
+        "name": "SIYUAN_TOKEN",
+        "description": "API 认证令牌",
+        "required": true
+      },
+      {
+        "name": "SIYUAN_DEFAULT_NOTEBOOK",
+        "description": "默认笔记本 ID",
+        "required": true
+      }
+    ],
+    "optionalEnvVars": [
+      {
+        "name": "SIYUAN_PERMISSION_MODE",
+        "description": "权限模式",
+        "default": "all"
+      },
+      {
+        "name": "SIYUAN_NOTEBOOK_LIST",
+        "description": "白名单/黑名单笔记本列表"
+      },
+      {
+        "name": "QDRANT_URL",
+        "description": "Qdrant 向量数据库地址（语义搜索需要）"
+      },
+      {
+        "name": "OLLAMA_BASE_URL",
+        "description": "Ollama 服务地址（语义搜索需要）"
+      },
+      {
+        "name": "OLLAMA_EMBED_MODEL",
+        "description": "Embedding 模型名称",
+        "default": "nomic-embed-text"
+      }
+    ],
+    "security": {
+      "recommendedBaseUrl": "http://localhost:6806",
+      "tlsValidation": "enabled",
+      "sensitiveFields": ["token", "password", "apiKey"]
+    }
   }
 }

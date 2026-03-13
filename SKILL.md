@@ -1,14 +1,16 @@
 ---
 name: "siyuan-skill"
-version: "1.6.2"
+version: "1.6.3"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
+skillType: "cli"
 runtime: "node"
 runtimeVersion: ">=14.0.0"
+installType: "executable"
 required_env_vars:
   - name: "SIYUAN_BASE_URL"
     description: "思源笔记 API 地址"
     required: true
-    example: "http://127.0.0.1:6806"
+    example: "http://localhost:6806"
   - name: "SIYUAN_TOKEN"
     description: "API 认证令牌"
     required: true
@@ -41,7 +43,7 @@ required_env_vars:
   - name: "SIYUAN_TLS_ALLOWED_HOSTS"
     description: "允许自签名证书的主机列表（逗号分隔）"
     required: false
-    default: "localhost,127.0.0.1,::1"
+    default: "localhost"
 ---
 # 核心价值
 
@@ -65,11 +67,11 @@ required_env_vars:
 
 | 环境变量 | 说明 | 示例 |
 |---------|------|------|
-| `SIYUAN_BASE_URL` | 思源笔记 API 地址（建议使用 localhost） | `http://127.0.0.1:6806` |
+| `SIYUAN_BASE_URL` | 思源笔记 API 地址（建议使用 localhost） | `http://localhost:6806` |
 | `SIYUAN_TOKEN` | API 认证令牌 | 从思源设置中获取 |
 | `SIYUAN_DEFAULT_NOTEBOOK` | 默认笔记本 ID | `20260227231831-yq1lxq2` |
 
-> 🔒 **安全建议**：仅将 `SIYUAN_BASE_URL` 设置为受信任的本地实例（如 `http://127.0.0.1:6806`）
+> 🔒 **安全建议**：仅将 `SIYUAN_BASE_URL` 设置为受信任的本地实例（如 `http://localhost:6806`）
 
 ---
 
@@ -77,15 +79,15 @@ required_env_vars:
 
 **必须使用 CLI 命令来操作思源笔记**
 
-**禁止自动修改配置文件与本技能相关环境变量配置**
+> 💡 **说明**：本技能通过 CLI 命令与思源笔记 HTTP API 通信。用户/AI Agent 应使用 CLI 命令（如 `siyuan create`、`siyuan search`），而非直接调用思源笔记 API。
 
-**禁止直接调用 API**
+**禁止agent自动修改配置文件与本技能相关环境变量配置，避免导致意外的权限泄露**
 
 ---
 
 # 问题导向文档导航
 
-> 💡 **提示**：遇到以下问题时，建议先查阅对应文档以获取详细说明。如需深入理解实现细节，可以查阅源码（本技能完全开源）。
+> 💡 **提示**：遇到以下问题时，建议先查阅对应文档以获取详细说明。如需深入理解实现细节，可以查阅源码（本技能完全开源，欢迎审计）。
 
 | 问题类型 | 查阅文档 | 说明 |
 |----------|----------|------|
@@ -441,7 +443,7 @@ siyuan attrs <docId> --get "internal" --hide
 
 | 配置项 | 推荐值 | 说明 |
 |--------|--------|------|
-| `SIYUAN_BASE_URL` | `http://127.0.0.1:6806` | 仅绑定本地地址 |
+| `SIYUAN_BASE_URL` | `http://localhost:6806` | 仅绑定本地地址 |
 | TLS 证书验证 | 默认启用 | 仅 localhost 允许自签名证书 |
 
 ## 权限控制
@@ -470,7 +472,7 @@ SIYUAN_NOTEBOOK_LIST=notebook-id-1,notebook-id-2
 ```javascript
 // 程序化使用示例
 const { createSkill } = require('./index.js');
-const skill = createSkill({ baseURL: 'http://127.0.0.1:6806', token: 'xxx' });
+const skill = createSkill({ baseURL: 'http://localhost:6806', token: 'xxx' });
 ```
 
 > ⚠️ **注意**：程序化 API 仅供高级用户在受控环境中使用。普通 AI Agent 应仅使用 CLI 命令。

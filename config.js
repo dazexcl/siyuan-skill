@@ -31,7 +31,7 @@ class ConfigManager {
   getDefaultConfig() {
     return {
       // 连接配置
-      baseURL: 'http://127.0.0.1:6806',
+      baseURL: 'http://localhost:6806',
       token: '',
       timeout: 10000,
       
@@ -90,9 +90,9 @@ class ConfigManager {
       
       // TLS 安全配置
       tls: {
-        allowSelfSignedCerts: false,
-        allowedHosts: ['localhost', '127.0.0.1', '::1']
-      }
+          allowSelfSignedCerts: false,
+          allowedHosts: ['localhost']
+        }
     };
   }
   

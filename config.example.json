@@ -1,5 +1,5 @@
 {
-  "baseURL": "http://127.0.0.1:6806",
+  "baseURL": "http://localhost:6806",
   "token": "your-api-token-here",
   "timeout": 10000,
   "cacheExpiry": 300000,
@@ -17,7 +17,7 @@
     "requireConfirmation": false
   },
   "qdrant": {
-    "url": "http://127.0.0.1:6333",
+    "url": "http://localhost:6333",
     "apiKey": "",
     "collectionName": "siyuan_notes"
   },
@@ -25,7 +25,7 @@
     "model": "nomic-embed-text",
     "dimension": 768,
     "batchSize": 8,
-    "baseUrl": "http://127.0.0.1:11434"
+    "baseUrl": "http://localhost:11434"
   },
   "hybridSearch": {
     "denseWeight": 0.7,
@@ -39,6 +39,6 @@
   },
   "tls": {
     "allowSelfSignedCerts": false,
-    "allowedHosts": ["localhost", "127.0.0.1", "::1"]
+    "allowedHosts": ["localhost"]
   }
 }
