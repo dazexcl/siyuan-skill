@@ -8,11 +8,21 @@
  * 
  * 注意：
  * - 标签在思源笔记中是特殊的属性，存储在 'tags' 属性中
- * - 多个标签使用英文逗号分隔
+ * - 多个标签使用英文逗号或中文逗号分隔（自动兼容）
  * - 文档本身也是一种特殊的块，因此设置文档标签也使用相同的 API
  */
 
 const Permission = require('../utils/permission');
+
+/**
+ * 分割标签字符串，同时支持中英文逗号
+ * @param {string} tagsStr - 标签字符串
+ * @returns {string[]} 标签数组
+ */
+function splitTags(tagsStr) {
+  if (!tagsStr) return [];
+  return tagsStr.split(/[,，]/).map(t => t.trim()).filter(t => t);
+}
 
 /**
  * 指令配置
@@ -61,7 +71,7 @@ const command = {
         });
         
         const currentTags = result?.tags || '';
-        const tagList = currentTags ? currentTags.split(',').map(t => t.trim()).filter(t => t) : [];
+        const tagList = splitTags(currentTags);
         
         return {
           success: true,
@@ -77,7 +87,7 @@ const command = {
         };
       }
       
-      const tagList = tags.split(',').map(t => t.trim()).filter(t => t);
+      const tagList = splitTags(tags);
       
       if (add || remove) {
         const currentResult = await skill.connector.request('/api/attr/getBlockAttrs', {
@@ -85,7 +95,7 @@ const command = {
         });
         
         const currentTags = currentResult?.tags || '';
-        let currentTagList = currentTags ? currentTags.split(',').map(t => t.trim()).filter(t => t) : [];
+        let currentTagList = splitTags(currentTags);
         
         if (add) {
           for (const tag of tagList) {

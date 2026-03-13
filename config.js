@@ -86,6 +86,12 @@ class ConfigManager {
       deleteProtection: {
         safeMode: true,
         requireConfirmation: false
+      },
+      
+      // TLS 安全配置
+      tls: {
+        allowSelfSignedCerts: false,
+        allowedHosts: ['localhost', '127.0.0.1', '::1']
       }
     };
   }
@@ -136,6 +142,12 @@ class ConfigManager {
         ...fileConfig.deleteProtection,
         ...envConfig.deleteProtection,
         ...(this.overrideConfig.deleteProtection || {})
+      },
+      tls: {
+        ...this.defaultConfig.tls,
+        ...fileConfig.tls,
+        ...envConfig.tls,
+        ...(this.overrideConfig.tls || {})
       }
     };
     
@@ -293,6 +305,16 @@ class ConfigManager {
       };
     }
     
+    // TLS 安全配置
+    if (process.env.SIYUAN_TLS_ALLOW_SELF_SIGNED !== undefined) {
+      envConfig.tls = {
+        allowSelfSignedCerts: process.env.SIYUAN_TLS_ALLOW_SELF_SIGNED === 'true',
+        allowedHosts: process.env.SIYUAN_TLS_ALLOWED_HOSTS 
+          ? process.env.SIYUAN_TLS_ALLOWED_HOSTS.split(',').map(h => h.trim())
+          : this.defaultConfig.tls.allowedHosts
+      };
+    }
+    
     return envConfig;
   }
   
@@ -439,6 +461,18 @@ class ConfigManager {
       validatedConfig.deleteProtection = {
         safeMode: validatedConfig.deleteProtection.safeMode ?? this.defaultConfig.deleteProtection.safeMode,
         requireConfirmation: validatedConfig.deleteProtection.requireConfirmation ?? this.defaultConfig.deleteProtection.requireConfirmation
+      };
+    }
+    
+    // 验证 TLS 配置
+    if (!validatedConfig.tls || typeof validatedConfig.tls !== 'object') {
+      validatedConfig.tls = { ...this.defaultConfig.tls };
+    } else {
+      validatedConfig.tls = {
+        allowSelfSignedCerts: validatedConfig.tls.allowSelfSignedCerts ?? this.defaultConfig.tls.allowSelfSignedCerts,
+        allowedHosts: Array.isArray(validatedConfig.tls.allowedHosts) 
+          ? validatedConfig.tls.allowedHosts 
+          : this.defaultConfig.tls.allowedHosts
       };
     }
     

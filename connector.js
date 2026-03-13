@@ -7,6 +7,16 @@ const http = require('http');
 const https = require('https');
 
 /**
+ * 默认 TLS 配置
+ * 默认情况下，仅允许 localhost 使用自签名证书
+ * 生产环境建议设置 allowSelfSignedCerts: false
+ */
+const DEFAULT_TLS_CONFIG = {
+  allowSelfSignedCerts: false,
+  allowedHosts: ['localhost', '127.0.0.1', '::1']
+};
+
+/**
  * SiyuanConnector 类
  * 处理与 Siyuan Notes API 的通信
  */
@@ -19,6 +29,9 @@ class SiyuanConnector {
    * @param {number} options.timeout - 请求超时时间（毫秒）
    * @param {number} options.maxRetries - 最大重试次数
    * @param {number} options.retryDelay - 重试延迟（毫秒）
+   * @param {Object} options.tls - TLS 安全配置
+   * @param {boolean} options.tls.allowSelfSignedCerts - 是否允许自签名证书（默认 false）
+   * @param {string[]} options.tls.allowedHosts - 允许自签名证书的主机列表
    */
   constructor(options = {}) {
     this.baseURL = options.baseURL || 'http://127.0.0.1:6806';
@@ -27,7 +40,13 @@ class SiyuanConnector {
     this.maxRetries = options.maxRetries || 3;
     this.retryDelay = options.retryDelay || 1000;
     
-    // 解析 URL
+    // TLS 配置（支持 options.tlsConfig 和 options.tls 两种方式）
+    const tlsConfig = options.tls || options.tlsConfig || {};
+    this.tlsConfig = {
+      allowSelfSignedCerts: tlsConfig.allowSelfSignedCerts ?? DEFAULT_TLS_CONFIG.allowSelfSignedCerts,
+      allowedHosts: tlsConfig.allowedHosts || DEFAULT_TLS_CONFIG.allowedHosts
+    };
+    
     this.updateURL(this.baseURL);
   }
   
@@ -89,11 +108,14 @@ class SiyuanConnector {
         options.headers['Authorization'] = `Token ${this.token}`;
       }
       
-      // 处理 HTTPS
+      // 处理 HTTPS（仅对允许的主机使用自签名证书）
       let agent = null;
       if (this.protocol === 'https:') {
+        const isAllowedHost = this.tlsConfig.allowedHosts.includes(this.hostname);
+        const allowSelfSigned = this.tlsConfig.allowSelfSignedCerts && isAllowedHost;
+        
         agent = new https.Agent({
-          rejectUnauthorized: false
+          rejectUnauthorized: !allowSelfSigned
         });
         options.agent = agent;
       }
@@ -119,9 +141,12 @@ class SiyuanConnector {
               return;
             }
             
-            // 记录响应（调试用）
+            // 记录响应（调试用）- 已过滤敏感信息
             if (process.env.DEBUG) {
-              console.log(`API响应 [${statusCode}]:`, responseData.substring(0, 200) + (responseData.length > 200 ? '...' : ''));
+              const sanitizedData = responseData.replace(/"token"\s*:\s*"[^"]*"/gi, '"token":"***"')
+                .replace(/"password"\s*:\s*"[^"]*"/gi, '"password":"***"')
+                .replace(/"Authorization"\s*:\s*"[^"]*"/gi, '"Authorization":"***"');
+              console.log(`API响应 [${statusCode}]:`, sanitizedData.substring(0, 200) + (sanitizedData.length > 200 ? '...' : ''));
             }
             
             const parsedData = JSON.parse(responseData);
@@ -263,15 +288,16 @@ class SiyuanConnector {
     const errorInfo = {
       message: error.message,
       endpoint,
-      baseURL: this.baseURL,
       timestamp: new Date().toISOString()
     };
     
-    // 添加请求数据（敏感信息已过滤）
     if (data) {
       const safeData = { ...data };
       if (safeData.token) safeData.token = '***';
       if (safeData.password) safeData.password = '***';
+      if (safeData.Authorization) safeData.Authorization = '***';
+      if (safeData.apiKey) safeData.apiKey = '***';
+      if (safeData.secret) safeData.secret = '***';
       errorInfo.requestData = safeData;
     }
     

@@ -2,6 +2,8 @@
   "baseURL": "http://127.0.0.1:6806",
   "token": "your-api-token-here",
   "timeout": 10000,
+  "cacheExpiry": 300000,
+  "syncInterval": 30000,
   "defaultNotebook": "your-notebook-id-here",
   "defaultFormat": "markdown",
   "permissionMode": "all",
@@ -10,6 +12,10 @@
   "enableSync": false,
   "enableLogging": true,
   "debugMode": false,
+  "deleteProtection": {
+    "safeMode": true,
+    "requireConfirmation": false
+  },
   "qdrant": {
     "url": "http://127.0.0.1:6333",
     "apiKey": "",
@@ -30,5 +36,9 @@
     "language": "zh",
     "extractEntities": true,
     "extractKeywords": true
+  },
+  "tls": {
+    "allowSelfSignedCerts": false,
+    "allowedHosts": ["localhost", "127.0.0.1", "::1"]
   }
 }

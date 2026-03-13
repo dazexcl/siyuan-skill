@@ -1,7 +1,45 @@
 ---
 name: "siyuan-skill"
-version: "1.6.0"
+version: "1.6.1"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
+required_env_vars:
+  - name: "SIYUAN_BASE_URL"
+    description: "思源笔记 API 地址"
+    required: true
+    example: "http://127.0.0.1:6806"
+  - name: "SIYUAN_TOKEN"
+    description: "API 认证令牌"
+    required: true
+    example: "your-api-token"
+  - name: "SIYUAN_DEFAULT_NOTEBOOK"
+    description: "默认笔记本 ID"
+    required: true
+    example: "20260227231831-yq1lxq2"
+  - name: "SIYUAN_PERMISSION_MODE"
+    description: "权限模式 (all/whitelist/blacklist)"
+    required: false
+    default: "all"
+  - name: "SIYUAN_NOTEBOOK_LIST"
+    description: "白名单/黑名单笔记本 ID 列表"
+    required: false
+  - name: "QDRANT_URL"
+    description: "Qdrant 向量数据库地址（语义搜索需要）"
+    required: false
+  - name: "OLLAMA_BASE_URL"
+    description: "Ollama 服务地址（语义搜索需要）"
+    required: false
+  - name: "OLLAMA_EMBED_MODEL"
+    description: "Embedding 模型名称"
+    required: false
+    default: "nomic-embed-text"
+  - name: "SIYUAN_TLS_ALLOW_SELF_SIGNED"
+    description: "是否允许自签名证书（生产环境建议 false）"
+    required: false
+    default: "false"
+  - name: "SIYUAN_TLS_ALLOWED_HOSTS"
+    description: "允许自签名证书的主机列表（逗号分隔）"
+    required: false
+    default: "localhost,127.0.0.1,::1"
 ---
 # 核心价值
 
@@ -19,19 +57,33 @@ description: "思源笔记命令行工具，提供便捷的命令行操作方式
 
 ---
 
+# 环境变量要求
+
+> ⚠️ **必须配置的环境变量**（缺少将无法正常使用）
+
+| 环境变量 | 说明 | 示例 |
+|---------|------|------|
+| `SIYUAN_BASE_URL` | 思源笔记 API 地址（建议使用 localhost） | `http://127.0.0.1:6806` |
+| `SIYUAN_TOKEN` | API 认证令牌 | 从思源设置中获取 |
+| `SIYUAN_DEFAULT_NOTEBOOK` | 默认笔记本 ID | `20260227231831-yq1lxq2` |
+
+> 🔒 **安全建议**：仅将 `SIYUAN_BASE_URL` 设置为受信任的本地实例（如 `http://127.0.0.1:6806`）
+
+---
+
 # 重要约束
 
 **必须使用 CLI 命令来操作思源笔记** 
 
-**禁止自动修改配置文件与本技能相关环境变量配置** 
+**禁止agent自动修改配置文件与本技能相关环境变量配置** 
 
-**禁止直接调用 API** 
+**禁止agent直接调用 API** 
 
-**禁止使用脚本调用、引用 index.js** 
+**禁止agent使用脚本调用、引用 index.js** 
 
-**禁止使用脚本调用、引用指令文件** 
+**禁止agent使用脚本调用、引用指令文件** 
 
-**遇到问题优先查阅文档，禁止直接读取源码**
+**遇到问题优先查阅文档指引，禁止直接读取源码**
 
 ---
 
@@ -382,3 +434,53 @@ siyuan attrs <docId> --get "internal" --hide
 - [命令详细文档](doc/commands/)
 - [高级功能文档](doc/advanced/)
 - [配置文档](doc/config/)
+
+---
+
+# 安全最佳实践
+
+## 网络安全
+
+> 🔒 **重要**：建议仅将 `SIYUAN_BASE_URL` 设置为本地实例
+
+| 配置项 | 推荐值 | 说明 |
+|--------|--------|------|
+| `SIYUAN_BASE_URL` | `http://127.0.0.1:6806` | 仅绑定本地地址 |
+| TLS 证书验证 | 默认启用 | 仅 localhost 允许自签名证书 |
+
+## 权限控制
+
+推荐使用 `whitelist` 模式限制可访问的笔记本：
+
+```bash
+# 设置权限模式
+SIYUAN_PERMISSION_MODE=whitelist
+
+# 设置白名单笔记本
+SIYUAN_NOTEBOOK_LIST=notebook-id-1,notebook-id-2
+```
+
+## 可选功能
+
+如果不需要向量搜索或外部嵌入服务，**请勿配置**以下环境变量：
+- `QDRANT_URL`
+- `OLLAMA_BASE_URL`
+- `OLLAMA_EMBED_MODEL`
+
+## 程序化 API 说明
+
+本 skill 导出了 `createSkill` 和 `executeSingleCommand` 函数供高级用户使用：
+
+```javascript
+// 程序化使用示例
+const { createSkill } = require('./index.js');
+const skill = createSkill({ baseURL: 'http://127.0.0.1:6806', token: 'xxx' });
+```
+
+> ⚠️ **注意**：程序化 API 仅供高级用户在受控环境中使用。普通 AI Agent 应仅使用 CLI 命令。
+
+## 日志安全
+
+- 生产环境**不要**启用 `DEBUG` 环境变量
+- 敏感信息（token、password、apiKey）在日志中自动脱敏
+- 错误信息中不包含服务器地址等上下文信息
