@@ -335,19 +335,18 @@ function showCommandHelp(command) {
     'block-insert': {
       aliases: ['bi'],
       description: '插入新块',
-      usage: 'siyuan block-insert <content> [--parent-id <parentId>] [--previous-id <previousId>] [--next-id <nextId>] [--data-type <type>]',
+      usage: 'siyuan block-insert <content> --parent-id <parentId> [--data-type <type>]\n       siyuan block-insert <content> --previous-id <blockId>\n       siyuan block-insert <content> --next-id <blockId>',
       options: [
-        { name: '<content>', description: '块内容（必需，位置参数）' },
-        { name: '--data', description: '块内容（可选，等同于位置参数）' },
-        { name: '--data-type', description: '数据类型：markdown/dom（默认：markdown）' },
-        { name: '--parent-id', description: '父块ID' },
-        { name: '--previous-id', description: '前一个块ID' },
-        { name: '--next-id', description: '后一个块ID' }
+        { name: '<content>', description: '块内容（必需）' },
+        { name: '--parent-id', description: '父块ID（必需，三者选一）' },
+        { name: '--previous-id', description: '前一个块ID，插入其后（必需，三者选一）' },
+        { name: '--next-id', description: '后一个块ID，插入其前（必需，三者选一）' },
+        { name: '--data-type', description: '数据类型：markdown/dom（默认：markdown）' }
       ],
       examples: [
-        'siyuan bi "新块内容" --parent-id <blockId>',
-        'siyuan block-insert "新块内容" --previous-id <blockId>',
-        'siyuan bi --data "新块内容" --next-id <blockId>'
+        'siyuan bi "新块内容" --parent-id 20260313203048-cjem96v',
+        'siyuan block-insert "新段落" --previous-id 20260313203048-cjem96v',
+        'siyuan bi --data "新块" --next-id 20260313203048-cjem96v'
       ]
     },
     'block-update': {

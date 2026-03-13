@@ -39,7 +39,9 @@ siyuan bd <blockId>
 ### 命令格式
 
 ```bash
-siyuan block-insert <content> [--parent-id <parentId>] [--previous-id <previousId>] [--next-id <nextId>] [--data-type <type>]
+siyuan block-insert <content> --parent-id <parentId> [--data-type <type>]
+siyuan block-insert <content> --previous-id <blockId>
+siyuan block-insert <content> --next-id <blockId>
 ```
 
 ### 参数说明
@@ -47,16 +49,17 @@ siyuan block-insert <content> [--parent-id <parentId>] [--previous-id <previousI
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
 | `<content>` | string | ✅ | 块内容（位置参数） |
-| `--data` | string | ❌ | 块内容（等同于位置参数） |
+| `--parent-id` | string | ⚡ | 父块ID（位置参数三选一） |
+| `--previous-id` | string | ⚡ | 前一个块ID，插入到其后（位置参数三选一） |
+| `--next-id` | string | ⚡ | 后一个块ID，插入到其前（位置参数三选一） |
 | `--data-type` | string | ❌ | 数据类型：markdown/dom（默认：markdown） |
-| `--parent-id` | string | ❌ | 父块ID |
-| `--previous-id` | string | ❌ | 前一个块ID（插入到其后） |
-| `--next-id` | string | ❌ | 后一个块ID（插入到其前） |
+
+> ⚡ 必须提供 `--parent-id`、`--previous-id` 或 `--next-id` 中的一个
 
 ### 使用示例
 
 ```bash
-# 在文档末尾插入块
+# 在文档末尾插入块（推荐方式）
 siyuan bi "新段落内容" --parent-id <docId>
 
 # 在指定块后插入
