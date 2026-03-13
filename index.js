@@ -192,7 +192,7 @@ class SiyuanNotesSkill {
   getInfo() {
     return {
       name: 'siyuan-skill',
-      version: '1.6.1',
+      version: '1.6.2',
       description: 'Siyuan Notes 连接器技能（支持向量搜索和 NLP）',
       commands: Object.keys(commands).map(cmd => ({
         name: cmd,

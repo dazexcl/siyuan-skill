@@ -2,11 +2,33 @@
 
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill) 
-[![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.6.2-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 
 > **Siyuan Notes 命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索等功能。**
+
+## 运行时要求
+
+- **Node.js**: >= 14.0.0（必需）
+- **思源笔记**: 运行中的本地实例（推荐 `http://127.0.0.1:6806`）
+
+## 必需环境变量
+
+| 环境变量 | 说明 |
+|---------|------|
+| `SIYUAN_BASE_URL` | 思源笔记 API 地址（推荐 localhost） |
+| `SIYUAN_TOKEN` | API 认证令牌 |
+| `SIYUAN_DEFAULT_NOTEBOOK` | 默认笔记本 ID |
+
+## 安全审计
+
+本技能完全开源，欢迎审计源码：
+- 主要源文件：`connector.js`, `config.js`, `index.js`, `siyuan.js`
+- API 连接器：`connector.js`（TLS 默认启用证书验证）
+- 配置管理：`config.js`（敏感信息自动脱敏）
+
+> 🔒 **安全建议**：仅将 `SIYUAN_BASE_URL` 设置为受信任的本地实例。
 
 [![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Features](https://img.shields.io/badge/features-NLP-orange.svg)](https://github.com/dazexcl/siyuan-skill)

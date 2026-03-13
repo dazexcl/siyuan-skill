@@ -1,6 +1,6 @@
 {
   "name": "siyuan-skill",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Siyuan Notes connector skill for AI Agents",
   "main": "siyuan.js",
   "bin": {
@@ -37,5 +37,24 @@
   "homepage": "https://github.com/dazexcl/siyuan-skill#readme",
   "engines": {
     "node": ">=14.0.0"
+  },
+  "siyuan": {
+    "requiredEnvVars": [
+      "SIYUAN_BASE_URL",
+      "SIYUAN_TOKEN",
+      "SIYUAN_DEFAULT_NOTEBOOK"
+    ],
+    "optionalEnvVars": [
+      "SIYUAN_PERMISSION_MODE",
+      "SIYUAN_NOTEBOOK_LIST",
+      "QDRANT_URL",
+      "QDRANT_API_KEY",
+      "OLLAMA_BASE_URL",
+      "OLLAMA_EMBED_MODEL",
+      "SIYUAN_TLS_ALLOW_SELF_SIGNED",
+      "SIYUAN_TLS_ALLOWED_HOSTS"
+    ],
+    "runtime": "node",
+    "runtimeVersion": ">=14.0.0"
   }
 }
