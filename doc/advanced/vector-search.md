@@ -4,7 +4,7 @@
 
 ## 概述
 
-向量搜索功能基于 Qdrant 向量数据库和 Ollama Embedding 服务，提供语义搜索能力。
+向量搜索功能基于 Qdrant 向量数据库和 Ollama Embedding 服务，提供语义搜索和关键词搜索能力。
 
 ## 前置要求
 
@@ -49,10 +49,6 @@ export QDRANT_COLLECTION_NAME="siyuan_notes"
 # Ollama 配置
 export OLLAMA_BASE_URL="http://127.0.0.1:11434"
 export OLLAMA_EMBED_MODEL="nomic-embed-text"
-
-# 混合搜索权重
-export HYBRID_DENSE_WEIGHT=0.7
-export HYBRID_SPARSE_WEIGHT=0.3
 ```
 
 ### 配置文件配置
@@ -71,13 +67,53 @@ export HYBRID_SPARSE_WEIGHT=0.3
     "dimension": 768,
     "batchSize": 8,
     "baseUrl": "http://127.0.0.1:11434"
-  },
-  "hybridSearch": {
-    "denseWeight": 0.7,
-    "sparseWeight": 0.3,
-    "limit": 20
   }
 }
+```
+
+## 搜索模式
+
+### Legacy 模式（默认）
+- 使用 SQL LIKE 查询
+- 精确匹配关键词
+- 无需配置向量服务
+
+```bash
+siyuan search "关键词"
+siyuan search "长颈鹿"
+```
+
+### Keyword 模式（稀疏向量）
+- 基于 BM25 算法
+- 支持中文分词 + N-gram
+- 对未登录词效果好
+
+```bash
+siyuan search "Kubernetes" --mode keyword
+siyuan search "长颈鹿" --mode keyword
+```
+
+### Semantic 模式（稠密向量）
+- 基于向量相似度
+- 能找到语义相关的内容
+- 适合同义词、概念关联搜索
+
+```bash
+siyuan search "人工智能" --mode semantic
+siyuan search "AI" --mode semantic --threshold 0.5
+```
+
+### Hybrid 模式（混合搜索）
+- 结合稠密向量 + 稀疏向量
+- 默认权重：denseWeight=0.7, sparseWeight=0.3, sqlWeight=0
+- 可通过参数调整权重
+
+```bash
+siyuan search "机器学习" --mode hybrid
+siyuan search "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
+
+# 如需包含 SQL 精确匹配
+siyuan search "长颈鹿" --mode hybrid --sql-weight 0.3
 ```
 
 ## 使用方式
@@ -102,14 +138,36 @@ siyuan index --force
 使用向量搜索：
 
 ```bash
+# 默认 Legacy 模式
+siyuan search "关键词"
+
+# 关键词搜索
+siyuan search "长颈鹿" --mode keyword
+
 # 语义搜索
 siyuan search "机器学习技术" --mode semantic
 
-# 混合搜索（推荐）
+# 混合搜索
 siyuan search "人工智能应用" --mode hybrid
+```
 
-# 调整权重
-siyuan search "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
+## 中文分词支持
+
+系统使用双向最大匹配分词算法，并结合 N-gram 处理未登录词：
+
+### 分词策略
+1. **词典分词**：使用内置词典（837+ 词）进行分词
+2. **N-gram 补充**：对未登录词自动生成 2-gram 和 3-gram
+
+### 示例
+```
+输入: "长颈鹿"
+分词: ["长颈", "颈鹿", "长颈鹿"]（N-gram）
+     + 词典中的词（如果有）
+
+输入: "人工智能技术"
+分词: ["人工智能", "技术"]（词典）
+     + ["人工", "工智", "智能", "能技", "技术"]（N-gram）
 ```
 
 ## 自动分块处理
@@ -149,15 +207,14 @@ siyuan search "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
 ```
 
 ### 3. 混合搜索权重
-根据使用场景调整权重：
+根据使用场景通过命令行参数调整权重：
 
-```json
-{
-  "hybridSearch": {
-    "denseWeight": 0.7,
-    "sparseWeight": 0.3
-  }
-}
+```bash
+# 偏向语义搜索
+siyuan search "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
+
+# 偏向关键词匹配
+siyuan search "Kubernetes" --mode hybrid --dense-weight 0.3 --sparse-weight 0.7
 ```
 
 ## 故障排除
@@ -180,10 +237,17 @@ siyuan search "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
 解决: 检查模型配置的维度是否正确
 ```
 
+### 关键词搜索找不到结果
+```
+问题: 词典中没有该词
+解决: 系统会自动使用 N-gram 处理，确保重建索引
+命令: siyuan index --force
+```
+
 ## 注意事项
 
-1. **服务依赖**：向量搜索功能需要 Qdrant 和 Ollama 服务
-2. **自动回退**：如果服务不可用，系统会自动回退到 SQL 搜索
+1. **默认使用 Legacy 模式**：无需配置向量服务，精确匹配
+2. **服务依赖**：keyword/semantic/hybrid 模式需要 Qdrant 和 Ollama 服务
 3. **索引时间**：首次索引可能需要较长时间，取决于文档数量
 4. **存储空间**：向量数据库需要足够的存储空间
 5. **模型选择**：推荐使用 nomic-embed-text 模型
