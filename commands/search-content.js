@@ -38,7 +38,7 @@ const command = {
   async execute(skill, args = {}) {
     const { 
       query, 
-      mode = 'hybrid',
+      mode = 'legacy',
       notebookId, 
       path,
       limit = 10, 
@@ -49,7 +49,7 @@ const command = {
       sql,
       denseWeight = 0.7,
       sparseWeight = 0.3,
-      sqlWeight = 0.0,
+      sqlWeight = 0,
       threshold = 0.0
     } = args;
     

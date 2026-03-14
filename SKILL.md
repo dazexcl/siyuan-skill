@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.6.5"
+version: "1.6.6"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
 skillType: "cli"
 runtime: "node"
@@ -200,6 +200,31 @@ siyuan create "标题" "第一段## 二级标题 内容"
 需部署 Qdrant + Ollama，配置环境变量：
 - `QDRANT_URL`
 - `OLLAMA_BASE_URL`
+
+### 搜索模式
+
+| 模式 | 说明 | 适用场景 |
+|------|------|----------|
+| `legacy`（默认） | SQL LIKE 精确匹配 | 精确关键词搜索 |
+| `keyword` | 稀疏向量（BM25）+ N-gram | 关键词匹配，支持未登录词 |
+| `semantic` | 稠密向量（语义） | 同义词、概念关联 |
+| `hybrid` | 稠密 + 稀疏 | 综合搜索 |
+
+### 搜索示例
+
+```bash
+# 默认 Legacy 模式（精确匹配）
+siyuan search "关键词"
+
+# 关键词搜索（支持 N-gram）
+siyuan search "长颈鹿" --mode keyword
+
+# 语义搜索
+siyuan search "人工智能" --mode semantic
+
+# 混合搜索
+siyuan search "AI" --mode hybrid
+```
 
 ## NLP 分析
 

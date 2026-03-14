@@ -14,7 +14,7 @@ siyuan search <query> [options]
 
 | 参数 | 类型 | 说明 | 示例 |
 |-----|------|------|------|
-| `--mode <mode>` | string | 搜索模式：hybrid（混合）、semantic（语义）、keyword（关键词）、legacy（SQL） | `--mode hybrid` |
+| `--mode <mode>` | string | 搜索模式：hybrid（混合）、semantic（语义）、keyword（关键词）、legacy（SQL，默认） | `--mode hybrid` |
 | `--type <type>` | string | 按单个类型过滤 | `--type d` |
 | `--types <types>` | string | 按多个类型过滤（逗号分隔） | `--types d,p,h` |
 | `--sort-by <sortBy>` | string | 排序方式（relevance/date） | `--sort-by date` |
@@ -22,17 +22,26 @@ siyuan search <query> [options]
 | `--path <path>` | string | 搜索路径（仅搜索指定路径下的内容） | `--path /AI/openclaw` |
 | `--notebook <notebookId>` | string | 指定笔记本ID | `--notebook 20260227231831-yq1lxq2` |
 | `--sql <sql>` | string | 自定义SQL查询条件 | `--sql "length(content) > 100 AND updated > '20260101000000'"` |
-| `--sql-weight <weight>` | number | SQL搜索权重（混合搜索时） | `--sql-weight 0.2` |
+| `--sql-weight <weight>` | number | SQL搜索权重（混合搜索时，默认 0） | `--sql-weight 0.3` |
 | `--dense-weight <weight>` | number | 语义搜索权重（混合搜索时，默认 0.7） | `--dense-weight 0.8` |
 | `--sparse-weight <weight>` | number | 关键词搜索权重（混合搜索时，默认 0.3） | `--sparse-weight 0.2` |
 | `--threshold <score>` | number | 相似度阈值（0-1） | `--threshold 0.5` |
 
 ## 搜索模式说明
 
-- `hybrid` - 混合搜索（默认）：结合语义搜索和关键词搜索，提供最佳检索效果
+- `legacy` - SQL 搜索（默认）：使用 SQL LIKE 查询，精确匹配关键词
+- `hybrid` - 混合搜索：结合语义搜索和关键词搜索
 - `semantic` - 语义搜索：基于向量相似度，能找到语义相关的内容（使用 nomic-embed-text 模型）
 - `keyword` - 关键词搜索：基于 BM25 算法，精确匹配关键词
-- `legacy` - SQL 搜索：使用原有的 SQL LIKE 查询
+
+### 模式对比
+
+| 模式 | 匹配方式 | 适用场景 | 精确度 |
+|------|----------|----------|--------|
+| legacy | SQL LIKE 精确匹配 | 精确关键词搜索 | ★★★★★ |
+| keyword | 稀疏向量（BM25） | 关键词匹配，支持 N-gram | ★★★★☆ |
+| semantic | 稠密向量（语义） | 同义词、概念关联 | ★★★☆☆ |
+| hybrid | 稠密 + 稀疏 | 综合搜索 | ★★★★☆ |
 
 ## 支持的类型
 - `d` - 文档
@@ -47,17 +56,21 @@ siyuan search <query> [options]
 
 ## 使用示例
 
-### 基本搜索
+### 基本搜索（默认 Legacy 模式）
 ```bash
 siyuan search "关键词"
+siyuan search "长颈鹿"
 siyuan search "关键词" --type d
 siyuan search "关键词" --types p,h
 ```
 
-### 混合搜索（推荐）
+### 混合搜索
 ```bash
 siyuan search "机器学习技术" --mode hybrid
 siyuan search "机器学习" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
+
+# 如需在混合搜索中包含 SQL 精确匹配，手动指定 sql-weight
+siyuan search "长颈鹿" --mode hybrid --sql-weight 0.3
 ```
 
 ### 语义搜索
@@ -69,6 +82,7 @@ siyuan search "AI" --mode semantic --threshold 0.5
 ### 关键词搜索
 ```bash
 siyuan search "深度学习" --mode keyword
+siyuan search "Kubernetes" --mode keyword
 ```
 
 ### SQL搜索
@@ -91,11 +105,13 @@ siyuan search "关键词" --sort-by date --limit 5
 ```
 
 ## 最佳实践
-1. **默认使用混合搜索**：适用于大多数场景，提供最佳检索效果
-2. **语义搜索用于概念查找**：当需要找到概念相关的内容时使用
-3. **关键词搜索用于精确查找**：当需要精确匹配关键词时使用
-4. **合理设置limit**：避免返回过多结果，影响性能
-5. **使用路径限制搜索范围**：提高搜索效率和准确性
+
+1. **默认使用 Legacy 模式**：精确匹配关键词，结果最可靠
+2. **关键词搜索用于技术术语**：`keyword` 模式支持 N-gram，对未登录词效果好
+3. **语义搜索用于概念查找**：当需要找到同义词、概念相关的内容时使用 `semantic` 模式
+4. **混合搜索用于综合需求**：需要同时匹配语义和关键词时使用 `hybrid` 模式
+5. **合理设置 limit**：避免返回过多结果，影响性能
+6. **使用路径限制搜索范围**：提高搜索效率和准确性
 
 ## 相关文档
 - [向量搜索配置](../advanced/vector-search.md)
