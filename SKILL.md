@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.6.8"
+version: "1.6.9"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
 skillType: "cli"
 runtime: "node"
@@ -180,6 +180,30 @@ siyuan exists --path "/目录/文档标题"
 ---
 
 # 最佳实践
+
+## create 命令参数
+
+参数顺序灵活，以下写法都支持：
+
+```bash
+# 以下三种写法效果相同
+siyuan create "文档标题" "文档内容" --parent-id <parentId>
+siyuan create --parent-id <parentId> "文档标题" "文档内容"
+siyuan create "文档标题" --path "/笔记本/目录/文档名" "文档内容"
+```
+
+**指定目标位置的方式**（二选一）：
+- `--parent-id <id>` — 指定父文档/笔记本ID
+- `--path "/路径"` — 指定完整路径（推荐）
+
+**常见错误参数提示**：
+- ❌ `--parent-path` → ✅ 使用 `--path` 或 `--parent-id`
+- ❌ `--notebook` → ✅ 使用 `--parent-id`（笔记本ID也可作为父ID）
+- ❌ `--folder` / `--dir` → ✅ 使用 `--parent-id` 或 `--path`
+
+**标题包含斜杠**：
+- 标题中的 `/` 会自动转换为全角 `／`，避免被误认为路径分隔符
+- 示例：`siyuan create "文档/子标题" "内容"` → 实际标题为 `文档／子标题`
 
 ## 内容修改
 

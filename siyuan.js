@@ -15,6 +15,80 @@ if (process.platform === 'win32') {
 const { createSkill } = require('./index');
 
 /**
+ * 通用命令行参数解析器
+ * 支持任意参数顺序，自动识别选项参数和位置参数
+ * @param {Array} args - 命令行参数数组（从索引1开始，不包括命令本身）
+ * @param {Object} config - 解析配置
+ * @param {Object} config.options - 选项定义 { optionName: { hasValue: true/false, aliases: [] } }
+ * @param {number} config.positionalCount - 位置参数数量（如标题、内容等）
+ * @param {Array} config.commonMistakes - 常见错误参数映射 { wrong: correct }
+ * @returns {Object} 解析结果 { positional: [...], options: {...} }
+ */
+function parseCommandArgs(args, config) {
+  const { options = {}, positionalCount = 0, commonMistakes = {} } = config;
+  
+  const result = {
+    positional: [],
+    options: {}
+  };
+  
+  // 构建选项映射（包括别名）
+  const optionMap = {};
+  for (const [name, opt] of Object.entries(options)) {
+    optionMap[name] = opt;
+    if (opt.aliases) {
+      for (const alias of opt.aliases) {
+        optionMap[alias] = { ...opt, targetName: name };
+      }
+    }
+  }
+  
+  const knownOptions = Object.keys(optionMap);
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg.startsWith('--')) {
+      // 检测常见错误参数
+      if (commonMistakes[arg]) {
+        console.error(`\n❌ 未知参数: ${arg}`);
+        console.error(`您可能想使用: ${commonMistakes[arg]}`);
+        process.exit(1);
+      }
+      
+      // 检查是否是已知选项
+      const optConfig = optionMap[arg];
+      if (optConfig) {
+        const targetName = optConfig.targetName || arg.replace(/^--/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        
+        if (optConfig.hasValue && i + 1 < args.length) {
+          result.options[targetName] = args[++i];
+        } else if (optConfig.isFlag) {
+          result.options[targetName] = true;
+        }
+      } else {
+        // 未知参数警告
+        if (!knownOptions.includes(arg)) {
+          console.warn(`⚠️ 警告: 未知参数 "${arg}" 将被忽略`);
+        }
+      }
+    } else {
+      // 非选项参数，按位置收集
+      result.positional.push(arg);
+    }
+  }
+  
+  // 限制位置参数数量
+  if (positionalCount > 0 && result.positional.length > positionalCount) {
+    // 超出部分合并到最后一个参数
+    const extra = result.positional.splice(positionalCount - 1);
+    result.positional[positionalCount - 1] = extra.join(' ');
+  }
+  
+  return result;
+}
+
+/**
  * 命令别名映射（全局）
  */
 const ALIAS_MAP = {
@@ -189,18 +263,36 @@ function showCommandHelp(command) {
       aliases: ['new'],
       description: '创建文档（自动处理换行符）',
       usage: 'siyuan create <title> [content] [--parent-id <parentId>] [--path <path>] [--force]',
+      notes: [
+        '参数顺序灵活，以下写法都支持：',
+        '  siyuan create "标题" "内容" --parent-id <id>',
+        '  siyuan create --parent-id <id> "标题" "内容"',
+        '  siyuan create "标题" --path "/路径" "内容"',
+        '',
+        '标题中的 / 会自动转换为全角 ／',
+        '',
+        '指定目标位置的方式：',
+        '  --parent-id <id>  指定父文档/笔记本ID',
+        '  --path "/路径"     指定完整路径（推荐）'
+      ],
       options: [
         { name: '--parent-id, --parent', description: '父文档/笔记本ID' },
         { name: '--path', description: '文档路径（支持绝对路径或相对路径）' },
         { name: '--force', description: '强制创建（忽略重名检测）' }
       ],
       examples: [
+        '# 基本用法',
         'siyuan create "我的文档"',
         'siyuan create "我的文档" "文档内容"',
-        'siyuan create "子文档" "文档内容" --parent <parentId>',
-        'siyuan create "子文档" "文档内容" --path /AI/openclaw/插件',
-        'siyuan create "子文档" "文档内容" --path /AI/openclaw/插件 --force',
-        'siyuan create "多行文档" "第一行内容\\n第二行内容\\n第三行内容"'
+        '',
+        '# 指定目标位置（参数顺序灵活）',
+        'siyuan create "子文档" "内容" --parent <parentId>',
+        'siyuan create --parent-id <parentId> "子文档" "内容"',
+        'siyuan create "子文档" --path /笔记本/目录/文档名 "内容"',
+        '',
+        '# 标题包含斜杠会自动转换',
+        'siyuan create "文档/子标题" "内容"',
+        '# 实际创建的标题为 "文档／子标题"'
       ]
     },
     'update-document': {
@@ -518,6 +610,9 @@ ${help.description}
 
 用法:
   ${help.usage}
+${help.notes ? '\n注意事项:\n' : ''}${help.notes ? help.notes.map(note => 
+    note === '' ? '' : `  ${note}`
+  ).join('\n') : ''}
 ${help.options ? '\n选项:\n' : ''}${help.options ? help.options.map(opt => 
     `  ${opt.name.padEnd(20)} ${opt.description}`
   ).join('\n') : ''}
@@ -586,15 +681,24 @@ async function main(customArgs = null) {
           showHelp('structure');
           process.exit(0);
         }
-        if (args.length < 2) {
+        console.log('获取文档结构...');
+        const structureParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--notebook-id': { hasValue: true, aliases: ['--notebook'] },
+            '--force-refresh': { isFlag: true }
+          },
+          positionalCount: 1
+        });
+        const structureArgs = {};
+        if (structureParsed.positional.length > 0) {
+          structureArgs.notebookId = structureParsed.positional[0];
+        }
+        if (structureParsed.options.notebookId) structureArgs.notebookId = structureParsed.options.notebookId;
+        if (structureParsed.options.forceRefresh) structureArgs.forceRefresh = true;
+        if (!structureArgs.notebookId) {
           console.error('错误: 请提供笔记本ID');
           console.log('用法: siyuan structure <notebookId> [--force-refresh]');
           process.exit(1);
-        }
-        console.log('获取文档结构...');
-        const structureArgs = { notebookId: args[1] };
-        if (args.includes('--force-refresh')) {
-          structureArgs.forceRefresh = true;
         }
         const structure = await skill.executeCommand('get-doc-structure', structureArgs);
         console.log(JSON.stringify(structure, null, 2));
@@ -607,22 +711,28 @@ async function main(customArgs = null) {
           showHelp('content');
           process.exit(0);
         }
-        if (args.length < 2) {
+        console.log('获取文档内容...');
+        const contentParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--doc-id': { hasValue: true, aliases: ['--id'] },
+            '--format': { hasValue: true },
+            '--raw': { isFlag: true }
+          },
+          positionalCount: 1
+        });
+        const contentArgs = {};
+        if (contentParsed.positional.length > 0) {
+          contentArgs.docId = contentParsed.positional[0];
+        }
+        if (contentParsed.options.docId) contentArgs.docId = contentParsed.options.docId;
+        if (contentParsed.options.format) contentArgs.format = contentParsed.options.format;
+        if (contentParsed.options.raw) contentArgs.raw = true;
+        if (!contentArgs.docId) {
           console.error('错误: 请提供文档ID');
           console.log('用法: siyuan content <docId> [--format <format>] [--raw]');
           process.exit(1);
         }
-        console.log('获取文档内容...');
-        const contentArgs = { docId: args[1] };
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === '--format' && i + 1 < args.length) {
-            contentArgs.format = args[++i];
-          } else if (args[i] === '--raw') {
-            contentArgs.raw = true;
-          }
-        }
         const content = await skill.executeCommand('get-doc-content', contentArgs);
-        // 如果返回的是字符串（raw模式），直接输出，否则输出JSON
         if (typeof content === 'string') {
           console.log(content);
         } else {
@@ -638,18 +748,20 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('检查文档是否存在...');
+        const existsParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--title': { hasValue: true, aliases: ['-t'] },
+            '--parent-id': { hasValue: true, aliases: ['-p'] },
+            '--notebook-id': { hasValue: true, aliases: ['-n', '--notebook'] },
+            '--path': { hasValue: true }
+          },
+          positionalCount: 0
+        });
         const existsArgs = {};
-        for (let i = 1; i < args.length; i++) {
-          if ((args[i] === '--title' || args[i] === '-t') && i + 1 < args.length) {
-            existsArgs.title = args[++i];
-          } else if ((args[i] === '--parent-id' || args[i] === '-p') && i + 1 < args.length) {
-            existsArgs.parentId = args[++i];
-          } else if ((args[i] === '--notebook-id' || args[i] === '-n') && i + 1 < args.length) {
-            existsArgs.notebookId = args[++i];
-          } else if (args[i] === '--path' && i + 1 < args.length) {
-            existsArgs.path = args[++i];
-          }
-        }
+        if (existsParsed.options.title) existsArgs.title = existsParsed.options.title;
+        if (existsParsed.options.parentId) existsArgs.parentId = existsParsed.options.parentId;
+        if (existsParsed.options.notebookId) existsArgs.notebookId = existsParsed.options.notebookId;
+        if (existsParsed.options.path) existsArgs.path = existsParsed.options.path;
         const existsResult = await skill.executeCommand('check-exists', existsArgs);
         console.log(JSON.stringify(existsResult, null, 2));
         break;
@@ -661,44 +773,46 @@ async function main(customArgs = null) {
           showHelp('search');
           process.exit(0);
         }
-        if (args.length < 2) {
+        console.log('搜索内容...');
+        const searchParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--type': { hasValue: true },
+            '--types': { hasValue: true },
+            '--sort-by': { hasValue: true },
+            '--limit': { hasValue: true },
+            '--path': { hasValue: true },
+            '--sql': { hasValue: true },
+            '--mode': { hasValue: true },
+            '--notebook': { hasValue: true },
+            '--notebook-id': { hasValue: true, aliases: ['--notebook'] },
+            '--sql-weight': { hasValue: true },
+            '--dense-weight': { hasValue: true },
+            '--sparse-weight': { hasValue: true },
+            '--threshold': { hasValue: true }
+          },
+          positionalCount: 1
+        });
+        const searchArgs = {};
+        if (searchParsed.positional.length > 0) {
+          searchArgs.query = searchParsed.positional[0];
+        }
+        if (searchParsed.options.type) searchArgs.type = searchParsed.options.type;
+        if (searchParsed.options.types) searchArgs.types = searchParsed.options.types;
+        if (searchParsed.options.sortBy) searchArgs.sortBy = searchParsed.options.sortBy;
+        if (searchParsed.options.limit) searchArgs.limit = parseInt(searchParsed.options.limit, 10);
+        if (searchParsed.options.path) searchArgs.path = searchParsed.options.path;
+        if (searchParsed.options.sql) searchArgs.sql = searchParsed.options.sql;
+        if (searchParsed.options.mode) searchArgs.mode = searchParsed.options.mode;
+        if (searchParsed.options.notebookId) searchArgs.notebookId = searchParsed.options.notebookId;
+        if (searchParsed.options.sqlWeight) searchArgs.sqlWeight = parseFloat(searchParsed.options.sqlWeight);
+        if (searchParsed.options.denseWeight) searchArgs.denseWeight = parseFloat(searchParsed.options.denseWeight);
+        if (searchParsed.options.sparseWeight) searchArgs.sparseWeight = parseFloat(searchParsed.options.sparseWeight);
+        if (searchParsed.options.threshold) searchArgs.threshold = parseFloat(searchParsed.options.threshold);
+        if (!searchArgs.query) {
           console.error('错误: 请提供搜索关键词');
           console.log('用法: siyuan search <query> [--type <type>] [--types <types>] [--sort-by <sortBy>] [--limit <limit>] [--mode hybrid|semantic|keyword|legacy] [--sql-weight <weight>] [--dense-weight <weight>] [--sparse-weight <weight>] [--threshold <score>]');
           process.exit(1);
         }
-        
-        console.log('搜索内容...');
-        
-        // 解析额外参数
-        const searchArgs = { query: args[1] };
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === '--type' && i + 1 < args.length) {
-            searchArgs.type = args[++i];
-          } else if (args[i] === '--types' && i + 1 < args.length) {
-            searchArgs.types = args[++i];
-          } else if (args[i] === '--sort-by' && i + 1 < args.length) {
-            searchArgs.sortBy = args[++i];
-          } else if (args[i] === '--limit' && i + 1 < args.length) {
-            searchArgs.limit = parseInt(args[++i], 10);
-          } else if (args[i] === '--path' && i + 1 < args.length) {
-            searchArgs.path = args[++i];
-          } else if (args[i] === '--sql' && i + 1 < args.length) {
-            searchArgs.sql = args[++i];
-          } else if (args[i] === '--mode' && i + 1 < args.length) {
-            searchArgs.mode = args[++i];
-          } else if (args[i] === '--notebook' && i + 1 < args.length) {
-            searchArgs.notebookId = args[++i];
-          } else if (args[i] === '--sql-weight' && i + 1 < args.length) {
-            searchArgs.sqlWeight = parseFloat(args[++i]);
-          } else if (args[i] === '--dense-weight' && i + 1 < args.length) {
-            searchArgs.denseWeight = parseFloat(args[++i]);
-          } else if (args[i] === '--sparse-weight' && i + 1 < args.length) {
-            searchArgs.sparseWeight = parseFloat(args[++i]);
-          } else if (args[i] === '--threshold' && i + 1 < args.length) {
-            searchArgs.threshold = parseFloat(args[++i]);
-          }
-        }
-        
         const searchResult = await skill.executeCommand('search-content', searchArgs);
         console.log(JSON.stringify(searchResult, null, 2));
         break;
@@ -710,35 +824,41 @@ async function main(customArgs = null) {
           showHelp('create');
           process.exit(0);
         }
-        if (args.length < 2) {
+        
+        // 使用通用参数解析器
+        const createParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--parent-id': { hasValue: true, aliases: ['--parent'] },
+            '--path': { hasValue: true },
+            '--force': { isFlag: true }
+          },
+          positionalCount: 2,
+          commonMistakes: {
+            '--parent-path': '--path（用于指定完整路径）或 --parent-id（用于指定父文档ID）',
+            '--notebook': '--parent-id（指定笔记本ID作为父ID）',
+            '--folder': '--parent-id（指定父文档ID）或 --path（指定完整路径）',
+            '--dir': '--parent-id（指定父文档ID）或 --path（指定完整路径）'
+          }
+        });
+        
+        if (createParsed.positional.length === 0) {
           console.error('错误: 请提供文档标题');
           console.log('用法: siyuan create <title> [content] [--parent-id <parentId>] [--path <path>] [--force]');
           process.exit(1);
         }
-        let title = args[1];
-        let docContent = '';
-        let parentId = process.env.SIYUAN_DEFAULT_NOTEBOOK;
-        let path = '';
-        let force = false;
         
-        // 已知的参数选项（用于排除）
-        const knownOptions = ['--parent-id', '--parent', '--path', '--force'];
+        let title = createParsed.positional[0];
+        let docContent = createParsed.positional[1] || '';
+        let parentId = createParsed.options.parentId || process.env.SIYUAN_DEFAULT_NOTEBOOK;
+        let createPath = createParsed.options.path || '';
+        let force = createParsed.options.force || false;
         
-        // 解析参数 - 收集所有非选项参数作为内容
-        let contentParts = [];
-        for (let i = 2; i < args.length; i++) {
-          if ((args[i] === '--parent-id' || args[i] === '--parent') && i + 1 < args.length) {
-            parentId = args[++i];
-          } else if (args[i] === '--path' && i + 1 < args.length) {
-            path = args[++i];
-          } else if (args[i] === '--force') {
-            force = true;
-          } else if (!knownOptions.includes(args[i]) && !args[i].startsWith('--parent-id') && !args[i].startsWith('--parent')) {
-            // 排除已知选项及其值，其他都作为内容
-            contentParts.push(args[i]);
-          }
+        // 处理标题中的斜杠：将 / 转换为全角 ／（避免被误认为路径分隔符）
+        if (title.includes('/')) {
+          const originalTitle = title;
+          title = title.replace(/\//g, '／');
+          console.log(`⚠️ 标题包含斜杠，已自动转换: "${originalTitle}" → "${title}"`);
         }
-        docContent = contentParts.join(' ');
         
         // 如果未提供 parentId，使用技能配置的默认笔记本
         if (!parentId) {
@@ -756,8 +876,8 @@ async function main(customArgs = null) {
         if (parentId) {
           console.log('父文档 ID:', parentId);
         }
-        if (path) {
-          console.log('路径:', path);
+        if (createPath) {
+          console.log('路径:', createPath);
         }
         console.log('强制创建:', force);
         
@@ -766,7 +886,7 @@ async function main(customArgs = null) {
           title: title,
           content: docContent,
           force: force,
-          path: path
+          path: createPath
         });
         console.log(JSON.stringify(createResult, null, 2));
         break;
@@ -778,26 +898,27 @@ async function main(customArgs = null) {
           showHelp('update');
           process.exit(0);
         }
-        if (args.length < 3) {
+        
+        // 使用通用参数解析器
+        const updateParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--data-type': { hasValue: true }
+          },
+          positionalCount: 2
+        });
+        
+        if (updateParsed.positional.length < 2) {
           console.error('错误: 请提供文档ID和内容');
           console.log('用法: siyuan update <docId> <content> [--data-type <type>]');
           process.exit(1);
         }
+        
         console.log('更新文档...');
         const updateDocArgs = {
-          docId: args[1],
-          content: args[2]
+          docId: updateParsed.positional[0],
+          content: updateParsed.positional[1],
+          dataType: updateParsed.options.dataType
         };
-        
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--doc-id' && i + 1 < args.length) {
-            updateDocArgs.docId = args[++i];
-          } else if (args[i] === '--content' && i + 1 < args.length) {
-            updateDocArgs.content = args[++i];
-          } else if (args[i] === '--data-type' && i + 1 < args.length) {
-            updateDocArgs.dataType = args[++i];
-          }
-        }
         
         const updateDocResult = await skill.executeCommand('update-document', updateDocArgs);
         console.log(JSON.stringify(updateDocResult, null, 2));
@@ -811,27 +932,25 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         
-        const deleteArgs = {};
+        // 使用通用参数解析器
+        const deleteParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--confirm-title': { hasValue: true }
+          },
+          positionalCount: 1
+        });
         
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--doc-id' && i + 1 < args.length) {
-            deleteArgs.docId = args[++i];
-          } else if (args[i] === '--confirm-title' && i + 1 < args.length) {
-            deleteArgs.confirmTitle = args[++i];
-          } else if (!args[i].startsWith('-') && !deleteArgs.docId) {
-            deleteArgs.docId = args[i];
-          }
-        }
-        
-        if (!deleteArgs.docId) {
+        if (deleteParsed.positional.length < 1) {
           console.error('错误: 请提供文档ID');
           console.log('用法: siyuan delete <docId> [--confirm-title <title>]');
-          console.log('     siyuan delete --doc-id <docId> [--confirm-title <title>]');
           process.exit(1);
         }
         
         console.log('删除文档...');
-        const deleteResult = await skill.executeCommand('delete-document', deleteArgs);
+        const deleteResult = await skill.executeCommand('delete-document', {
+          docId: deleteParsed.positional[0],
+          confirmTitle: deleteParsed.options.confirmTitle
+        });
         console.log(JSON.stringify(deleteResult, null, 2));
         break;
         
@@ -841,20 +960,28 @@ async function main(customArgs = null) {
           showHelp('protect');
           process.exit(0);
         }
-        if (args.length < 2) {
+        
+        // 使用通用参数解析器
+        const protectParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--remove': { isFlag: true },
+            '--permanent': { isFlag: true }
+          },
+          positionalCount: 1
+        });
+        
+        if (protectParsed.positional.length < 1) {
           console.error('错误: 请提供文档ID');
           console.log('用法: siyuan protect <docId> [--remove] [--permanent]');
           process.exit(1);
         }
         
-        const protectArgs = {
-          docId: args[1],
-          remove: args.includes('--remove'),
-          permanent: args.includes('--permanent')
-        };
-        
         console.log('设置文档保护...');
-        const protectResult = await skill.executeCommand('protect-document', protectArgs);
+        const protectResult = await skill.executeCommand('protect-document', {
+          docId: protectParsed.positional[0],
+          remove: protectParsed.options.remove || false,
+          permanent: protectParsed.options.permanent || false
+        });
         console.log(JSON.stringify(protectResult, null, 2));
         break;
         
@@ -865,23 +992,33 @@ async function main(customArgs = null) {
           showHelp('move');
           process.exit(0);
         }
-        if (args.length < 3) {
+        
+        // 使用通用参数解析器
+        const moveParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--new-title': { hasValue: true }
+          },
+          positionalCount: 2
+        });
+        
+        if (moveParsed.positional.length < 2) {
           console.error('错误：请提供文档 ID/路径和目标位置');
           console.log('用法：siyuan move <docId|path> <targetParentId|path> [--new-title <title>]');
           process.exit(1);
         }
-        console.log('移动文档...');
         
-        // 解析额外参数
-        const moveArgs = {
-          docId: args[1],
-          targetParentId: args[2]
-        };
-        for (let i = 3; i < args.length; i++) {
-          if (args[i] === '--new-title' && i + 1 < args.length) {
-            moveArgs.newTitle = args[++i];
-          }
+        console.log('移动文档...');
+        let moveNewTitle = moveParsed.options.newTitle;
+        if (moveNewTitle && moveNewTitle.includes('/')) {
+          const convertedTitle = moveNewTitle.replace(/\//g, '／');
+          console.log(`⚠️ 标题包含斜杠，已自动转换: "${moveNewTitle}" → "${convertedTitle}"`);
+          moveNewTitle = convertedTitle;
         }
+        const moveArgs = {
+          docId: moveParsed.positional[0],
+          targetParentId: moveParsed.positional[1],
+          newTitle: moveNewTitle
+        };
         
         console.log('文档 ID/路径:', moveArgs.docId);
         console.log('目标位置:', moveArgs.targetParentId);
@@ -1023,24 +1160,25 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('插入块...');
-        const insertBlockArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          insertBlockArgs.data = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--data' && i + 1 < args.length) {
-            insertBlockArgs.data = args[++i];
-          } else if (args[i] === '--data-type' && i + 1 < args.length) {
-            insertBlockArgs.dataType = args[++i];
-          } else if (args[i] === '--parent-id' && i + 1 < args.length) {
-            insertBlockArgs.parentId = args[++i];
-          } else if (args[i] === '--previous-id' && i + 1 < args.length) {
-            insertBlockArgs.previousId = args[++i];
-          } else if (args[i] === '--next-id' && i + 1 < args.length) {
-            insertBlockArgs.nextId = args[++i];
-          }
-        }
-        const insertBlockResult = await skill.executeCommand('block-insert', insertBlockArgs);
+        
+        // 使用通用参数解析器
+        const insertBlockParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--data-type': { hasValue: true },
+            '--parent-id': { hasValue: true },
+            '--previous-id': { hasValue: true },
+            '--next-id': { hasValue: true }
+          },
+          positionalCount: 1
+        });
+        
+        const insertBlockResult = await skill.executeCommand('block-insert', {
+          data: insertBlockParsed.positional[0] || '',
+          dataType: insertBlockParsed.options.dataType,
+          parentId: insertBlockParsed.options.parentId,
+          previousId: insertBlockParsed.options.previousId,
+          nextId: insertBlockParsed.options.nextId
+        });
         console.log(JSON.stringify(insertBlockResult, null, 2));
         break;
         
@@ -1051,35 +1189,26 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('更新块...');
-        const updateBlockArgs = {};
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            updateBlockArgs.id = args[++i];
-          } else if (args[i] === '--data' && i + 1 < args.length) {
-            updateBlockArgs.data = args[++i];
-          } else if (args[i] === '--data-type' && i + 1 < args.length) {
-            updateBlockArgs.dataType = args[++i];
-          } else if (args[i] === '--content' && i + 1 < args.length) {
-            updateBlockArgs.data = args[++i];
-          } else if (i === 1 && !args[i].startsWith('--')) {
-            updateBlockArgs.id = args[i];
-          } else if (i === 2 && !args[i].startsWith('--')) {
-            updateBlockArgs.data = args[i];
-          }
-        }
         
-        if (!updateBlockArgs.id) {
-          console.error('错误: 请提供块ID');
-          console.log('用法: siyuan block-update <blockId> <content> [--data-type <type>]');
-          process.exit(1);
-        }
-        if (!updateBlockArgs.data) {
-          console.error('错误: 请提供块内容');
+        // 使用通用参数解析器
+        const updateBlockParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--data-type': { hasValue: true }
+          },
+          positionalCount: 2
+        });
+        
+        if (updateBlockParsed.positional.length < 2) {
+          console.error('错误: 请提供块ID和内容');
           console.log('用法: siyuan block-update <blockId> <content> [--data-type <type>]');
           process.exit(1);
         }
         
-        const updateBlockResult = await skill.executeCommand('block-update', updateBlockArgs);
+        const updateBlockResult = await skill.executeCommand('block-update', {
+          id: updateBlockParsed.positional[0],
+          data: updateBlockParsed.positional[1],
+          dataType: updateBlockParsed.options.dataType
+        });
         console.log(JSON.stringify(updateBlockResult, null, 2));
         break;
         
@@ -1090,17 +1219,22 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('删除块...');
-        const deleteBlockArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          deleteBlockArgs.id = args[1];
-        } else {
-          for (let i = 1; i < args.length; i++) {
-            if (args[i] === '--id' && i + 1 < args.length) {
-              deleteBlockArgs.id = args[++i];
-            }
-          }
+        
+        // 使用通用参数解析器
+        const deleteBlockParsed = parseCommandArgs(args.slice(1), {
+          options: {},
+          positionalCount: 1
+        });
+        
+        if (deleteBlockParsed.positional.length < 1) {
+          console.error('错误: 请提供块ID');
+          console.log('用法: siyuan block-delete <blockId>');
+          process.exit(1);
         }
-        const deleteBlockResult = await skill.executeCommand('block-delete', deleteBlockArgs);
+        
+        const deleteBlockResult = await skill.executeCommand('block-delete', {
+          id: deleteBlockParsed.positional[0]
+        });
         console.log(JSON.stringify(deleteBlockResult, null, 2));
         break;
         
@@ -1111,20 +1245,21 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('移动块...');
-        const moveBlockArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          moveBlockArgs.id = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            moveBlockArgs.id = args[++i];
-          } else if (args[i] === '--parent-id' && i + 1 < args.length) {
-            moveBlockArgs.parentId = args[++i];
-          } else if (args[i] === '--previous-id' && i + 1 < args.length) {
-            moveBlockArgs.previousId = args[++i];
-          }
-        }
-        const moveBlockResult = await skill.executeCommand('block-move', moveBlockArgs);
+        
+        // 使用通用参数解析器
+        const moveBlockParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--parent-id': { hasValue: true },
+            '--previous-id': { hasValue: true }
+          },
+          positionalCount: 1
+        });
+        
+        const moveBlockResult = await skill.executeCommand('block-move', {
+          id: moveBlockParsed.positional[0],
+          parentId: moveBlockParsed.options.parentId,
+          previousId: moveBlockParsed.options.previousId
+        });
         console.log(JSON.stringify(moveBlockResult, null, 2));
         break;
         
@@ -1135,18 +1270,19 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('获取块信息...');
-        const getBlockArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          getBlockArgs.id = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            getBlockArgs.id = args[++i];
-          } else if (args[i] === '--mode' && i + 1 < args.length) {
-            getBlockArgs.mode = args[++i];
-          }
-        }
-        const getBlockResult = await skill.executeCommand('block-get', getBlockArgs);
+        
+        // 使用通用参数解析器
+        const getBlockParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--mode': { hasValue: true }
+          },
+          positionalCount: 1
+        });
+        
+        const getBlockResult = await skill.executeCommand('block-get', {
+          id: getBlockParsed.positional[0],
+          mode: getBlockParsed.options.mode
+        });
         console.log(JSON.stringify(getBlockResult, null, 2));
         break;
         
@@ -1158,20 +1294,23 @@ async function main(customArgs = null) {
           showHelp('block-fold');
           process.exit(0);
         }
+        
+        // 使用通用参数解析器
+        const foldBlockParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--action': { hasValue: true }
+          },
+          positionalCount: 1
+        });
+        
         const defaultFoldAction = (command === 'block-unfold' || command === 'buu') ? 'unfold' : 'fold';
-        const foldBlockArgs = { action: defaultFoldAction };
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          foldBlockArgs.id = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            foldBlockArgs.id = args[++i];
-          } else if (args[i] === '--action' && i + 1 < args.length) {
-            foldBlockArgs.action = args[++i];
-          }
-        }
-        console.log(`${foldBlockArgs.action === 'fold' ? '折叠' : '展开'}块...`);
-        const foldBlockResult = await skill.executeCommand('block-fold', foldBlockArgs);
+        const foldAction = foldBlockParsed.options.action || defaultFoldAction;
+        
+        console.log(`${foldAction === 'fold' ? '折叠' : '展开'}块...`);
+        const foldBlockResult = await skill.executeCommand('block-fold', {
+          id: foldBlockParsed.positional[0],
+          action: foldAction
+        });
         console.log(JSON.stringify(foldBlockResult, null, 2));
         break;
         
@@ -1182,17 +1321,22 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('转移块引用...');
-        const transferBlockRefArgs = {};
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--from-id' && i + 1 < args.length) {
-            transferBlockRefArgs.fromId = args[++i];
-          } else if (args[i] === '--to-id' && i + 1 < args.length) {
-            transferBlockRefArgs.toId = args[++i];
-          } else if (args[i] === '--ref-ids' && i + 1 < args.length) {
-            transferBlockRefArgs.refIds = args[++i];
-          }
-        }
-        const transferBlockRefResult = await skill.executeCommand('transfer-block-ref', transferBlockRefArgs);
+        
+        // 使用通用参数解析器
+        const transferBlockRefParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--from-id': { hasValue: true },
+            '--to-id': { hasValue: true },
+            '--ref-ids': { hasValue: true }
+          },
+          positionalCount: 0
+        });
+        
+        const transferBlockRefResult = await skill.executeCommand('transfer-block-ref', {
+          fromId: transferBlockRefParsed.options.fromId,
+          toId: transferBlockRefParsed.options.toId,
+          refIds: transferBlockRefParsed.options.refIds
+        });
         console.log(JSON.stringify(transferBlockRefResult, null, 2));
         break;
         
@@ -1202,20 +1346,36 @@ async function main(customArgs = null) {
           showHelp('rename');
           process.exit(0);
         }
-        if (args.length < 3) {
+        
+        // 使用通用参数解析器
+        const renameParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--force': { isFlag: true }
+          },
+          positionalCount: 2
+        });
+        
+        if (renameParsed.positional.length < 2) {
           console.error('错误：请提供文档 ID 和新标题');
           console.log('用法：siyuan rename <docId> <title> [--force]');
           process.exit(1);
         }
+        
+        let renameTitle = renameParsed.positional[1];
+        if (renameTitle.includes('/')) {
+          const convertedTitle = renameTitle.replace(/\//g, '／');
+          console.log(`⚠️ 标题包含斜杠，已自动转换: "${renameTitle}" → "${convertedTitle}"`);
+          renameTitle = convertedTitle;
+        }
+        
         console.log('重命名文档...');
-        const renameArgs = {
-          docId: args[1],
-          title: args[2],
-          force: args.includes('--force')
-        };
-        console.log('文档 ID:', renameArgs.docId);
-        console.log('新标题:', renameArgs.title);
-        const renameResult = await skill.executeCommand('rename-document', renameArgs);
+        console.log('文档 ID:', renameParsed.positional[0]);
+        console.log('新标题:', renameTitle);
+        const renameResult = await skill.executeCommand('rename-document', {
+          docId: renameParsed.positional[0],
+          title: renameTitle,
+          force: renameParsed.options.force || false
+        });
         console.log(JSON.stringify(renameResult, null, 2));
         break;
         
@@ -1226,31 +1386,32 @@ async function main(customArgs = null) {
           showHelp('block-attrs');
           process.exit(0);
         }
-        if (args.length < 2) {
+        console.log('设置属性...');
+        const baParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--id': { hasValue: true },
+            '--attrs': { hasValue: true },
+            '--set': { hasValue: true, aliases: ['--attrs'] },
+            '--get': { isFlag: true },
+            '--key': { hasValue: true },
+            '--hide': { isFlag: true }
+          },
+          positionalCount: 1
+        });
+        const setAttrsArgs = {};
+        if (baParsed.positional.length > 0) {
+          setAttrsArgs.id = baParsed.positional[0];
+        }
+        if (baParsed.options.id) setAttrsArgs.id = baParsed.options.id;
+        if (baParsed.options.attrs) setAttrsArgs.attrs = baParsed.options.attrs;
+        if (baParsed.options.set) setAttrsArgs.attrs = baParsed.options.set;
+        if (baParsed.options.key) setAttrsArgs.key = baParsed.options.key;
+        if (baParsed.options.get) setAttrsArgs.get = true;
+        if (baParsed.options.hide) setAttrsArgs.hide = true;
+        if (!setAttrsArgs.id) {
           console.error('错误：请提供块/文档 ID');
           console.log('用法：siyuan block-attrs <id> --set <attrs> [--get [key]] [--hide]');
           process.exit(1);
-        }
-        console.log('设置属性...');
-        const setAttrsArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          setAttrsArgs.id = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            setAttrsArgs.id = args[++i];
-          } else if (args[i] === '--attrs' && i + 1 < args.length) {
-            setAttrsArgs.attrs = args[++i];
-          } else if (args[i] === '--set' && i + 1 < args.length) {
-            setAttrsArgs.attrs = args[++i];
-          } else if (args[i] === '--get') {
-            if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-              setAttrsArgs.key = args[++i];
-            }
-            setAttrsArgs.get = true;
-          } else if (args[i] === '--hide') {
-            setAttrsArgs.hide = true;
-          }
         }
         const setAttrsResult = await skill.executeCommand('block-attrs', setAttrsArgs);
         console.log(JSON.stringify(setAttrsResult, null, 2));
@@ -1261,28 +1422,30 @@ async function main(customArgs = null) {
           showHelp('tags');
           process.exit(0);
         }
-        if (args.length < 2) {
+        console.log('设置标签...');
+        const tagsParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--id': { hasValue: true },
+            '--tags': { hasValue: true },
+            '--add': { isFlag: true },
+            '--remove': { isFlag: true },
+            '--get': { isFlag: true }
+          },
+          positionalCount: 1
+        });
+        const tagsArgs = {};
+        if (tagsParsed.positional.length > 0) {
+          tagsArgs.id = tagsParsed.positional[0];
+        }
+        if (tagsParsed.options.id) tagsArgs.id = tagsParsed.options.id;
+        if (tagsParsed.options.tags) tagsArgs.tags = tagsParsed.options.tags;
+        if (tagsParsed.options.add) tagsArgs.add = true;
+        if (tagsParsed.options.remove) tagsArgs.remove = true;
+        if (tagsParsed.options.get) tagsArgs.get = true;
+        if (!tagsArgs.id) {
           console.error('错误：请提供块/文档 ID');
           console.log('用法：siyuan tags <id> --tags <tags> [--add] [--remove] [--get]');
           process.exit(1);
-        }
-        console.log('设置标签...');
-        const tagsArgs = {};
-        if (args.length >= 2 && !args[1].startsWith('--')) {
-          tagsArgs.id = args[1];
-        }
-        for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            tagsArgs.id = args[++i];
-          } else if (args[i] === '--tags' && i + 1 < args.length) {
-            tagsArgs.tags = args[++i];
-          } else if (args[i] === '--add') {
-            tagsArgs.add = true;
-          } else if (args[i] === '--remove') {
-            tagsArgs.remove = true;
-          } else if (args[i] === '--get') {
-            tagsArgs.get = true;
-          }
         }
         const tagsResult = await skill.executeCommand('tags', tagsArgs);
         console.log(JSON.stringify(tagsResult, null, 2));
