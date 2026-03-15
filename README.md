@@ -221,10 +221,13 @@ siyuan content <docId> --format html
 siyuan content <docId> --raw            # 纯文本输出
 siyuan cat <docId>                      # 别名
 
-# 更新文档
+# 更新文档（仅接受文档ID）
 siyuan update <docId> "新的文档内容"
 siyuan edit <docId> "新内容"            # 别名
-siyuan bu <docId> "新内容"              # 别名
+
+# 更新块（仅接受块ID）
+siyuan block-update <blockId> "更新后的内容"
+siyuan bu <blockId> "新内容"            # 别名
 
 # 删除文档（受保护）
 siyuan delete <docId>

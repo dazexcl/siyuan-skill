@@ -1,10 +1,10 @@
 /**
- * 块更新命令
- * 在 Siyuan Notes 中更新块内容
+ * 文档更新命令
+ * 在 Siyuan Notes 中更新文档内容
  * 
  * 限制说明：
- * - 只接受块ID（type != 'd'）
- * - 不接受文档ID，文档更新请使用 update 命令
+ * - 只接受文档ID（type='d'）
+ * - 不接受块ID，块更新请使用 block-update 命令
  */
 
 const Permission = require('../utils/permission');
@@ -19,29 +19,33 @@ function processContent(content) {
 }
 
 /**
- * 验证ID是否为块ID（非文档ID）
+ * 验证ID是否为文档ID
  * @param {SiyuanNotesSkill} skill - 技能实例
  * @param {string} id - 要验证的ID
- * @returns {Promise<Object>} 验证结果 { isBlock: boolean, error?: string }
+ * @returns {Promise<Object>} 验证结果 { isDoc: boolean, error?: string }
  */
-async function validateBlockId(skill, id) {
+async function validateDocId(skill, id) {
   try {
     const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id });
     
     if (!blockInfo) {
-      return { isBlock: false, error: '无法获取块信息，请检查ID是否正确' };
+      return { isDoc: false, error: '无法获取文档信息，请检查ID是否正确' };
     }
     
     if (blockInfo.rootID === id && blockInfo.path && blockInfo.path.endsWith('.sy')) {
+      return { isDoc: true };
+    }
+    
+    if (blockInfo.rootID !== id) {
       return { 
-        isBlock: false, 
-        error: `传入的ID是文档。请使用 update 命令更新文档内容` 
+        isDoc: false, 
+        error: `传入的ID是子块，不是文档。请使用 block-update 命令更新块内容` 
       };
     }
     
-    return { isBlock: true };
+    return { isDoc: true };
   } catch (error) {
-    return { isBlock: false, error: `验证块ID失败: ${error.message}` };
+    return { isDoc: false, error: `验证文档ID失败: ${error.message}` };
   }
 }
 
@@ -49,45 +53,45 @@ async function validateBlockId(skill, id) {
  * 命令配置
  */
 const command = {
-  name: 'block-update',
-  description: '在 Siyuan Notes 中更新块内容（仅接受块ID，非文档ID）',
-  usage: 'block-update --id <blockId> --data <content> [--data-type <dataType>]',
+  name: 'update-document',
+  description: '在 Siyuan Notes 中更新文档内容（仅接受文档ID）',
+  usage: 'update --doc-id <docId> --content <content> [--data-type <dataType>]',
   
   /**
    * 执行命令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 命令参数
-   * @param {string} args.id - 块ID（必需，非文档ID）
-   * @param {string} args.data - 新内容（必需）
+   * @param {string} args.docId - 文档ID（必需）
+   * @param {string} args.content - 新内容（必需）
    * @param {string} args.dataType - 数据类型（markdown/dom，默认 markdown）
    * @returns {Promise<Object>} 更新结果
    */
   execute: async (skill, args = {}) => {
-    const id = args.id || args.blockId || args['block-id'];
-    const data = args.data || args.content;
+    const docId = args.docId || args['doc-id'] || args.id;
+    const content = args.content || args.data;
     const dataType = args.dataType || args['data-type'] || 'markdown';
     
-    if (!id) {
+    if (!docId) {
       return {
         success: false,
         error: '缺少必要参数',
-        message: '必须提供 id 参数（块ID）'
+        message: '必须提供 docId 参数'
       };
     }
     
-    if (data === undefined) {
+    if (content === undefined) {
       return {
         success: false,
         error: '缺少必要参数',
-        message: '必须提供 data 参数'
+        message: '必须提供 content 参数'
       };
     }
     
     const permissionHandler = Permission.createPermissionWrapper(async (skill, args, notebookId) => {
       try {
-        const validation = await validateBlockId(skill, id);
+        const validation = await validateDocId(skill, docId);
         
-        if (!validation.isBlock) {
+        if (!validation.isDoc) {
           return {
             success: false,
             error: '参数类型错误',
@@ -95,19 +99,19 @@ const command = {
           };
         }
         
-        const processedData = processContent(data);
+        const processedContent = processContent(content);
         
         const requestData = {
-          id,
+          id: docId,
           dataType,
-          data: processedData
+          data: processedContent
         };
         
-        console.log('更新块参数:', { id, dataType, dataLength: processedData.length });
+        console.log('更新文档参数:', { docId, dataType, contentLength: processedContent.length });
         
         const result = await skill.connector.request('/api/block/updateBlock', requestData);
         
-        console.log('更新块成功:', result);
+        console.log('更新文档成功:', result);
         
         if (result && Array.isArray(result) && result.length > 0) {
           const operation = result[0]?.doOperations?.[0];
@@ -118,13 +122,13 @@ const command = {
             return {
               success: true,
               data: {
-                id,
-                operation: 'block-update',
-                contentLength: data.length,
+                docId,
+                operation: 'update-document',
+                contentLength: content.length,
                 timestamp: Date.now(),
                 notebookId
               },
-              message: '块更新成功'
+              message: '文档更新成功'
             };
           }
         }
@@ -135,32 +139,32 @@ const command = {
           return {
             success: true,
             data: {
-              id,
-              operation: 'block-update',
-              contentLength: data.length,
+              docId,
+              operation: 'update-document',
+              contentLength: content.length,
               timestamp: Date.now(),
               notebookId
             },
-            message: '块更新成功'
+            message: '文档更新成功'
           };
         }
         
         return {
           success: false,
-          error: '块更新失败',
-          message: '块更新失败'
+          error: '文档更新失败',
+          message: '文档更新失败'
         };
       } catch (error) {
-        console.error('更新块失败:', error);
+        console.error('更新文档失败:', error);
         return {
           success: false,
           error: error.message,
-          message: '更新块失败'
+          message: '更新文档失败'
         };
       }
     }, {
-      type: 'block',
-      idParam: 'id',
+      type: 'document',
+      idParam: 'docId',
       defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
     });
     

@@ -23,8 +23,8 @@ const ALIAS_MAP = {
   'cat': 'content',
   'find': 'search',
   'new': 'create',
-  'edit': 'block-update',
-  'update': 'block-update',
+  'edit': 'update-document',
+  'update': 'update-document',
   'rm': 'delete',
   'mv': 'move',
   'path': 'convert',
@@ -76,7 +76,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
   structure, ls                    获取指定笔记本的文档结构
   content, cat                     获取文档内容
   create, new                      创建文档（自动重名检测）
-  update, edit, bu                 更新文档/块内容
+  update, edit                     更新文档内容（仅接受文档ID）
   delete, rm                       删除文档（受保护机制约束）
   protect                          设置/移除文档保护标记
   move, mv                         移动文档（自动重名检测）
@@ -87,7 +87,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
   index, index-documents           索引文档到向量数据库
   nlp                              NLP 文本分析 [实验性]
   block-insert, bi                 插入新块
-  block-update, bu                 更新块内容
+  block-update, bu                 更新块内容（仅接受块ID）
   block-delete, bd                 删除块
   block-move, bm                   移动块
   block-get, bg                    获取块信息
@@ -203,13 +203,13 @@ function showCommandHelp(command) {
         'siyuan create "多行文档" "第一行内容\\n第二行内容\\n第三行内容"'
       ]
     },
-    'update': {
-      aliases: ['edit'],
-      description: '更新文档内容（实际更新文档块，支持Markdown格式）',
+    'update-document': {
+      aliases: ['edit', 'update'],
+      description: '更新文档内容（仅接受文档ID，支持Markdown格式）',
       usage: 'siyuan update <docId> <content>',
       notes: [
-        '文档本身也是一种特殊的块（文档块），文档块ID = 文档ID',
-        '使用 /api/block/updateBlock API 更新文档'
+        '此命令仅用于更新文档内容，需要传入文档ID',
+        '如需更新块内容，请使用 block-update 命令'
       ],
       examples: [
         'siyuan update <doc-id> "新的文档内容"',
@@ -350,21 +350,23 @@ function showCommandHelp(command) {
       ]
     },
     'block-update': {
-      aliases: ['bu', 'update', 'edit'],
-      description: '更新块/文档内容（文档也是一种特殊的块）',
+      aliases: ['bu'],
+      description: '更新块内容（仅接受块ID，不接受文档ID）',
       usage: 'siyuan block-update <blockId> <content> [--data-type <type>]',
       options: [
-        { name: '<blockId>', description: '块ID/文档ID（必需，位置参数）' },
+        { name: '<blockId>', description: '块ID（必需，位置参数，不接受文档ID）' },
         { name: '<content>', description: '新内容（必需，位置参数）' },
         { name: '--id', description: '块ID（可选，等同于位置参数）' },
         { name: '--data', description: '新内容（可选，等同于位置参数）' },
         { name: '--data-type', description: '数据类型：markdown/dom（默认：markdown）' }
       ],
+      notes: [
+        '此命令仅用于更新块内容，不接受文档ID',
+        '如需更新文档内容，请使用 update 命令'
+      ],
       examples: [
         'siyuan bu <blockId> "更新后的内容"',
         'siyuan block-update <blockId> "更新后的内容"',
-        'siyuan update <docId> "更新文档内容"',
-        'siyuan edit <docId> "编辑文档内容"',
         'siyuan bu --id <blockId> --data "更新后的内容"',
         'siyuan bu <blockId> "内容" --data-type dom'
       ]
@@ -773,32 +775,32 @@ async function main(customArgs = null) {
       case 'update':
       case 'edit':
         if (args.includes('--help') || args.includes('-h')) {
-          showHelp('block-update');
+          showHelp('update');
           process.exit(0);
         }
         if (args.length < 3) {
-          console.error('错误: 请提供块/文档 ID 和内容');
-          console.log('用法: siyuan update <blockId> <content> [--data-type <type>]');
+          console.error('错误: 请提供文档ID和内容');
+          console.log('用法: siyuan update <docId> <content> [--data-type <type>]');
           process.exit(1);
         }
-        console.log('更新块/文档...');
-        const updateArgs = {
-          id: args[1],
-          data: args[2]
+        console.log('更新文档...');
+        const updateDocArgs = {
+          docId: args[1],
+          content: args[2]
         };
         
         for (let i = 1; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            updateArgs.id = args[++i];
-          } else if (args[i] === '--data' && i + 1 < args.length) {
-            updateArgs.data = args[++i];
+          if (args[i] === '--doc-id' && i + 1 < args.length) {
+            updateDocArgs.docId = args[++i];
+          } else if (args[i] === '--content' && i + 1 < args.length) {
+            updateDocArgs.content = args[++i];
           } else if (args[i] === '--data-type' && i + 1 < args.length) {
-            updateArgs.dataType = args[++i];
+            updateDocArgs.dataType = args[++i];
           }
         }
         
-        const updateResult = await skill.executeCommand('block-update', updateArgs);
-        console.log(JSON.stringify(updateResult, null, 2));
+        const updateDocResult = await skill.executeCommand('update-document', updateDocArgs);
+        console.log(JSON.stringify(updateDocResult, null, 2));
         break;
         
       case 'delete-document':
@@ -1044,13 +1046,11 @@ async function main(customArgs = null) {
         
       case 'block-update':
       case 'bu':
-      case 'update':
-      case 'edit':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-update');
           process.exit(0);
         }
-        console.log('更新块/文档...');
+        console.log('更新块...');
         const updateBlockArgs = {};
         for (let i = 1; i < args.length; i++) {
           if (args[i] === '--id' && i + 1 < args.length) {
@@ -1061,14 +1061,24 @@ async function main(customArgs = null) {
             updateBlockArgs.dataType = args[++i];
           } else if (args[i] === '--content' && i + 1 < args.length) {
             updateBlockArgs.data = args[++i];
-          } else if (args[i] === '--doc-id' && i + 1 < args.length) {
-            updateBlockArgs.id = args[++i];
           } else if (i === 1 && !args[i].startsWith('--')) {
             updateBlockArgs.id = args[i];
           } else if (i === 2 && !args[i].startsWith('--')) {
             updateBlockArgs.data = args[i];
           }
         }
+        
+        if (!updateBlockArgs.id) {
+          console.error('错误: 请提供块ID');
+          console.log('用法: siyuan block-update <blockId> <content> [--data-type <type>]');
+          process.exit(1);
+        }
+        if (!updateBlockArgs.data) {
+          console.error('错误: 请提供块内容');
+          console.log('用法: siyuan block-update <blockId> <content> [--data-type <type>]');
+          process.exit(1);
+        }
+        
         const updateBlockResult = await skill.executeCommand('block-update', updateBlockArgs);
         console.log(JSON.stringify(updateBlockResult, null, 2));
         break;

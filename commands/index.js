@@ -8,6 +8,7 @@ const getDocStructure = require('./get-doc-structure');
 const getDocContent = require('./get-doc-content');
 const searchContent = require('./search-content');
 const createDocument = require('./create-document');
+const updateDocument = require('./update-document');
 const deleteDocument = require('./delete-document');
 const protectDocument = require('./protect-document');
 const moveDocument = require('./move-document');
@@ -35,7 +36,7 @@ const commands = {
   'get-doc-content': getDocContent,
   'search-content': searchContent,
   'create-document': createDocument,
-  'update-document': updateBlock,
+  'update-document': updateDocument,
   'delete-document': deleteDocument,
   'protect-document': protectDocument,
   'move-document': moveDocument,

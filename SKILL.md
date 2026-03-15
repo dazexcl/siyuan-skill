@@ -68,7 +68,7 @@ siyuan help <command>  # 查看命令帮助
 | `structure` | `ls` | 获取文档结构 |
 | `content` | `cat` | 获取文档内容 |
 | `create` | `new` | 创建文档（自动重名检测） |
-| `update` | `edit`, `bu` | 更新文档/块内容 |
+| `update` | `edit` | 更新文档内容（仅接受文档ID） |
 | `delete` | `rm` | 删除文档（受保护） |
 | `protect` | - | 设置/移除文档保护 |
 | `move` | `mv` | 移动文档（自动重名检测） |
@@ -84,13 +84,16 @@ siyuan help <command>  # 查看命令帮助
 | 命令 | 别名 | 说明 |
 |------|------|------|
 | `block-insert` | `bi` | 插入块 |
-| `block-update` | `bu` | 更新块 |
+| `block-update` | `bu` | 更新块内容（仅接受块ID） |
 | `block-delete` | `bd` | 删除块（仅限普通块） |
 | `block-move` | `bm` | 移动块 |
 | `block-get` | `bg` | 获取块信息 |
 | `block-fold` | `bf`, `buu` | 折叠/展开块 |
 
-> **block-delete 限制**：此命令仅用于删除普通块。如果传入文档 ID，会返回错误并提示使用 `delete` 命令。
+> **重要区分**：
+> - `update` 命令：仅接受**文档ID**，用于更新整个文档内容
+> - `block-update` 命令：仅接受**块ID**（非文档ID），用于更新单个块内容
+> - 两个命令不能混用，传入错误类型的ID会返回错误提示
 
 ## 块操作决策流程
 
@@ -181,12 +184,21 @@ siyuan exists --path "/目录/文档标题"
 ## 内容修改
 
 ```bash
-# ✅ 推荐：直接更新
-siyuan update <docId> "新内容"
-siyuan bu <blockId> "新内容"
+# ✅ 推荐：使用正确的命令
+siyuan update <docId> "新内容"        # 全文更新：必须传入完整的文档内容
+siyuan edit <docId> "新内容"          # 全文更新：同上
+siyuan bu <blockId> "新内容"          # 块更新：只需传入需要修改的块内容
+
+# ❌ 错误：混用命令
+siyuan bu <docId> "内容"              # 错误：block-update 不接受文档ID
+siyuan update <blockId> "内容"        # 错误：update 不接受块ID
 
 # ❌ 不推荐：删除再新建（丢失属性、引用）
 ```
+
+> **重要说明**：
+> - `update` 命令：**全文更新**，必须传入文档的完整内容，会替换整个文档
+> - `block-update` 命令：**块更新**，只需传入需要修改的单个块内容，不影响其他块
 
 ## 属性设置
 

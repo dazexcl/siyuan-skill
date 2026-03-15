@@ -2,6 +2,8 @@
 
 更新思源笔记文档内容，支持自动处理换行符。
 
+**重要限制**：此命令仅接受**文档ID**，不接受块ID。如果传入块ID，将返回错误并提示使用 `block-update` 命令。
+
 ## 命令格式
 
 ```bash
@@ -14,8 +16,20 @@ siyuan update <docId> <content>
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `<docId>` | string | ✅ | 文档 ID |
-| `<content>` | string | ✅ | 新的文档内容 |
+| `<docId>` | string | ✅ | 文档 ID（不能是块ID） |
+| `<content>` | string | ✅ | 新的文档内容（完整内容，会覆盖整个文档） |
+
+## 错误处理
+
+当传入块 ID 时，命令会返回错误：
+
+```json
+{
+  "success": false,
+  "error": "参数类型错误",
+  "message": "传入的ID是子块，不是文档。请使用 block-update 命令更新块内容"
+}
+```
 
 ## 功能特性
 

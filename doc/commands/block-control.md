@@ -75,28 +75,46 @@ siyuan bi "新段落内容" --next-id <blockId>
 
 更新指定块的内容。
 
+**重要限制**：此命令仅接受**块ID**，不接受文档ID。如果传入文档ID，将返回错误并提示使用 `update` 命令。
+
 ### 命令格式
 
 ```bash
-siyuan block-update <blockId> <content> [--data-type <type>]
+siyuan block-update <blockId> <content>
+siyuan bu <blockId> <content>
 ```
 
 ### 参数说明
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `<blockId>` | string | ✅ | 块ID（位置参数） |
-| `<content>` | string | ✅ | 新内容（位置参数） |
+| `blockId` | string | ✅ | 块ID（不能是文档ID） |
+| `content` | string | ✅ | 新的块内容 |
 | `--data-type` | string | ❌ | 数据类型：markdown/dom（默认：markdown） |
 
 ### 使用示例
 
 ```bash
-# 更新块内容
+# 简写形式（推荐）
 siyuan bu <blockId> "更新后的内容"
 
-# 使用完整参数
-siyuan block-update --id <blockId> --data "更新后的内容"
+# 完整命令
+siyuan block-update <blockId> "更新后的内容"
+
+# 使用命名参数
+siyuan bu --id <blockId> --data "更新后的内容"
+```
+
+### 错误处理
+
+当传入文档 ID 时，命令会返回错误：
+
+```json
+{
+  "success": false,
+  "error": "参数类型错误",
+  "message": "传入的ID是文档。请使用 update 命令更新文档内容"
+}
 ```
 
 ---
