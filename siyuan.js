@@ -808,20 +808,24 @@ async function main(customArgs = null) {
           showHelp('delete');
           process.exit(0);
         }
-        if (args.length < 2) {
-          console.error('错误: 请提供文档ID');
-          console.log('用法: siyuan delete <docId> [--confirm-title <title>]');
-          process.exit(1);
+        
+        const deleteArgs = {};
+        
+        for (let i = 1; i < args.length; i++) {
+          if (args[i] === '--doc-id' && i + 1 < args.length) {
+            deleteArgs.docId = args[++i];
+          } else if (args[i] === '--confirm-title' && i + 1 < args.length) {
+            deleteArgs.confirmTitle = args[++i];
+          } else if (!args[i].startsWith('-') && !deleteArgs.docId) {
+            deleteArgs.docId = args[i];
+          }
         }
         
-        const deleteArgs = {
-          docId: args[1]
-        };
-        
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === '--confirm-title' && i + 1 < args.length) {
-            deleteArgs.confirmTitle = args[++i];
-          }
+        if (!deleteArgs.docId) {
+          console.error('错误: 请提供文档ID');
+          console.log('用法: siyuan delete <docId> [--confirm-title <title>]');
+          console.log('     siyuan delete --doc-id <docId> [--confirm-title <title>]');
+          process.exit(1);
         }
         
         console.log('删除文档...');

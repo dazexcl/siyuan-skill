@@ -105,6 +105,8 @@ siyuan block-update --id <blockId> --data "更新后的内容"
 
 删除指定的块。
 
+**注意**：此命令仅用于删除普通块。如果传入的是文档 ID，将返回错误并提示使用 `delete` 命令。
+
 ### 命令格式
 
 ```bash
@@ -115,14 +117,31 @@ siyuan block-delete <blockId>
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `<blockId>` | string | ✅ | 块ID（位置参数） |
+| `<blockId>` | string | ✅ | 块ID（位置参数，不能是文档ID） |
+
+### 错误处理
+
+当传入文档 ID 时，命令会返回错误：
+
+```json
+{
+  "success": false,
+  "error": "无效操作",
+  "message": "传入的 ID \"xxx\" 是文档而非普通块。删除文档请使用 delete 命令：siyuan delete --doc-id xxx",
+  "hint": "文档标题: \"文档名称\"",
+  "blockType": "document"
+}
+```
 
 ### 使用示例
 
 ```bash
-# 删除块
+# 删除普通块
 siyuan bd <blockId>
 siyuan block-delete <blockId>
+
+# 如果需要删除文档，请使用 delete 命令
+siyuan delete --doc-id <docId>
 ```
 
 ---

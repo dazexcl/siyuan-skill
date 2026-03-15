@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.6.7"
+version: "1.6.8"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
 skillType: "cli"
 runtime: "node"
@@ -85,10 +85,12 @@ siyuan help <command>  # 查看命令帮助
 |------|------|------|
 | `block-insert` | `bi` | 插入块 |
 | `block-update` | `bu` | 更新块 |
-| `block-delete` | `bd` | 删除块 |
+| `block-delete` | `bd` | 删除块（仅限普通块） |
 | `block-move` | `bm` | 移动块 |
 | `block-get` | `bg` | 获取块信息 |
 | `block-fold` | `bf`, `buu` | 折叠/展开块 |
+
+> **block-delete 限制**：此命令仅用于删除普通块。如果传入文档 ID，会返回错误并提示使用 `delete` 命令。
 
 ---
 
@@ -188,6 +190,8 @@ siyuan create "标题" "第一段## 二级标题 内容"
 ## 内容规范
 
 - 内容从正文开始，标题通过命令指定
+- **不要在正文中包含标题块**（如 `# 标题`），标题由命令参数单独指定
+- **不要在正文中包含 Front Matter 块**（如 `---\ntitle: xxx\n---`），元数据通过属性命令设置
 - 写入使用 Markdown 格式
 - kramdown 格式仅用于读取
 

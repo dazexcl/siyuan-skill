@@ -6,17 +6,44 @@
  * 1. 全局安全模式 - 禁止所有删除操作
  * 2. 文档保护标记 - 通过属性标记重要文档
  * 3. 删除确认机制 - 需要传入文档标题确认
+ * 
+ * 注意：此命令仅用于删除文档，不能删除普通块
+ * 如需删除普通块，请使用 block-delete 命令
  */
 
 const Permission = require('../utils/permission');
 const DeleteProtection = require('../utils/delete-protection');
 
 /**
+ * 检查ID是否为文档块（rootID === id）
+ * @param {SiyuanNotesSkill} skill - 技能实例
+ * @param {string} id - 块/文档ID
+ * @returns {Promise<{isDocument: boolean, blockInfo: Object|null}>}
+ */
+async function checkIfDocumentBlock(skill, id) {
+  try {
+    const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id });
+    
+    if (!blockInfo || typeof blockInfo !== 'object') {
+      return { isDocument: false, blockInfo: null };
+    }
+    
+    const rootId = blockInfo.rootID || blockInfo.root_id || blockInfo.rootChildID;
+    const isDocument = rootId === id;
+    
+    return { isDocument, blockInfo };
+  } catch (error) {
+    console.warn('获取块信息失败:', error.message);
+    return { isDocument: false, blockInfo: null };
+  }
+}
+
+/**
  * 指令配置
  */
 const command = {
   name: 'delete-document',
-  description: '删除 Siyuan Notes 中的文档（受多层保护机制约束）',
+  description: '删除 Siyuan Notes 中的文档（受多层保护机制约束，仅限文档）',
   usage: 'delete-document --doc-id <docId> [--confirm-title <title>]',
   
   /**
@@ -32,6 +59,19 @@ const command = {
     
     try {
       console.log('开始删除文档，文档ID:', docId);
+      
+      const { isDocument, blockInfo } = await checkIfDocumentBlock(skill, docId);
+      
+      if (!isDocument && blockInfo) {
+        const rootTitle = blockInfo.rootTitle || blockInfo.rootID || docId;
+        return {
+          success: false,
+          error: '无效操作',
+          message: `传入的 ID "${docId}" 是普通块而非文档。删除块请使用 block-delete 命令：siyuan bd --id ${docId}`,
+          hint: `所属文档: "${rootTitle}"`,
+          blockType: 'block'
+        };
+      }
       
       const protectionResult = await DeleteProtection.checkDeletePermission(skill, docId, {
         confirmTitle

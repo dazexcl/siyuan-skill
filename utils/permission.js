@@ -136,10 +136,72 @@ class Permission {
         };
       }
       
+      if (error.message && error.message.includes('invalid ID argument')) {
+        return await this.fallbackCheckBlockPermission(skill, docId);
+      }
+      
       return {
         hasPermission: false,
         notebookId: null,
-        error: '获取文档路径信息失败'
+        error: '获取文档路径信息失败: ' + error.message
+      };
+    }
+  }
+
+  /**
+   * 使用 getBlockInfo 作为后备方案检查权限
+   * @param {SiyuanNotesSkill} skill - 技能实例
+   * @param {string} id - 块/文档ID
+   * @returns {Promise<{hasPermission: boolean, notebookId: string|null, error: string|null}>}
+   */
+  static async fallbackCheckBlockPermission(skill, id) {
+    try {
+      const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id });
+      
+      if (!blockInfo || typeof blockInfo !== 'object') {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: '无法获取块信息'
+        };
+      }
+      
+      const notebookId = blockInfo.box;
+      
+      if (!notebookId) {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: '无法获取块所在的笔记本信息'
+        };
+      }
+      
+      const hasPermission = skill.checkPermission(notebookId);
+      const { permissionMode, notebookList } = skill.config;
+      
+      let errorMessage = null;
+      if (!hasPermission) {
+        if (permissionMode === 'whitelist') {
+          errorMessage = `笔记本 ${notebookId} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
+        } else if (permissionMode === 'blacklist') {
+          errorMessage = `笔记本 ${notebookId} 在黑名单中，禁止访问`;
+        } else {
+          errorMessage = `无权访问笔记本 ${notebookId}`;
+        }
+      }
+      
+      return {
+        hasPermission,
+        notebookId,
+        error: errorMessage
+      };
+    } catch (fallbackError) {
+      console.warn('后备方案获取块信息失败:', fallbackError.message);
+      return {
+        hasPermission: false,
+        notebookId: null,
+        error: '文档不存在或ID无效',
+        reason: 'not_found'
       };
     }
   }
@@ -399,10 +461,17 @@ class Permission {
         }
         
         if (!permissionResult.hasPermission) {
+          const isNotFound = permissionResult.reason === 'not_found' || 
+                             (permissionResult.error && (
+                               permissionResult.error.includes('不存在') || 
+                               permissionResult.error.includes('无效') ||
+                               permissionResult.error.includes('未找到')
+                             ));
           return {
             success: false,
-            error: '权限不足',
-            message: permissionResult.error || '无权操作'
+            error: isNotFound ? '资源不存在' : '权限不足',
+            message: permissionResult.error || '无权操作',
+            reason: isNotFound ? 'not_found' : 'permission_denied'
           };
         }
         

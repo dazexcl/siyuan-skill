@@ -2,10 +2,13 @@
 
 删除思源笔记文档（受多层保护机制约束）。
 
+**注意**：此命令仅用于删除文档。如果传入的是普通块 ID，将返回错误并提示使用 `block-delete` 命令。
+
 ## 命令格式
 
 ```bash
 siyuan delete <docId> [--confirm-title <title>]
+siyuan delete --doc-id <docId> [--confirm-title <title>]
 ```
 
 **别名**：`rm`
@@ -14,7 +17,8 @@ siyuan delete <docId> [--confirm-title <title>]
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `<docId>` | string | ✅ | 文档 ID |
+| `<docId>` | string | ✅ | 文档 ID（位置参数或 --doc-id） |
+| `--doc-id` | string | ✅ | 文档 ID（命名参数） |
 | `--confirm-title` | string | ❌ | 确认标题（启用删除确认时需要） |
 
 ## 删除保护机制
@@ -102,6 +106,18 @@ siyuan delete <docId> --confirm-title "文档标题"
   "error": "删除保护",
   "message": "标题确认失败。文档标题: \"实际标题\"，提供的确认标题: \"错误标题\"。请确保标题完全匹配。",
   "protectionLevel": "confirmation_failed"
+}
+```
+
+### 传入普通块 ID
+
+```json
+{
+  "success": false,
+  "error": "无效操作",
+  "message": "传入的 ID \"xxx\" 是普通块而非文档。删除块请使用 block-delete 命令：siyuan bd --id xxx",
+  "hint": "所属文档: \"文档标题\"",
+  "blockType": "block"
 }
 ```
 
