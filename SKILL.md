@@ -281,6 +281,16 @@ siyuan create "标题" "第一段## 二级标题 内容"
 - `QDRANT_URL`
 - `OLLAMA_BASE_URL`
 
+### 向量索引
+
+```bash
+siyuan index                            # 增量索引（默认，自动清理孤立索引）
+siyuan index --force                    # 强制重建索引
+siyuan index --remove                   # 只移除索引，不重新索引
+siyuan index <notebook-id>              # 索引指定笔记本
+siyuan index --notebook <notebookId>    # 索引指定笔记本
+```
+
 ### 搜索模式
 
 | 模式 | 说明 | 适用场景 |

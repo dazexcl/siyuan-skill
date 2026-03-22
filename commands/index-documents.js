@@ -1,52 +1,44 @@
 /**
  * 索引文档命令
- * 将 Siyuan 文档索引到向量数据库
+ * 功能：增量索引、孤立索引清理、自动分块、强制重建、移除索引
  */
 
-/**
- * 指令配置
- */
 const command = {
   name: 'index-documents',
   description: '将文档索引到向量数据库',
-  usage: 'index-documents [--notebook <id>] [--doc-ids <ids>] [--force] [--incremental] [--batch-size <size>]',
-  
+  usage: 'index-documents [--notebook <id>] [--doc-ids <ids>] [--force] [--remove]',
+
   /**
    * 执行指令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 指令参数
    * @param {string} args.notebookId - 笔记本 ID（可选，索引指定笔记本）
    * @param {Array} args.docIds - 文档 ID 数组（可选，索引指定文档）
-   * @param {boolean} args.force - 是否强制重建索引（清空所有数据）
-   * @param {boolean} args.incremental - 是否增量索引（只索引有变化的文档）
-   * @param {number} args.batchSize - 批处理大小（默认：10）
+   * @param {boolean} args.force - 是否强制重建索引（按范围删除后重建）
+   * @param {boolean} args.remove - 只移除索引，不重新索引
    * @returns {Promise<Object>} 执行结果
    */
   async execute(skill, args = {}) {
-    const {
-      notebookId,
-      docIds,
-      force = false,
-      incremental = true,
-      batchSize = 10
-    } = args;
+    const { notebookId, docIds, force = false, remove = false } = args;
 
     if (!skill.isVectorSearchReady()) {
       await skill.initVectorSearch();
     }
-
     if (!skill.isVectorSearchReady()) {
-      return {
-        success: false,
-        error: '向量搜索功能不可用，请检查 Qdrant 连接'
-      };
+      return { success: false, error: '向量搜索功能不可用，请检查 Qdrant 连接' };
+    }
+
+    if (remove) {
+      return await this.removeIndex(skill, { notebookId, docIds });
     }
 
     try {
       let documentsToIndex = [];
       let skippedCount = 0;
+      let cleanedCount = 0;
 
-      if (docIds && Array.isArray(docIds) && docIds.length > 0) {
+      // 根据参数获取待索引文档
+      if (docIds?.length > 0) {
         documentsToIndex = await this.fetchDocumentsByIds(skill, docIds);
       } else if (notebookId) {
         documentsToIndex = await this.fetchDocumentsByNotebook(skill, notebookId);
@@ -55,395 +47,173 @@ const command = {
       }
 
       if (documentsToIndex.length === 0) {
-        return {
-          success: true,
-          indexed: 0,
-          message: '没有找到需要索引的文档'
-        };
+        return { success: true, indexed: 0, message: '没有找到需要索引的文档' };
       }
 
+      // 强制重建：先删除现有索引
       if (force) {
-        if (docIds && Array.isArray(docIds) && docIds.length > 0) {
-          console.log(`强制重建索引，删除 ${docIds.length} 个指定文档的现有索引...`);
-          await skill.vectorManager.deleteDocumentsWithChunks(docIds);
-        } else if (notebookId) {
-          console.log(`强制重建索引，删除笔记本 ${notebookId} 的现有索引...`);
-          await skill.vectorManager.deleteNotebookDocuments(notebookId);
-        } else {
-          console.log('强制重建索引，清空现有数据...');
-          await skill.vectorManager.clearCollection();
-        }
-      } else if (incremental) {
-        // 增量索引：只索引有变化的文档
-        const originalDocIds = [...new Set(documentsToIndex
-          .filter(d => !d.metadata?.isChunk)
-          .map(d => d.originalDocId || d.docId))];
-        
-        if (originalDocIds.length > 0) {
-          console.log('增量索引模式：检查文档更新状态...');
-          const indexedUpdateTimes = await skill.vectorManager.getIndexedDocumentsUpdateTime(originalDocIds);
-          
-          // 找出需要更新的原始文档ID
-          const originalDocsNeedUpdate = new Set();
-          
-          for (const docId of originalDocIds) {
-            const indexedTime = indexedUpdateTimes.get(docId);
-            // 获取该原始文档的最新更新时间
-            const doc = documentsToIndex.find(d => (d.originalDocId || d.docId) === docId && !d.metadata?.isChunk);
-            const docTime = doc?.metadata?.updated || 0;
-            
-            // 如果文档未索引或已更新，则需要索引
-            if (!indexedTime || docTime > indexedTime) {
-              originalDocsNeedUpdate.add(docId);
-            }
-          }
-          
-          // 过滤出需要更新的文档（包括分块）
-          const docsNeedUpdate = [];
-          const docsUnchanged = [];
-          
-          for (const doc of documentsToIndex) {
-            const originalId = doc.originalDocId || doc.docId;
-            
-            // 如果原始文档需要更新，则包含所有分块
-            if (originalDocsNeedUpdate.has(originalId)) {
-              docsNeedUpdate.push(doc);
-            } else {
-              docsUnchanged.push(doc);
-            }
-          }
-          
-          skippedCount = docsUnchanged.length;
-          documentsToIndex = docsNeedUpdate;
-          
-          console.log(`发现 ${originalDocsNeedUpdate.size} 个原始文档需要更新，跳过 ${skippedCount} 个未变化的文档/分块`);
-        }
+        await this.deleteExistingIndices(skill, { notebookId, docIds });
+      } else {
+        // 增量索引：检查更新、清理孤立索引
+        const result = await this.processIncrementalIndex(skill, { documentsToIndex, notebookId, docIds });
+        skippedCount = result.skippedCount;
+        cleanedCount = result.cleanedCount;
+        documentsToIndex = result.documentsToIndex;
       }
 
       if (documentsToIndex.length === 0) {
-        return {
-          success: true,
-          indexed: 0,
-          skipped: skippedCount,
-          message: '所有文档已是最新，无需重新索引'
-        };
+        return this.buildResult(0, skippedCount, cleanedCount);
       }
 
       console.log(`开始索引 ${documentsToIndex.length} 个文档...`);
+      const batchResult = await skill.vectorManager.indexBatch(documentsToIndex);
 
-      const result = await skill.vectorManager.indexBatch(documentsToIndex);
-
-      return {
-        success: result.success,
-        indexed: result.indexed,
-        skipped: skippedCount,
-        total: result.total + skippedCount,
-        errors: result.errors,
-        message: `成功索引 ${result.indexed} 个文档${skippedCount > 0 ? `，跳过 ${skippedCount} 个未变化的文档` : ''}`
-      };
+      return this.buildResult(batchResult.indexed, skippedCount, cleanedCount, batchResult);
     } catch (error) {
       console.error('索引文档失败:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      return { success: false, error: error.message };
     }
   },
 
-  /**
-   * 根据文档 ID 获取文档（支持分块）
-   * @param {Object} skill - 技能实例
-   * @param {Array} docIds - 文档 ID 数组
-   * @returns {Promise<Array>} 文档数组（包含分块）
-   */
+  // 强制重建：删除现有索引
+  async deleteExistingIndices(skill, { notebookId, docIds }) {
+    if (docIds?.length > 0) {
+      console.log(`强制重建索引，删除 ${docIds.length} 个指定文档的现有索引...`);
+      await skill.vectorManager.deleteDocumentsWithChunks(docIds);
+    } else if (notebookId) {
+      console.log(`强制重建索引，删除笔记本 ${notebookId} 的现有索引...`);
+      await skill.vectorManager.deleteNotebookDocuments(notebookId);
+    } else {
+      console.log('强制重建索引，清空现有数据...');
+      await skill.vectorManager.clearCollection();
+    }
+  },
+
+  // 增量索引：清理孤立索引 + 检查更新
+  async processIncrementalIndex(skill, { documentsToIndex, notebookId, docIds }) {
+    const originalDocIds = [...new Set(documentsToIndex.map(d => d.originalDocId || d.docId))];
+    let skippedCount = 0;
+    let cleanedCount = 0;
+
+    if (originalDocIds.length === 0) {
+      return { skippedCount, cleanedCount, documentsToIndex };
+    }
+
+    console.log('增量索引模式：检查文档更新状态...');
+
+    // 清理孤立索引（只在索引笔记本或全部文档时执行）
+    if (!docIds || docIds.length === 0) {
+      cleanedCount = await this.cleanOrphanedIndices(skill, { originalDocIds, notebookId });
+    }
+
+    // 获取已索引文档的更新时间，找出需要更新的文档
+    const indexedUpdateTimes = await skill.vectorManager.getIndexedDocumentsUpdateTime(originalDocIds);
+    const originalDocsNeedUpdate = new Set();
+
+    for (const docId of originalDocIds) {
+      const indexedTime = indexedUpdateTimes.get(docId);
+      const doc = documentsToIndex.find(d => (d.originalDocId || d.docId) === docId && !d.metadata?.isChunk);
+      const docTime = doc?.metadata?.updated || 0;
+      if (!indexedTime || docTime > indexedTime) {
+        originalDocsNeedUpdate.add(docId);
+      }
+    }
+
+    // 删除需要更新的文档的旧索引（包括分块）
+    if (originalDocsNeedUpdate.size > 0) {
+      console.log(`删除 ${originalDocsNeedUpdate.size} 个已更新文档的旧索引（含分块）...`);
+      await skill.vectorManager.deleteDocumentsWithChunks(Array.from(originalDocsNeedUpdate));
+    }
+
+    // 分区：需要更新的文档 vs 未变化的文档
+    const { docsNeedUpdate, docsUnchanged } = this.partitionDocuments(documentsToIndex, originalDocsNeedUpdate);
+    skippedCount = docsUnchanged.length;
+
+    console.log(`发现 ${originalDocsNeedUpdate.size} 个原始文档需要更新，跳过 ${skippedCount} 个未变化的文档/分块`);
+
+    return { skippedCount, cleanedCount, documentsToIndex: docsNeedUpdate };
+  },
+
+  // 清理孤立索引（思源已删除但向量库残留的索引）
+  async cleanOrphanedIndices(skill, { originalDocIds, notebookId }) {
+    const siyuanDocIds = new Set(originalDocIds);
+    const indexedDocIds = await skill.vectorManager.getIndexedOriginalDocIds(notebookId ? { notebookId } : {});
+    const orphanedDocIds = [...indexedDocIds].filter(id => !siyuanDocIds.has(id));
+
+    if (orphanedDocIds.length > 0) {
+      console.log(`发现 ${orphanedDocIds.length} 个孤立索引（思源已删除），正在清理...`);
+      await skill.vectorManager.deleteDocumentsWithChunks(orphanedDocIds);
+      return orphanedDocIds.length;
+    }
+    return 0;
+  },
+
+  // 分区文档
+  partitionDocuments(documents, docIdsNeedUpdate) {
+    const docsNeedUpdate = [];
+    const docsUnchanged = [];
+    for (const doc of documents) {
+      const originalId = doc.originalDocId || doc.docId;
+      if (docIdsNeedUpdate.has(originalId)) {
+        docsNeedUpdate.push(doc);
+      } else {
+        docsUnchanged.push(doc);
+      }
+    }
+    return { docsNeedUpdate, docsUnchanged };
+  },
+
+  // 构建返回结果
+  buildResult(indexed, skipped, cleaned, batchResult = null) {
+    const messages = [];
+    if (indexed > 0) messages.push(`成功索引 ${indexed} 个文档`);
+    if (cleaned > 0) messages.push(`清理 ${cleaned} 个孤立索引`);
+    if (skipped > 0) messages.push(`跳过 ${skipped} 个未变化的文档`);
+
+    const result = {
+      success: batchResult ? batchResult.errors.length === 0 : true,
+      indexed, skipped, cleaned,
+      message: messages.length > 0 ? messages.join('，') : '所有文档已是最新，无需重新索引'
+    };
+
+    if (batchResult) {
+      result.total = batchResult.total + skipped;
+      result.errors = batchResult.errors;
+    }
+    return result;
+  },
+
+  // 通过文档 ID 获取文档
   async fetchDocumentsByIds(skill, docIds) {
     const documents = [];
-
     for (const docId of docIds) {
       try {
-        // 获取文档的基本信息
         const docInfo = await skill.connector.request('/api/block/getBlockInfo', { id: docId });
-        
         if (!docInfo) {
           console.warn(`文档 ${docId} 不存在`);
           continue;
         }
-
-        // 获取文档的完整内容
-        const content = await skill.connector.request('/api/export/exportMdContent', {
-          id: docId
-        });
-
-        // 获取 tags（使用 getBlockAttrs API）
-        let docTags = [];
-        try {
-          const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
-          if (attrs && attrs.tags) {
-            docTags = attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
-          }
-        } catch (e) {
-          // 忽略获取 tags 失败
-        }
-
-        if (content && content.content) {
-          let pathInfo = null;
-          try {
-            pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: docId });
-          } catch (e) {
-            // 忽略错误
-          }
-
-          const embeddingConfig = skill.config?.embedding || {};
-          const maxContentLength = embeddingConfig.maxContentLength || 1000;
-          const docContent = content.content.trim();
-          
-          // 跳过空内容文档
-          if (!docContent) {
-            console.log(`文档 ${docId} 内容为空，跳过索引`);
-            continue;
-          }
-          
-          const docTitle = content.hPath?.split('/').pop() || docId;
-          const docPath = content.hPath || '';
-          const notebookIdFromPath = pathInfo?.notebook || '';
-
-          if (docContent.length > maxContentLength) {
-            const chunks = await this.fetchDocumentChunks(skill, docId);
-            
-            chunks.forEach((chunk, index) => {
-              documents.push({
-                docId: `${docId}_chunk_${index}`,
-                originalDocId: docId,
-                content: chunk.content,
-                chunkIndex: index,
-                totalChunks: chunks.length,
-                metadata: {
-                  title: docTitle,
-                  path: docPath,
-                  notebookId: notebookIdFromPath,
-                  updated: Date.now(),
-                  isChunk: true,
-                  originalDocId: docId,
-                  tags: docTags
-                }
-              });
-            });
-            
-            console.log(`文档 ${docId} 已分为 ${chunks.length} 个块进行索引`);
-          } else {
-            documents.push({
-              docId,
-              content: docContent,
-              metadata: {
-                title: docTitle,
-                path: docPath,
-                notebookId: notebookIdFromPath,
-                updated: Date.now(),
-                tags: docTags
-              }
-            });
-          }
-        }
+        const processedDocs = await this.processDocument(skill, docId, { notebookId: null, updated: docInfo.updated });
+        documents.push(...processedDocs);
       } catch (error) {
         console.warn(`获取文档 ${docId} 失败:`, error.message);
       }
     }
-
     return documents;
   },
 
-  /**
-   * 获取文档的分块内容
-   * @param {Object} skill - 技能实例
-   * @param {string} docId - 文档 ID
-   * @returns {Promise<Array>} 分块数组
-   */
-  async fetchDocumentChunks(skill, docId) {
-    const chunks = [];
-    
-    try {
-      // 获取文档的所有子块
-      const childBlocks = await skill.connector.request('/api/block/getChildBlocks', { id: docId });
-      
-      if (!childBlocks || childBlocks.length === 0) {
-        // 如果没有子块，使用文档的完整内容
-        const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
-        if (content && content.content) {
-          chunks.push({
-            content: content.content,
-            type: 'full'
-          });
-        }
-        return chunks;
-      }
-
-      // 遍历所有子块，收集内容
-      let currentChunk = '';
-      const embeddingConfig = skill.config?.embedding || {};
-      const maxChunkLength = embeddingConfig.maxChunkLength || 800;
-      const minChunkLength = embeddingConfig.minChunkLength || 200;
-
-      for (const block of childBlocks) {
-        // 获取块内容
-        let blockContent = '';
-        
-        if (block.type === 'h') {
-          // 标题块
-          const level = block.headingLevel || 1;
-          const prefix = '#'.repeat(level);
-          blockContent = `${prefix} ${block.content || ''}\n\n`;
-        } else if (block.type === 'p') {
-          // 段落块
-          blockContent = `${block.content || ''}\n\n`;
-        } else if (block.type === 'l') {
-          // 列表块
-          blockContent = `- ${block.content || ''}\n`;
-        } else if (block.type === 'i') {
-          // 列表项
-          blockContent = `  - ${block.content || ''}\n`;
-        } else if (block.type === 'c') {
-          // 代码块
-          blockContent = `\`\`\`\n${block.content || ''}\n\`\`\`\n\n`;
-        } else if (block.type === 'tb') {
-          // 表格块
-          blockContent = `${block.content || ''}\n\n`;
-        } else if (block.type === 'b') {
-          // 引用块
-          blockContent = `> ${block.content || ''}\n\n`;
-        } else if (block.type === 'd') {
-          // 子文档块，递归获取
-          const subChunks = await this.fetchDocumentChunks(skill, block.id);
-          subChunks.forEach(subChunk => {
-            chunks.push(subChunk);
-          });
-          continue;
-        } else {
-          // 其他类型的块
-          blockContent = `${block.content || ''}\n\n`;
-        }
-
-        // 如果块内容为空，跳过
-        if (!blockContent.trim()) {
-          continue;
-        }
-
-        // 检查是否需要创建新的块
-        if (currentChunk.length + blockContent.length > maxChunkLength && currentChunk.length >= minChunkLength) {
-          chunks.push({
-            content: currentChunk.trim(),
-            type: 'chunk'
-          });
-          currentChunk = blockContent;
-        } else {
-          currentChunk += blockContent;
-        }
-      }
-
-      // 添加最后一个块
-      if (currentChunk.trim().length > 0) {
-        chunks.push({
-          content: currentChunk.trim(),
-          type: 'chunk'
-        });
-      }
-
-    } catch (error) {
-      console.warn(`获取文档 ${docId} 的分块失败:`, error.message);
-      // 回退到完整内容
-      const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
-      if (content && content.content) {
-        chunks.push({
-          content: content.content,
-          type: 'full'
-        });
-      }
-    }
-
-    return chunks;
-  },
-
-  /**
-   * 根据笔记本 ID 获取所有文档（支持分块）
-   * @param {Object} skill - 技能实例
-   * @param {string} notebookId - 笔记本 ID
-   * @returns {Promise<Array>}
-   */
+  // 通过笔记本 ID 获取文档
   async fetchDocumentsByNotebook(skill, notebookId) {
     const documents = [];
-
     try {
       const sqlQuery = `SELECT id, content, path, updated, box FROM blocks WHERE box = '${notebookId}' AND type = 'd'`;
       const blocks = await skill.connector.request('/api/query/sql', { stmt: sqlQuery });
 
-      if (blocks && Array.isArray(blocks)) {
+      if (blocks?.length > 0) {
         for (const block of blocks) {
           try {
-            const content = await skill.connector.request('/api/export/exportMdContent', {
-              id: block.id
-            });
-
-            // 获取 tags
-            let docTags = [];
-            try {
-              const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: block.id });
-              if (attrs && attrs.tags) {
-                docTags = attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
-              }
-            } catch (e) {
-              // 忽略获取 tags 失败
-            }
-
-            if (content && content.content) {
-              const docContent = content.content.trim();
-              
-              // 跳过空内容文档
-              if (!docContent) {
-                console.log(`文档 ${block.id} 内容为空，跳过索引`);
-                continue;
-              }
-              
-              const embeddingConfig = skill.config?.embedding || {};
-              const maxContentLength = embeddingConfig.maxContentLength || 1000;
-              const docTitle = content.hPath?.split('/').pop() || block.id;
-              const docPath = content.hPath || '';
-
-              if (docContent.length > maxContentLength) {
-                const chunks = await this.fetchDocumentChunks(skill, block.id);
-                
-                chunks.forEach((chunk, index) => {
-                  documents.push({
-                    docId: `${block.id}_chunk_${index}`,
-                    originalDocId: block.id,
-                    content: chunk.content,
-                    chunkIndex: index,
-                    totalChunks: chunks.length,
-                    metadata: {
-                      title: docTitle,
-                      path: docPath,
-                      notebookId: notebookId,
-                      updated: block.updated || Date.now(),
-                      isChunk: true,
-                      originalDocId: block.id,
-                      tags: docTags
-                    }
-                  });
-                });
-                
-                console.log(`文档 ${block.id} 已分为 ${chunks.length} 个块进行索引`);
-              } else {
-                documents.push({
-                  docId: block.id,
-                  content: docContent,
-                  metadata: {
-                    title: docTitle,
-                    path: docPath,
-                    notebookId: notebookId,
-                    updated: block.updated || Date.now(),
-                    tags: docTags
-                  }
-                });
-              }
-            }
+            const processedDocs = await this.processDocument(skill, block.id, { notebookId, updated: block.updated });
+            documents.push(...processedDocs);
           } catch (error) {
             console.warn(`获取文档 ${block.id} 内容失败:`, error.message);
           }
@@ -452,36 +222,174 @@ const command = {
     } catch (error) {
       console.error('获取笔记本文档失败:', error.message);
     }
-
     return documents;
   },
 
-  /**
-   * 获取所有笔记本的文档
-   * @param {Object} skill - 技能实例
-   * @returns {Promise<Array>}
-   */
+  // 获取所有文档
   async fetchAllDocuments(skill) {
     const documents = [];
-
     try {
-      const notebooks = await skill.connector.request('/api/notebook/lsNotebooks');
-      
-      if (notebooks && Array.isArray(notebooks)) {
-        for (const notebook of notebooks) {
-          if (skill.checkPermission && !skill.checkPermission(notebook.id)) {
-            continue;
-          }
+      const notebooksResponse = await skill.connector.request('/api/notebook/lsNotebooks');
+      const notebooks = notebooksResponse?.notebooks || notebooksResponse || [];
 
-          const notebookDocs = await this.fetchDocumentsByNotebook(skill, notebook.id);
-          documents.push(...notebookDocs);
-        }
+      for (const notebook of notebooks) {
+        if (skill.checkPermission && !skill.checkPermission(notebook.id)) continue;
+        const notebookDocs = await this.fetchDocumentsByNotebook(skill, notebook.id);
+        documents.push(...notebookDocs);
       }
     } catch (error) {
       console.error('获取所有文档失败:', error.message);
     }
-
     return documents;
+  },
+
+  // 处理单个文档：获取内容、标签、路径，根据长度决定是否分块
+  async processDocument(skill, docId, options = {}) {
+    const { notebookId: defaultNotebookId, updated: defaultUpdated } = options;
+    const embeddingConfig = skill.config?.embedding || {};
+    const maxContentLength = embeddingConfig.maxContentLength || 1000;
+
+    const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
+    if (!content?.content) return [];
+
+    const docContent = content.content.trim();
+    if (!docContent) {
+      console.log(`文档 ${docId} 内容为空，跳过索引`);
+      return [];
+    }
+
+    // 获取文档标签和路径信息
+    const docTags = await this.fetchDocumentTags(skill, docId);
+    const pathInfo = await this.fetchPathInfo(skill, docId);
+
+    const docTitle = content.hPath?.split('/').pop() || docId;
+    const docPath = content.hPath || '';
+    const notebookId = defaultNotebookId || pathInfo?.notebook || '';
+    const docUpdatedTime = defaultUpdated ? defaultUpdated * 1000 : Date.now();
+
+    const metadata = { title: docTitle, path: docPath, notebookId, updated: docUpdatedTime, tags: docTags };
+
+    if (docContent.length > maxContentLength) {
+      return await this.createChunkedDocuments(skill, docId, docContent, metadata);
+    }
+    return [{ docId, content: docContent, metadata }];
+  },
+
+  async fetchDocumentTags(skill, docId) {
+    try {
+      const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
+      if (attrs?.tags) return attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
+    } catch (e) { }
+    return [];
+  },
+
+  async fetchPathInfo(skill, docId) {
+    try {
+      return await skill.connector.request('/api/filetree/getPathByID', { id: docId });
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // 创建分块文档
+  async createChunkedDocuments(skill, docId, content, metadata) {
+    const chunks = await this.fetchDocumentChunks(skill, docId, content);
+    const documents = chunks.map((chunk, index) => ({
+      docId: `${docId}_chunk_${index}`,
+      originalDocId: docId,
+      content: chunk.content,
+      chunkIndex: index,
+      totalChunks: chunks.length,
+      metadata: { ...metadata, isChunk: true, originalDocId: docId }
+    }));
+    console.log(`文档 ${docId} 已分为 ${chunks.length} 个块进行索引`);
+    return documents;
+  },
+
+  // 获取文档分块：通过递归获取子块，按配置的分块大小进行分块
+  async fetchDocumentChunks(skill, docId, fallbackContent = null) {
+    const chunks = [];
+    const embeddingConfig = skill?.config?.embedding || {};
+    const maxChunkLength = embeddingConfig.maxChunkLength || 800;
+    const minChunkLength = embeddingConfig.minChunkLength || 200;
+
+    try {
+      const childBlocks = await skill.connector.request('/api/block/getChildBlocks', { id: docId });
+
+      if (!childBlocks?.length) {
+        if (fallbackContent) {
+          chunks.push({ content: fallbackContent, type: 'full' });
+        } else {
+          const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
+          if (content?.content) chunks.push({ content: content.content, type: 'full' });
+        }
+        return chunks;
+      }
+
+      let currentChunk = '';
+      for (const block of childBlocks) {
+        const blockContent = this.formatBlockContent(block);
+        if (!blockContent) continue;
+
+        // 子文档块递归处理
+        if (block.type === 'd') {
+          const subChunks = await this.fetchDocumentChunks(skill, block.id);
+          subChunks.forEach(subChunk => chunks.push(subChunk));
+          continue;
+        }
+
+        if (currentChunk.length + blockContent.length > maxChunkLength && currentChunk.length >= minChunkLength) {
+          chunks.push({ content: currentChunk.trim(), type: 'chunk' });
+          currentChunk = blockContent;
+        } else {
+          currentChunk += blockContent;
+        }
+      }
+      if (currentChunk.trim()) chunks.push({ content: currentChunk.trim(), type: 'chunk' });
+    } catch (error) {
+      console.warn(`获取文档 ${docId} 的分块失败:`, error.message);
+      if (fallbackContent) chunks.push({ content: fallbackContent, type: 'full' });
+    }
+    return chunks;
+  },
+
+  // 格式化块内容（根据块类型）
+  formatBlockContent(block) {
+    const content = block.content || '';
+    if (!content.trim()) return '';
+
+    const formatters = {
+      'h': () => `${'#'.repeat(block.headingLevel || 1)} ${content}\n\n`,
+      'p': () => `${content}\n\n`,
+      'l': () => `- ${content}\n`,
+      'i': () => `  - ${content}\n`,
+      'c': () => `\`\`\`\n${content}\n\`\`\`\n\n`,
+      'tb': () => `${content}\n\n`,
+      'b': () => `> ${content}\n\n`
+    };
+    return (formatters[block.type] || (() => `${content}\n\n`))();
+  },
+
+  // 移除索引
+  async removeIndex(skill, { notebookId, docIds }) {
+    try {
+      if (docIds?.length > 0) {
+        console.log(`移除 ${docIds.length} 个文档的索引...`);
+        await skill.vectorManager.deleteDocumentsWithChunks(docIds);
+        return { success: true, removed: docIds.length, message: `已移除 ${docIds.length} 个文档的索引` };
+      }
+      if (notebookId) {
+        console.log(`移除笔记本 ${notebookId} 的索引...`);
+        await skill.vectorManager.deleteNotebookDocuments(notebookId);
+        return { success: true, removed: 'notebook', message: `已移除笔记本 ${notebookId} 的索引` };
+      }
+      console.log('移除所有索引...');
+      await skill.vectorManager.clearCollection();
+      return { success: true, removed: 'all', message: '已移除所有索引' };
+    } catch (error) {
+      console.error('移除索引失败:', error.message);
+      return { success: false, error: error.message };
+    }
   }
 };
 

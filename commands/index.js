@@ -27,9 +27,6 @@ const blockAttrs = require('./block-attrs');
 const tags = require('./tags');
 const checkExists = require('./check-exists');
 
-/**
- * 所有可用命令的映射
- */
 const commands = {
   'get-notebooks': getNotebooks,
   'get-doc-structure': getDocStructure,

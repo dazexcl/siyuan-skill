@@ -98,6 +98,16 @@ const command = {
       });
       console.log('删除文档API返回结果:', result);
       
+      if (skill.isVectorSearchReady && skill.isVectorSearchReady()) {
+        try {
+          console.log('同步删除向量库索引...');
+          await skill.vectorManager.deleteDocumentsWithChunks([docId]);
+          console.log('向量库索引已删除');
+        } catch (vecError) {
+          console.warn('删除向量库索引失败（不影响文档删除）:', vecError.message);
+        }
+      }
+      
       skill.clearCache();
       console.log('缓存已清除');
       

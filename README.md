@@ -396,8 +396,9 @@ siyuan convert <id-or-path>
 siyuan path <id-or-path>                # 别名
 
 # 向量索引
-siyuan index                            # 增量索引（默认）
+siyuan index                            # 增量索引（默认，自动清理孤立索引）
 siyuan index --force                    # 强制重建索引
+siyuan index --remove                   # 只移除索引，不重新索引
 siyuan index <notebook-id>              # 索引指定笔记本
 siyuan index --notebook <notebookId>    # 索引指定笔记本
 

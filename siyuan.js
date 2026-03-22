@@ -388,18 +388,18 @@ function showCommandHelp(command) {
     },
     'index': {
       aliases: ['index-documents'],
-      description: '索引文档到向量数据库（支持增量索引、自动分块和按范围删除）',
-      usage: 'siyuan index [<id>] [--notebook <id>] [--doc-ids <ids>] [--force] [--no-incremental]',
+      description: '索引文档到向量数据库（增量索引、自动分块、孤立索引清理）',
+      usage: 'siyuan index [<id>] [--notebook <id>] [--doc-ids <ids>] [--force] [--remove]',
       options: [
         { name: '<id>', description: '位置参数：笔记本ID或文档ID（自动识别）' },
         { name: '--notebook', description: '索引指定笔记本' },
         { name: '--doc-ids', description: '索引指定文档ID（逗号分隔）' },
-        { name: '--force', description: '强制重建索引（按范围删除：单文档/笔记本/全部）' },
-        { name: '--no-incremental', description: '禁用增量索引，重新索引所有文档' },
+        { name: '--force', description: '强制重建索引（按范围删除后重建）' },
+        { name: '--remove', description: '只移除索引，不重新索引' },
         { name: '--batch-size', description: '批量大小（默认：5）' }
       ],
       examples: [
-        'siyuan index                           # 增量索引所有笔记本',
+        'siyuan index                           # 增量索引（清理孤立、更新变化）',
         'siyuan index <notebook-id>            # 索引指定笔记本（自动识别）',
         'siyuan index <doc-id>                 # 索引指定文档（自动识别）',
         'siyuan index --notebook <id>          # 索引指定笔记本',
@@ -407,6 +407,9 @@ function showCommandHelp(command) {
         'siyuan index <doc-id> --force         # 强制重建该文档索引',
         'siyuan index --notebook <id> --force  # 强制重建该笔记本索引',
         'siyuan index --force                  # 强制重建所有索引（清空集合）',
+        'siyuan index <doc-id> --remove        # 移除该文档的索引',
+        'siyuan index --notebook <id> --remove # 移除该笔记本的索引',
+        'siyuan index --remove                 # 移除所有索引',
         'siyuan index --batch-size 10'
       ]
     },
@@ -1063,8 +1066,8 @@ async function main(customArgs = null) {
             indexArgs.docIds = docIdsStr.split(',').map(id => id.trim());
           } else if (args[i] === '--force') {
             indexArgs.force = true;
-          } else if (args[i] === '--no-incremental') {
-            indexArgs.incremental = false;
+          } else if (args[i] === '--remove') {
+            indexArgs.remove = true;
           } else if (args[i] === '--batch-size' && i + 1 < args.length) {
             indexArgs.batchSize = parseInt(args[++i]);
           }

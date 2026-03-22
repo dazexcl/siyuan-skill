@@ -146,7 +146,7 @@ siyuan search "长颈鹿" --mode hybrid --sql-weight 0.3
 首先需要将文档索引到向量数据库：
 
 ```bash
-# 索引所有笔记本的文档
+# 增量索引所有笔记本（只索引有变化的文档，自动清理孤立索引）
 siyuan index
 
 # 索引指定笔记本
@@ -159,6 +159,10 @@ siyuan index <doc-id>
 siyuan index <doc-id> --force
 siyuan index --notebook <notebook-id> --force
 siyuan index --force  # 清空整个集合
+
+# 移除索引（不重新索引）
+siyuan index <doc-id> --remove
+siyuan index --notebook <notebook-id> --remove
 ```
 
 ### 2. 搜索文档
@@ -224,7 +228,7 @@ siyuan search "人工智能应用" --mode hybrid
 | `block_id` | string | 块 ID（分块格式：`{docId}_chunk_{index}`） |
 | `notebook_id` | string | 笔记本 ID |
 | `title` | string | 文档标题 |
-| `path` | string | 文档路径 |
+| `path` | string | 文档路径（hPath 格式，不含笔记本名） |
 | `content_preview` | string | 内容预览（最大 500 字符） |
 | `tags` | array | 文档标签列表 |
 | `updated` | number | 更新时间戳 |
