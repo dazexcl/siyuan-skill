@@ -28,7 +28,7 @@ docker run -p 6333:6333 qdrant/qdrant
 # macOS/Linux
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 下载模型
+# 下载模型（推荐 nomic-embed-text）
 ollama pull nomic-embed-text
 ```
 
@@ -63,13 +63,36 @@ export OLLAMA_EMBED_MODEL="nomic-embed-text"
     "collectionName": "siyuan_notes"
   },
   "embedding": {
+    "baseUrl": "http://127.0.0.1:11434",
     "model": "nomic-embed-text",
     "dimension": 768,
-    "batchSize": 8,
-    "baseUrl": "http://127.0.0.1:11434"
+    "maxContentLength": 4000,
+    "maxChunkLength": 4000,
+    "minChunkLength": 200,
+    "batchSize": 5
+  },
+  "hybridSearch": {
+    "denseWeight": 0.7,
+    "sparseWeight": 0.3,
+    "limit": 20
   }
 }
 ```
+
+### 配置参数说明
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `embedding.baseUrl` | `http://127.0.0.1:11434` | Ollama 服务地址 |
+| `embedding.model` | `nomic-embed-text` | Embedding 模型名称 |
+| `embedding.dimension` | `768` | 向量维度（需与模型匹配） |
+| `embedding.maxContentLength` | `4000` | 触发分块的内容长度阈值 |
+| `embedding.maxChunkLength` | `4000` | 单个分块最大长度 |
+| `embedding.minChunkLength` | `200` | 单个分块最小长度 |
+| `embedding.batchSize` | `5` | 批处理大小 |
+| `hybridSearch.denseWeight` | `0.7` | 稠密向量权重 |
+| `hybridSearch.sparseWeight` | `0.3` | 稀疏向量权重 |
+| `hybridSearch.limit` | `20` | 搜索结果数量限制 |
 
 ## 搜索模式
 
@@ -129,8 +152,13 @@ siyuan index
 # 索引指定笔记本
 siyuan index --notebook <notebook-id>
 
-# 强制重建索引
-siyuan index --force
+# 索引指定文档
+siyuan index <doc-id>
+
+# 强制重建索引（按范围删除对应记录）
+siyuan index <doc-id> --force
+siyuan index --notebook <notebook-id> --force
+siyuan index --force  # 清空整个集合
 ```
 
 ### 2. 搜索文档
@@ -172,15 +200,59 @@ siyuan search "人工智能应用" --mode hybrid
 
 ## 自动分块处理
 
-当文档内容超过 4000 字符时，系统会自动使用思源笔记 API 的块列表功能将文档分块索引。
+当文档内容超过 `maxContentLength`（默认 4000 字符）时，系统会自动使用思源笔记 API 的块列表功能将文档分块索引。
 
 ### 分块策略
 - 基于文档的块结构（标题、段落、列表等）进行分块
-- 每个块最大 3000 字符
+- 每个块最大长度由 `maxChunkLength` 配置（默认 4000 字符）
+- 最小块长度由 `minChunkLength` 配置（默认 200 字符）
 - 保留原始文档 ID，搜索时可以追溯到原始文档
+
+### 空内容过滤
+- 自动跳过内容为空的文档
+- 避免创建无意义的向量记录
 
 ### 递归处理
 支持递归处理子文档，确保所有内容都被正确索引。
+
+## 向量存储结构
+
+每条向量记录包含：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `block_id` | string | 块 ID（分块格式：`{docId}_chunk_{index}`） |
+| `notebook_id` | string | 笔记本 ID |
+| `title` | string | 文档标题 |
+| `path` | string | 文档路径 |
+| `content_preview` | string | 内容预览（最大 500 字符） |
+| `tags` | array | 文档标签列表 |
+| `updated` | number | 更新时间戳 |
+| `is_chunk` | boolean | 是否为分块记录 |
+| `chunk_index` | number | 分块索引 |
+| `total_chunks` | number | 总分块数 |
+| `original_doc_id` | string | 原始文档 ID（仅分块记录） |
+
+### 向量类型
+- **Dense（稠密向量）**：768 维，由 embedding 模型生成，捕获语义相似性
+- **Sparse（稀疏向量）**：关键词索引，用于精确匹配
+
+## 相关度分数
+
+使用余弦相似度，分数范围：
+
+| 分数范围 | 相关性 | 说明 |
+|----------|--------|------|
+| 0.9 - 1.0 | 极高 | 几乎相同的语义内容 |
+| 0.7 - 0.9 | 高度相关 | 语义非常接近 |
+| 0.5 - 0.7 | 中等相关 | 语义有交集，可用结果 |
+| 0.3 - 0.5 | 弱相关 | 语义有一定联系，参考价值低 |
+| < 0.3 | 不相关 | 基本无语义关联 |
+
+可通过 `--threshold` 参数过滤低相关度结果：
+```bash
+siyuan search "关键词" --mode semantic --threshold 0.5
+```
 
 ## 性能优化
 
@@ -190,7 +262,7 @@ siyuan search "人工智能应用" --mode hybrid
 ```json
 {
   "embedding": {
-    "batchSize": 16
+    "batchSize": 10
   }
 }
 ```
@@ -244,15 +316,22 @@ siyuan search "Kubernetes" --mode hybrid --dense-weight 0.3 --sparse-weight 0.7
 命令: siyuan index --force
 ```
 
+### Ollama GPU 降级问题
+```
+问题: 大文本块导致 GPU 内存溢出，降级为 CPU
+解决: 减小 maxChunkLength 和 batchSize 配置值
+```
+
 ## 注意事项
 
 1. **默认使用 Legacy 模式**：无需配置向量服务，精确匹配
 2. **服务依赖**：keyword/semantic/hybrid 模式需要 Qdrant 和 Ollama 服务
 3. **索引时间**：首次索引可能需要较长时间，取决于文档数量
-4. **存储空间**：向量数据库需要足够的存储空间
-5. **模型选择**：推荐使用 nomic-embed-text 模型
+4. **存储优化**：只存储内容预览（500 字符），全文通过 block_id 实时获取
+5. **模型选择**：推荐使用 nomic-embed-text 模型（768 维）
+6. **GPU 建议**：Ollama 建议使用 GPU 加速，大文本需注意内存配置
 
 ## 相关文档
-- [搜索命令](../commands/search.md)
 - [索引命令](../commands/index.md)
+- [搜索命令](../commands/search.md)
 - [最佳实践](best-practices.md)

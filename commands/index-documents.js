@@ -63,8 +63,16 @@ const command = {
       }
 
       if (force) {
-        console.log('强制重建索引，清空现有数据...');
-        await skill.vectorManager.clearCollection();
+        if (docIds && Array.isArray(docIds) && docIds.length > 0) {
+          console.log(`强制重建索引，删除 ${docIds.length} 个指定文档的现有索引...`);
+          await skill.vectorManager.deleteDocumentsWithChunks(docIds);
+        } else if (notebookId) {
+          console.log(`强制重建索引，删除笔记本 ${notebookId} 的现有索引...`);
+          await skill.vectorManager.deleteNotebookDocuments(notebookId);
+        } else {
+          console.log('强制重建索引，清空现有数据...');
+          await skill.vectorManager.clearCollection();
+        }
       } else if (incremental) {
         // 增量索引：只索引有变化的文档
         const originalDocIds = [...new Set(documentsToIndex
@@ -166,6 +174,17 @@ const command = {
           id: docId
         });
 
+        // 获取 tags（使用 getBlockAttrs API）
+        let docTags = [];
+        try {
+          const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
+          if (attrs && attrs.tags) {
+            docTags = attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
+          }
+        } catch (e) {
+          // 忽略获取 tags 失败
+        }
+
         if (content && content.content) {
           let pathInfo = null;
           try {
@@ -174,17 +193,23 @@ const command = {
             // 忽略错误
           }
 
-          // 检查内容长度，如果超过限制则使用分块
-          // nomic-embed-text 限制 8192 tokens，中文字符可能占用更多 token
-          // 安全起见，使用较小的分块大小
-          const maxContentLength = 2000;
-          const docContent = content.content;
+          const embeddingConfig = skill.config?.embedding || {};
+          const maxContentLength = embeddingConfig.maxContentLength || 1000;
+          const docContent = content.content.trim();
+          
+          // 跳过空内容文档
+          if (!docContent) {
+            console.log(`文档 ${docId} 内容为空，跳过索引`);
+            continue;
+          }
+          
+          const docTitle = content.hPath?.split('/').pop() || docId;
+          const docPath = content.hPath || '';
+          const notebookIdFromPath = pathInfo?.notebook || '';
 
           if (docContent.length > maxContentLength) {
-            // 使用思源笔记API获取文档的块列表
             const chunks = await this.fetchDocumentChunks(skill, docId);
             
-            // 为每个块创建索引项
             chunks.forEach((chunk, index) => {
               documents.push({
                 docId: `${docId}_chunk_${index}`,
@@ -193,27 +218,28 @@ const command = {
                 chunkIndex: index,
                 totalChunks: chunks.length,
                 metadata: {
-                  title: content.hPath?.split('/').pop() || docId,
-                  path: content.hPath || '',
-                  notebookId: pathInfo?.box || '',
+                  title: docTitle,
+                  path: docPath,
+                  notebookId: notebookIdFromPath,
                   updated: Date.now(),
                   isChunk: true,
-                  originalDocId: docId
+                  originalDocId: docId,
+                  tags: docTags
                 }
               });
             });
             
             console.log(`文档 ${docId} 已分为 ${chunks.length} 个块进行索引`);
           } else {
-            // 内容长度在限制内，直接索引
             documents.push({
               docId,
               content: docContent,
               metadata: {
-                title: content.hPath?.split('/').pop() || docId,
-                path: content.hPath || '',
-                notebookId: pathInfo?.box || '',
-                updated: Date.now()
+                title: docTitle,
+                path: docPath,
+                notebookId: notebookIdFromPath,
+                updated: Date.now(),
+                tags: docTags
               }
             });
           }
@@ -253,8 +279,9 @@ const command = {
 
       // 遍历所有子块，收集内容
       let currentChunk = '';
-      const maxChunkLength = 1500; // 每个块的最大长度（安全值，避免超出embedding模型限制）
-      const minChunkLength = 300; // 最小长度，避免过小的块
+      const embeddingConfig = skill.config?.embedding || {};
+      const maxChunkLength = embeddingConfig.maxChunkLength || 800;
+      const minChunkLength = embeddingConfig.minChunkLength || 200;
 
       for (const block of childBlocks) {
         // 获取块内容
@@ -355,15 +382,34 @@ const command = {
               id: block.id
             });
 
+            // 获取 tags
+            let docTags = [];
+            try {
+              const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: block.id });
+              if (attrs && attrs.tags) {
+                docTags = attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
+              }
+            } catch (e) {
+              // 忽略获取 tags 失败
+            }
+
             if (content && content.content) {
-              const docContent = content.content;
-              const maxContentLength = 2000; // embedding模型的上下文限制（安全值）
+              const docContent = content.content.trim();
+              
+              // 跳过空内容文档
+              if (!docContent) {
+                console.log(`文档 ${block.id} 内容为空，跳过索引`);
+                continue;
+              }
+              
+              const embeddingConfig = skill.config?.embedding || {};
+              const maxContentLength = embeddingConfig.maxContentLength || 1000;
+              const docTitle = content.hPath?.split('/').pop() || block.id;
+              const docPath = content.hPath || '';
 
               if (docContent.length > maxContentLength) {
-                // 使用思源笔记API获取文档的块列表
                 const chunks = await this.fetchDocumentChunks(skill, block.id);
                 
-                // 为每个块创建索引项
                 chunks.forEach((chunk, index) => {
                   documents.push({
                     docId: `${block.id}_chunk_${index}`,
@@ -372,27 +418,28 @@ const command = {
                     chunkIndex: index,
                     totalChunks: chunks.length,
                     metadata: {
-                      title: block.path?.split('/').pop() || block.id,
-                      path: block.path || '',
-                      notebookId: block.box || notebookId,
+                      title: docTitle,
+                      path: docPath,
+                      notebookId: notebookId,
                       updated: block.updated || Date.now(),
                       isChunk: true,
-                      originalDocId: block.id
+                      originalDocId: block.id,
+                      tags: docTags
                     }
                   });
                 });
                 
                 console.log(`文档 ${block.id} 已分为 ${chunks.length} 个块进行索引`);
               } else {
-                // 内容长度在限制内，直接索引
                 documents.push({
                   docId: block.id,
                   content: docContent,
                   metadata: {
-                    title: block.path?.split('/').pop() || block.id,
-                    path: block.path || '',
-                    notebookId: block.box || notebookId,
-                    updated: block.updated || Date.now()
+                    title: docTitle,
+                    path: docPath,
+                    notebookId: notebookId,
+                    updated: block.updated || Date.now(),
+                    tags: docTags
                   }
                 });
               }

@@ -22,10 +22,13 @@
     "collectionName": "siyuan_notes"
   },
   "embedding": {
+    "baseUrl": "http://localhost:11434",
     "model": "nomic-embed-text",
     "dimension": 768,
-    "batchSize": 8,
-    "baseUrl": "http://localhost:11434"
+    "maxContentLength": 1000,
+    "maxChunkLength": 800,
+    "minChunkLength": 200,
+    "batchSize": 3
   },
   "hybridSearch": {
     "denseWeight": 0.7,

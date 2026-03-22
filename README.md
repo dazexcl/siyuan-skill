@@ -445,7 +445,10 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
   "embedding": {
     "model": "nomic-embed-text",
     "dimension": 768,
-    "batchSize": 8,
+    "batchSize": 5,
+    "maxContentLength": 4000,
+    "maxChunkLength": 4000,
+    "minChunkLength": 200,
     "baseUrl": "http://localhost:11434"
   },
   "hybridSearch": {
@@ -538,7 +541,10 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 |--------|------|------|--------|------|
 | `embedding.model` | string | ❌ | `nomic-embed-text` | Embedding 模型名称 |
 | `embedding.dimension` | number | ❌ | `768` | 向量维度 |
-| `embedding.batchSize` | number | ❌ | `8` | 批处理大小 |
+| `embedding.batchSize` | number | ❌ | `5` | 批处理大小 |
+| `embedding.maxContentLength` | number | ❌ | `4000` | 触发分块的内容长度阈值 |
+| `embedding.maxChunkLength` | number | ❌ | `4000` | 单个分块最大长度 |
+| `embedding.minChunkLength` | number | ❌ | `200` | 单个分块最小长度 |
 | `embedding.baseUrl` | string | ❌ | `null` | Embedding 服务地址 |
 
 **说明：** 当前版本使用 Ollama Embedding 服务，无需下载本地模型文件。
@@ -625,7 +631,10 @@ QDRANT_COLLECTION_NAME="siyuan_notes"
 OLLAMA_BASE_URL="http://localhost:11434"
 OLLAMA_EMBED_MODEL="nomic-embed-text"
 EMBEDDING_DIMENSION=768
-EMBEDDING_BATCH_SIZE=8
+EMBEDDING_BATCH_SIZE=5
+SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH=4000
+SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH=4000
+SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH=200
 ```
 
 ### 混合搜索配置

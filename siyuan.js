@@ -388,25 +388,26 @@ function showCommandHelp(command) {
     },
     'index': {
       aliases: ['index-documents'],
-      description: '索引文档到向量数据库（支持增量索引和自动分块）',
+      description: '索引文档到向量数据库（支持增量索引、自动分块和按范围删除）',
       usage: 'siyuan index [<id>] [--notebook <id>] [--doc-ids <ids>] [--force] [--no-incremental]',
       options: [
         { name: '<id>', description: '位置参数：笔记本ID或文档ID（自动识别）' },
         { name: '--notebook', description: '索引指定笔记本' },
         { name: '--doc-ids', description: '索引指定文档ID（逗号分隔）' },
-        { name: '--force', description: '强制重建索引（清空所有数据）' },
+        { name: '--force', description: '强制重建索引（按范围删除：单文档/笔记本/全部）' },
         { name: '--no-incremental', description: '禁用增量索引，重新索引所有文档' },
-        { name: '--batch-size', description: '批量大小（默认：10）' }
+        { name: '--batch-size', description: '批量大小（默认：5）' }
       ],
       examples: [
-        'siyuan index                         # 索引所有笔记本',
-        'siyuan index <notebook-id>          # 索引指定笔记本（自动识别）',
-        'siyuan index <doc-id>               # 索引指定文档（自动识别）',
-        'siyuan index --notebook <id>        # 索引指定笔记本',
-        'siyuan index --doc-ids id1,id2      # 索引多个文档',
-        'siyuan index --force                # 强制重建索引',
-        'siyuan index --doc-ids <docId1,docId2,docId3>',
-        'siyuan index --batch-size 20'
+        'siyuan index                           # 增量索引所有笔记本',
+        'siyuan index <notebook-id>            # 索引指定笔记本（自动识别）',
+        'siyuan index <doc-id>                 # 索引指定文档（自动识别）',
+        'siyuan index --notebook <id>          # 索引指定笔记本',
+        'siyuan index --doc-ids id1,id2        # 索引多个文档',
+        'siyuan index <doc-id> --force         # 强制重建该文档索引',
+        'siyuan index --notebook <id> --force  # 强制重建该笔记本索引',
+        'siyuan index --force                  # 强制重建所有索引（清空集合）',
+        'siyuan index --batch-size 10'
       ]
     },
     'nlp': {

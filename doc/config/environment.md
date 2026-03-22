@@ -43,12 +43,20 @@
 
 ### 向量搜索（可选）
 
-| 变量 | 说明 | 示例 |
-|------|------|------|
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
 | `QDRANT_URL` | Qdrant 服务地址 | `http://localhost:6333` |
-| `QDRANT_API_KEY` | Qdrant API 密钥 | `your-api-key` |
+| `QDRANT_API_KEY` | Qdrant API 密钥 | `""` |
 | `OLLAMA_BASE_URL` | Ollama 服务地址 | `http://localhost:11434` |
 | `OLLAMA_EMBED_MODEL` | Embedding 模型 | `nomic-embed-text` |
+| `EMBEDDING_DIMENSION` | 向量维度 | `768` |
+| `EMBEDDING_BATCH_SIZE` | 批处理大小 | `5` |
+| `SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH` | 触发分块的内容长度阈值 | `4000` |
+| `SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH` | 单个分块最大长度 | `4000` |
+| `SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH` | 单个分块最小长度 | `200` |
+| `HYBRID_DENSE_WEIGHT` | 语义搜索权重 | `0.7` |
+| `HYBRID_SPARSE_WEIGHT` | 关键词搜索权重 | `0.3` |
+| `HYBRID_SEARCH_LIMIT` | 搜索结果数量限制 | `20` |
 
 ## 配置示例
 
