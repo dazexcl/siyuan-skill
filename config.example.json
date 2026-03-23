@@ -28,7 +28,8 @@
     "maxContentLength": 1000,
     "maxChunkLength": 800,
     "minChunkLength": 200,
-    "batchSize": 3
+    "batchSize": 3,
+    "skipIndexAttrs": ["custom-skip-index"]
   },
   "hybridSearch": {
     "denseWeight": 0.7,
