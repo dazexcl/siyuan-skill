@@ -254,44 +254,66 @@ siyuan bg <docId> --mode children
 
 ## block-attrs (ba, attrs)
 
-管理块属性，支持设置和获取属性。
+管理块属性，支持设置、获取和移除属性。
 
 **重要说明**：
 - 默认情况下，属性会自动添加 `custom-` 前缀（在思源笔记界面可见）
-- 使用 `--hide` 标记可以设置隐藏属性（不带 `custom-` 前缀）
+- 使用 `--hide` 标记可以设置内部属性（不带 `custom-` 前缀，在界面不可见）
 
 ### 命令格式
 
 ```bash
-siyuan block-attrs <blockId> --set <attrs> [--get [key]] [--hide]
+siyuan block-attrs <docId|blockId> (--set <attrs> | --get [key] | --remove <keys>) [--hide]
 ```
 
 ### 参数说明
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `<blockId>` | string | ✅ | 块ID（位置参数） |
-| `--set` | string | ❌ | 设置属性（key=value格式，多个用逗号分隔） |
-| `--get` | string | ❌ | 获取属性（不带参数取所有，带参数取指定属性） |
-| `--hide` | boolean | ❌ | 设置隐藏属性（不带 custom- 前缀） |
+| `<docId|blockId>` | string | ✅ | 块ID/文档ID（位置参数，必传） |
+| `--set` | string | ⚡ | 设置属性（key=value格式，多个用逗号分隔） |
+| `--get` | string | ⚡ | 获取属性（不带参数取所有，带参数取指定属性） |
+| `--remove` | string | ⚡ | 移除属性（传入属性键名，多个用逗号分隔） |
+| `--hide` | boolean | ❌ | 操作内部属性（不带 custom- 前缀，在界面不可见） |
+
+> ⚡ `--set`、`--get`、`--remove` 三者必须选其一
 
 ### 使用示例
 
+#### 设置属性
+
 ```bash
-# 设置可见属性（自动添加 custom- 前缀）
-siyuan attrs <blockId> --set "status=draft,priority=high"
+# 设置可见属性（自动添加 custom- 前缀，在界面可见）
+siyuan attrs <docId> --set "status=draft,priority=high"
 
-# 设置隐藏属性（不带 custom- 前缀）
+# 设置内部属性（不带 custom- 前缀，在界面不可见）
 siyuan attrs <blockId> --set "internal=true" --hide
+```
 
+#### 获取属性
+
+```bash
 # 获取所有属性（自动移除 custom- 前缀显示）
-siyuan attrs <blockId> --get
+siyuan attrs <docId> --get
 
 # 获取指定属性
 siyuan attrs <blockId> --get "status"
 
-# 获取隐藏属性
-siyuan attrs <blockId> --get "internal" --hide
+# 获取内部属性
+siyuan attrs <docId> --get "internal" --hide
+```
+
+#### 移除属性
+
+```bash
+# 移除单个属性
+siyuan attrs <docId> --remove "status"
+
+# 移除多个属性
+siyuan attrs <blockId> --remove "status,priority"
+
+# 移除内部属性
+siyuan attrs <docId> --remove "internal" --hide
 ```
 
 ---

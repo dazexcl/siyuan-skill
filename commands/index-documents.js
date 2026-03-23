@@ -36,17 +36,24 @@ const command = {
       let documentsToIndex = [];
       let skippedCount = 0;
       let cleanedCount = 0;
+      let skippedDocIds = [];
 
       // 根据参数获取待索引文档
       if (docIds?.length > 0) {
-        documentsToIndex = await this.fetchDocumentsByIds(skill, docIds);
+        const result = await this.fetchDocumentsByIds(skill, docIds);
+        documentsToIndex = result.documents;
+        skippedDocIds = result.skippedDocIds;
       } else if (notebookId) {
-        documentsToIndex = await this.fetchDocumentsByNotebook(skill, notebookId);
+        const result = await this.fetchDocumentsByNotebook(skill, notebookId);
+        documentsToIndex = result.documents;
+        skippedDocIds = result.skippedDocIds;
       } else {
-        documentsToIndex = await this.fetchAllDocuments(skill);
+        const result = await this.fetchAllDocuments(skill);
+        documentsToIndex = result.documents;
+        skippedDocIds = result.skippedDocIds;
       }
 
-      if (documentsToIndex.length === 0) {
+      if (documentsToIndex.length === 0 && skippedDocIds.length === 0) {
         return { success: true, indexed: 0, message: '没有找到需要索引的文档' };
       }
 
@@ -54,8 +61,8 @@ const command = {
       if (force) {
         await this.deleteExistingIndices(skill, { notebookId, docIds });
       } else {
-        // 增量索引：检查更新、清理孤立索引
-        const result = await this.processIncrementalIndex(skill, { documentsToIndex, notebookId, docIds });
+        // 增量索引：检查更新、清理孤立索引、清理跳过文档的索引
+        const result = await this.processIncrementalIndex(skill, { documentsToIndex, notebookId, docIds, skippedDocIds });
         skippedCount = result.skippedCount;
         cleanedCount = result.cleanedCount;
         documentsToIndex = result.documentsToIndex;
@@ -89,21 +96,29 @@ const command = {
     }
   },
 
-  // 增量索引：清理孤立索引 + 检查更新
-  async processIncrementalIndex(skill, { documentsToIndex, notebookId, docIds }) {
+  // 增量索引：清理孤立索引 + 检查更新 + 清理跳过文档的索引
+  async processIncrementalIndex(skill, { documentsToIndex, notebookId, docIds, skippedDocIds }) {
     const originalDocIds = [...new Set(documentsToIndex.map(d => d.originalDocId || d.docId))];
     let skippedCount = 0;
     let cleanedCount = 0;
+
+    console.log('增量索引模式：检查文档更新状态...');
+
+    // 清理跳过索引文档的旧索引
+    if (skippedDocIds && skippedDocIds.length > 0) {
+      console.log(`清理 ${skippedDocIds.length} 个跳过索引文档的旧索引...`);
+      await skill.vectorManager.deleteDocumentsWithChunks(skippedDocIds);
+      cleanedCount += skippedDocIds.length;
+    }
 
     if (originalDocIds.length === 0) {
       return { skippedCount, cleanedCount, documentsToIndex };
     }
 
-    console.log('增量索引模式：检查文档更新状态...');
-
     // 清理孤立索引（只在索引笔记本或全部文档时执行）
     if (!docIds || docIds.length === 0) {
-      cleanedCount = await this.cleanOrphanedIndices(skill, { originalDocIds, notebookId });
+      const orphanedCount = await this.cleanOrphanedIndices(skill, { originalDocIds, notebookId });
+      cleanedCount += orphanedCount;
     }
 
     // 获取已索引文档的更新时间，找出需要更新的文档
@@ -186,6 +201,7 @@ const command = {
   // 通过文档 ID 获取文档
   async fetchDocumentsByIds(skill, docIds) {
     const documents = [];
+    const skippedDocIds = [];
     for (const docId of docIds) {
       try {
         const docInfo = await skill.connector.request('/api/block/getBlockInfo', { id: docId });
@@ -193,18 +209,23 @@ const command = {
           console.warn(`文档 ${docId} 不存在`);
           continue;
         }
-        const processedDocs = await this.processDocument(skill, docId, { notebookId: null, updated: docInfo.updated });
-        documents.push(...processedDocs);
+        const result = await this.processDocument(skill, docId, { notebookId: null, updated: docInfo.updated });
+        if (result.skipped) {
+          skippedDocIds.push(docId);
+        } else {
+          documents.push(...result.docs);
+        }
       } catch (error) {
         console.warn(`获取文档 ${docId} 失败:`, error.message);
       }
     }
-    return documents;
+    return { documents, skippedDocIds };
   },
 
   // 通过笔记本 ID 获取文档
   async fetchDocumentsByNotebook(skill, notebookId) {
     const documents = [];
+    const skippedDocIds = [];
     try {
       const sqlQuery = `SELECT id, content, path, updated, box FROM blocks WHERE box = '${notebookId}' AND type = 'd'`;
       const blocks = await skill.connector.request('/api/query/sql', { stmt: sqlQuery });
@@ -212,8 +233,12 @@ const command = {
       if (blocks?.length > 0) {
         for (const block of blocks) {
           try {
-            const processedDocs = await this.processDocument(skill, block.id, { notebookId, updated: block.updated });
-            documents.push(...processedDocs);
+            const result = await this.processDocument(skill, block.id, { notebookId, updated: block.updated });
+            if (result.skipped) {
+              skippedDocIds.push(block.id);
+            } else {
+              documents.push(...result.docs);
+            }
           } catch (error) {
             console.warn(`获取文档 ${block.id} 内容失败:`, error.message);
           }
@@ -222,25 +247,27 @@ const command = {
     } catch (error) {
       console.error('获取笔记本文档失败:', error.message);
     }
-    return documents;
+    return { documents, skippedDocIds };
   },
 
   // 获取所有文档
   async fetchAllDocuments(skill) {
     const documents = [];
+    const skippedDocIds = [];
     try {
       const notebooksResponse = await skill.connector.request('/api/notebook/lsNotebooks');
       const notebooks = notebooksResponse?.notebooks || notebooksResponse || [];
 
       for (const notebook of notebooks) {
         if (skill.checkPermission && !skill.checkPermission(notebook.id)) continue;
-        const notebookDocs = await this.fetchDocumentsByNotebook(skill, notebook.id);
-        documents.push(...notebookDocs);
+        const result = await this.fetchDocumentsByNotebook(skill, notebook.id);
+        documents.push(...result.documents);
+        skippedDocIds.push(...result.skippedDocIds);
       }
     } catch (error) {
       console.error('获取所有文档失败:', error.message);
     }
-    return documents;
+    return { documents, skippedDocIds };
   },
 
   // 处理单个文档：获取内容、标签、路径，根据长度决定是否分块
@@ -248,18 +275,27 @@ const command = {
     const { notebookId: defaultNotebookId, updated: defaultUpdated } = options;
     const embeddingConfig = skill.config?.embedding || {};
     const maxContentLength = embeddingConfig.maxContentLength || 1000;
+    const skipIndexAttrs = embeddingConfig.skipIndexAttrs || [];
 
     const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
-    if (!content?.content) return [];
+    if (!content?.content) return { docs: [], skipped: false };
 
     const docContent = content.content.trim();
     if (!docContent) {
       console.log(`文档 ${docId} 内容为空，跳过索引`);
-      return [];
+      return { docs: [], skipped: false };
     }
 
-    // 获取文档标签和路径信息
-    const docTags = await this.fetchDocumentTags(skill, docId);
+    // 获取文档属性（包含 tags 和原始 attrs）
+    const docAttrs = await this.fetchDocumentAttrs(skill, docId);
+    
+    // 检查是否需要跳过索引
+    const skipReason = this.shouldSkipIndex(docAttrs, skipIndexAttrs);
+    if (skipReason) {
+      console.log(`文档 ${docId} 跳过索引: ${skipReason}`);
+      return { docs: [], skipped: true };
+    }
+
     const pathInfo = await this.fetchPathInfo(skill, docId);
 
     const docTitle = content.hPath?.split('/').pop() || docId;
@@ -267,20 +303,69 @@ const command = {
     const notebookId = defaultNotebookId || pathInfo?.notebook || '';
     const docUpdatedTime = defaultUpdated ? defaultUpdated * 1000 : Date.now();
 
-    const metadata = { title: docTitle, path: docPath, notebookId, updated: docUpdatedTime, tags: docTags };
+    const metadata = { title: docTitle, path: docPath, notebookId, updated: docUpdatedTime, tags: docAttrs.tags };
 
     if (docContent.length > maxContentLength) {
-      return await this.createChunkedDocuments(skill, docId, docContent, metadata);
+      const docs = await this.createChunkedDocuments(skill, docId, docContent, metadata);
+      return { docs, skipped: false };
     }
-    return [{ docId, content: docContent, metadata }];
+    return { docs: [{ docId, content: docContent, metadata }], skipped: false };
   },
 
-  async fetchDocumentTags(skill, docId) {
+  /**
+   * 获取文档属性（包含 tags 和原始 attrs）
+   * @param {Object} skill - 技能实例
+   * @param {string} docId - 文档 ID
+   * @returns {Promise<Object>} { tags: [], _raw: {} }
+   */
+  async fetchDocumentAttrs(skill, docId) {
     try {
       const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
-      if (attrs?.tags) return attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
-    } catch (e) { }
-    return [];
+      const result = { tags: [], _raw: {} };
+      
+      if (attrs) {
+        result._raw = attrs;
+        if (attrs.tags) {
+          result.tags = attrs.tags.split(',').map(t => t.trim()).filter(Boolean);
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      return { tags: [], _raw: {} };
+    }
+  },
+
+  /**
+   * 获取文档标签（兼容旧调用方式）
+   * @param {Object} skill - 技能实例
+   * @param {string} docId - 文档 ID
+   * @returns {Promise<string[]>} 标签数组
+   */
+  async fetchDocumentTags(skill, docId) {
+    const attrs = await this.fetchDocumentAttrs(skill, docId);
+    return attrs.tags;
+  },
+
+  /**
+   * 检查文档是否应该跳过索引
+   * @param {Object} attrs - 文档属性 { tags: [], _raw: {} }
+   * @param {string[]} skipIndexAttrs - 跳过索引的属性名列表
+   * @returns {string|null} 跳过原因，null 表示不跳过
+   */
+  shouldSkipIndex(attrs, skipIndexAttrs) {
+    if (!skipIndexAttrs || skipIndexAttrs.length === 0) return null;
+    
+    const rawAttrs = attrs._raw || {};
+    
+    for (const skipAttr of skipIndexAttrs) {
+      const value = rawAttrs[skipAttr];
+      if (value !== undefined && value !== '' && value !== 'false') {
+        return `${skipAttr}=${value}`;
+      }
+    }
+    
+    return null;
   },
 
   async fetchPathInfo(skill, docId) {

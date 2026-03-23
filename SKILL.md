@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.6.11"
+version: "1.6.12"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
 skillType: "cli"
 runtime: "node"
@@ -75,7 +75,7 @@ siyuan help <command>  # 查看命令帮助
 | `rename` | - | 重命名文档（自动重名检测） |
 | `search` | `find` | 搜索内容 |
 | `convert` | `path` | 转换 ID 和路径 |
-| `block-attrs` | `ba`, `attrs` | 设置块/文档属性 |
+| `block-attrs` | `ba`, `attrs` | 管理块/文档属性（设置/获取/移除） |
 | `tags` | `st` | 设置标签 |
 | `exists` | `check` | 检查文档是否存在 |
 
@@ -235,8 +235,18 @@ siyuan update <blockId> "内容"        # 错误：update 不接受块ID
 siyuan ba <docId> --set "status=published"
 siyuan st <docId> --tags "重要,待审核"
 
+# 获取属性
+siyuan ba <docId> --get
+
+# 移除属性
+siyuan ba <docId> --remove "status"
+
 # ❌ 不推荐：在内容中添加 Front Matter
 ```
+
+> **属性前缀说明**：
+> - 默认：属性自动添加 `custom-` 前缀，在思源界面**可见**
+> - `--hide`：设置/操作内部属性（不带 `custom-` 前缀），在界面**不可见**
 
 ## 文档格式
 
@@ -280,6 +290,30 @@ siyuan create "标题" "第一段## 二级标题 内容"
 需部署 Qdrant + Ollama，配置环境变量：
 - `QDRANT_URL`
 - `OLLAMA_BASE_URL`
+
+### 索引配置
+
+在 `config.json` 的 `embedding` 配置中可设置：
+
+```json
+{
+  "embedding": {
+    "maxContentLength": 4000,
+    "maxChunkLength": 4000,
+    "minChunkLength": 200,
+    "skipIndexAttrs": ["custom-skip-index", "custom-draft"]
+  }
+}
+```
+
+| 参数 | 说明 |
+|------|------|
+| `maxContentLength` | 超过此长度的文档将被分块索引 |
+| `maxChunkLength` | 每个分块的最大长度 |
+| `minChunkLength` | 每个分块的最小长度（避免碎片化） |
+| `skipIndexAttrs` | 包含指定属性的文档将跳过索引 |
+
+也可通过环境变量配置：`SIYUAN_SKIP_INDEX_ATTRS=custom-skip-index,custom-draft`
 
 ### 向量索引
 

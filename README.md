@@ -1,7 +1,7 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.6.11-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.6.12-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->=14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
@@ -313,16 +313,20 @@ siyuan btr --from-id <fromId> --to-id <toId>
 ### 属性与标签
 
 ```bash
-# 设置块属性
+# 设置块属性（默认添加 custom- 前缀，在界面可见）
 siyuan block-attrs <blockId> --set "key=value"
 siyuan ba <blockId> --set "status=published"   # 别名
 siyuan attrs <blockId> --set "key=value"       # 别名
 
 # 获取属性
-siyuan ba <blockId> --get
+siyuan ba <blockId> --get                  # 获取所有属性
+siyuan ba <blockId> --get status           # 获取指定属性
 
-# 设置多个属性
-siyuan ba <blockId> --set "priority=high" --set "due=2024-12-31"
+# 移除属性
+siyuan ba <blockId> --remove "key1,key2"   # 移除指定属性
+
+# 设置内部属性（不带 custom- 前缀，在界面不可见）
+siyuan ba <blockId> --set "internal=value" --hide
 
 # 设置标签
 siyuan tags <blockId> --tags "标签1,标签2"
@@ -337,6 +341,15 @@ siyuan tags <blockId> --get
 # 清除所有标签
 siyuan tags <blockId> --clear
 ```
+
+**属性前缀说明：**
+
+| 模式 | 前缀 | 可见性 |
+|------|------|--------|
+| 默认 | `custom-` | 在思源笔记界面可见 |
+| `--hide` | 无前缀 | 内部属性，界面不可见 |
+
+**注意：** `--set`、`--get`、`--remove` 三者互斥，每次只能使用其中一个。
 
 ### 文档保护
 
@@ -450,7 +463,8 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
     "maxContentLength": 4000,
     "maxChunkLength": 4000,
     "minChunkLength": 200,
-    "baseUrl": "http://localhost:11434"
+    "baseUrl": "http://localhost:11434",
+    "skipIndexAttrs": []
   },
   "hybridSearch": {
     "denseWeight": 0.7,
@@ -547,8 +561,9 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 | `embedding.maxChunkLength` | number | ❌ | `4000` | 单个分块最大长度 |
 | `embedding.minChunkLength` | number | ❌ | `200` | 单个分块最小长度 |
 | `embedding.baseUrl` | string | ❌ | `null` | Embedding 服务地址 |
+| `embedding.skipIndexAttrs` | array | ❌ | `[]` | 跳过索引的属性名列表 |
 
-**说明：** 当前版本使用 Ollama Embedding 服务，无需下载本地模型文件。
+**说明：** 当前版本使用 Ollama Embedding 服务，无需下载本地模型文件。`skipIndexAttrs` 用于指定哪些属性的文档应跳过索引，如 `["custom-skip-index", "custom-draft"]`。
 
 ### 9. 混合搜索配置（可选）
 

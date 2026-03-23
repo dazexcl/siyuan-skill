@@ -69,7 +69,8 @@ export OLLAMA_EMBED_MODEL="nomic-embed-text"
     "maxContentLength": 4000,
     "maxChunkLength": 4000,
     "minChunkLength": 200,
-    "batchSize": 5
+    "batchSize": 5,
+    "skipIndexAttrs": ["custom-skip-index", "custom-draft"]
   },
   "hybridSearch": {
     "denseWeight": 0.7,
@@ -90,6 +91,7 @@ export OLLAMA_EMBED_MODEL="nomic-embed-text"
 | `embedding.maxChunkLength` | `4000` | 单个分块最大长度 |
 | `embedding.minChunkLength` | `200` | 单个分块最小长度 |
 | `embedding.batchSize` | `5` | 批处理大小 |
+| `embedding.skipIndexAttrs` | `[]` | 跳过索引的属性名列表 |
 | `hybridSearch.denseWeight` | `0.7` | 稠密向量权重 |
 | `hybridSearch.sparseWeight` | `0.3` | 稀疏向量权重 |
 | `hybridSearch.limit` | `20` | 搜索结果数量限制 |
@@ -215,6 +217,21 @@ siyuan search "人工智能应用" --mode hybrid
 ### 空内容过滤
 - 自动跳过内容为空的文档
 - 避免创建无意义的向量记录
+
+### 跳过索引属性过滤
+通过配置 `skipIndexAttrs` 可以指定哪些文档应该跳过索引：
+
+```json
+{
+  "embedding": {
+    "skipIndexAttrs": ["custom-skip-index", "custom-draft"]
+  }
+}
+```
+
+- 包含这些属性（且值不为空或 `false`）的文档将被跳过
+- 增量索引时会自动清理已跳过文档的旧索引
+- 也可通过环境变量配置：`SIYUAN_SKIP_INDEX_ATTRS=custom-skip-index,custom-draft`
 
 ### 递归处理
 支持递归处理子文档，确保所有内容都被正确索引。

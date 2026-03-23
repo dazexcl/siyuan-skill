@@ -545,20 +545,23 @@ function showCommandHelp(command) {
     },
     'block-attrs': {
       aliases: ['ba', 'attrs'],
-      description: '设置块/文档属性（默认自动添加 custom- 前缀）',
-      usage: 'siyuan block-attrs <id> --set <attrs> [--get [key]] [--hide]',
+      description: '管理块/文档属性（设置/获取/移除，默认自动添加 custom- 前缀）',
+      usage: 'siyuan block-attrs <docId|blockId> (--set <attrs> | --get [key] | --remove <keys>) [--hide]',
       options: [
-        { name: '<id>', description: '块ID/文档ID（必需，位置参数）' },
+        { name: '<docId|blockId>', description: '块ID/文档ID（必传，位置参数）' },
         { name: '--set', description: '设置属性（key=value格式，多个用逗号分隔）' },
         { name: '--get', description: '获取属性（不带参数取所有，带参数取指定属性）' },
-        { name: '--hide', description: '设置隐藏属性（不带 custom- 前缀）' }
+        { name: '--remove', description: '移除属性（传入属性键名，多个用逗号分隔）' },
+        { name: '--hide', description: '设置内部属性（不带 custom- 前缀，在界面不可见）' }
       ],
       examples: [
-        'siyuan attrs <id> --set "status=draft,priority=high"',
-        'siyuan attrs <id> --set "internal=true" --hide',
-        'siyuan attrs <id> --get',
-        'siyuan attrs <id> --get "status"',
-        'siyuan attrs <id> --get "internal" --hide'
+        'siyuan attrs <docId> --set "status=draft,priority=high"',
+        'siyuan attrs <blockId> --set "internal=true" --hide',
+        'siyuan attrs <docId> --get',
+        'siyuan attrs <blockId> --get "status"',
+        'siyuan attrs <docId> --get "internal" --hide',
+        'siyuan attrs <docId> --remove "status"',
+        'siyuan attrs <blockId> --remove "status,priority"'
       ]
     },
     'tags': {
@@ -1390,7 +1393,7 @@ async function main(customArgs = null) {
           showHelp('block-attrs');
           process.exit(0);
         }
-        console.log('设置属性...');
+        console.log('操作属性...');
         const baParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--id': { hasValue: true },
@@ -1398,6 +1401,7 @@ async function main(customArgs = null) {
             '--set': { hasValue: true, aliases: ['--attrs'] },
             '--get': { isFlag: true },
             '--key': { hasValue: true },
+            '--remove': { hasValue: true },
             '--hide': { isFlag: true }
           },
           positionalCount: 1
@@ -1411,10 +1415,11 @@ async function main(customArgs = null) {
         if (baParsed.options.set) setAttrsArgs.attrs = baParsed.options.set;
         if (baParsed.options.key) setAttrsArgs.key = baParsed.options.key;
         if (baParsed.options.get) setAttrsArgs.get = true;
+        if (baParsed.options.remove) setAttrsArgs.remove = baParsed.options.remove;
         if (baParsed.options.hide) setAttrsArgs.hide = true;
         if (!setAttrsArgs.id) {
           console.error('错误：请提供块/文档 ID');
-          console.log('用法：siyuan block-attrs <id> --set <attrs> [--get [key]] [--hide]');
+          console.log('用法：siyuan block-attrs <id> (--set <attrs> | --get [key] | --remove <keys>) [--hide]');
           process.exit(1);
         }
         const setAttrsResult = await skill.executeCommand('block-attrs', setAttrsArgs);
