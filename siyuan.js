@@ -35,10 +35,11 @@ function parseCommandArgs(args, config) {
   // 构建选项映射（包括别名）
   const optionMap = {};
   for (const [name, opt] of Object.entries(options)) {
-    optionMap[name] = opt;
+    const camelCase = name.replace(/^--/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    optionMap[name] = { ...opt, targetName: camelCase };
     if (opt.aliases) {
       for (const alias of opt.aliases) {
-        optionMap[alias] = { ...opt, targetName: name };
+        optionMap[alias] = { ...opt, targetName: camelCase };
       }
     }
   }
@@ -200,27 +201,45 @@ function showCommandHelp(command) {
     },
     'structure': {
       aliases: ['ls'],
-      description: '获取指定笔记本的文档结构，支持笔记本ID和文档ID',
-      usage: 'siyuan structure <notebookId|docId>',
-      options: [],
+      description: '获取指定笔记本或文档的文档结构',
+      usage: 'siyuan structure (<notebookId|docId> | --path <path>)',
+      notes: [
+        '第一个位置参数默认为笔记本ID或文档ID',
+        '--path 与位置参数二选一，不能同时使用',
+        '路径格式支持首位存在或不存在笔记本名称'
+      ],
+      options: [
+        { name: '<notebookId|docId>', description: '笔记本ID或文档ID（位置参数，与 --path 二选一）' },
+        { name: '--path', description: '文档路径（与位置参数二选一）' }
+      ],
       examples: [
         'siyuan structure <notebook-id>',
-        'siyuan structure <doc-id>  # 使用文档ID获取子文档结构'
+        'siyuan structure <doc-id>',
+        'siyuan ls --path "/笔记本名"',
+        'siyuan ls --path "/笔记本名/文档路径"',
+        'siyuan ls --path "文档路径"  # 不含笔记本名时使用默认笔记本'
       ]
     },
     'content': {
       aliases: ['cat'],
       description: '获取文档内容',
-      usage: 'siyuan content <docId> [--format <format>] [--raw]',
+      usage: 'siyuan content [<docId>] [--path <path>] [--format <format>] [--raw]',
+      notes: [
+        '第一个位置参数默认为文档ID',
+        '--doc-id 和 --path 二选一，不能同时使用'
+      ],
       options: [
+        { name: '<docId>', description: '文档ID（位置参数，与 --path 二选一）' },
+        { name: '--doc-id', description: '文档ID（与 --path 二选一）' },
+        { name: '--path', description: '文档路径（与 --doc-id 二选一）' },
         { name: '--format', description: '输出格式：kramdown、markdown、text、html（默认：kramdown）' },
         { name: '--raw', description: '以纯文本格式返回（移除JSON外部结构）' }
       ],
       examples: [
         'siyuan content <doc-id>',
         'siyuan content <doc-id> --format text',
-        'siyuan content <doc-id> --raw',
-        'siyuan content <doc-id> --format text --raw'
+        'siyuan content --path "/目录/文档"',
+        'siyuan content <doc-id> --raw'
       ]
     },
     'search': {
@@ -257,37 +276,60 @@ function showCommandHelp(command) {
     'create': {
       aliases: ['new'],
       description: '创建文档（自动处理换行符）',
-      usage: 'siyuan create <title> [content] [--parent-id <parentId>] [--path <path>] [--force]',
+      usage: 'siyuan create (<title> [content] | --path <path> [content]) [--title <title>] [--parent-id <parentId>] [--force]',
       notes: [
-        '参数顺序灵活，以下写法都支持：',
-        '  siyuan create "标题" "内容" --parent-id <id>',
-        '  siyuan create --parent-id <id> "标题" "内容"',
-        '  siyuan create "标题" --path "/路径" "内容"',
+        '【三种使用模式】',
         '',
-        '标题中的 / 会自动转换为全角 ／',
+        '模式1：传统模式（无 --path）',
+        '  位置参数1 = 标题，位置参数2 = 内容',
+        '  siyuan create "标题" "内容" --parent-id <notebookId>',
+        '  siyuan create "标题" "内容" --parent-id <docId>',
         '',
-        '指定目标位置的方式：',
-        '  --parent-id <id>  指定父文档/笔记本ID',
-        '  --path "/路径"     指定完整路径（推荐）'
+        '模式2：路径指定文档（--path 末尾无 /）',
+        '  标题从路径最后一段提取，位置参数 = 内容',
+        '  siyuan create --path "笔记本/目录/文档名" "内容"',
+        '  siyuan create --path "笔记本/目录/文档名" --title "自定义标题" "内容"',
+        '  不提供内容则创建空文档：',
+        '  siyuan create --path "笔记本/目录/空文档"',
+        '',
+        '模式3：在目录下创建（--path 末尾有 /）',
+        '  在指定目录下创建新文档，位置参数1 = 标题，位置参数2 = 内容',
+        '  siyuan create --path "笔记本/目录/" "新文档标题" "内容"',
+        '',
+        '【路径自动创建】',
+        '  使用 --path 时，中间目录不存在会自动创建（空内容）',
+        '  例如：--path "A/B/C/D" 会自动创建 A、B、C 目录',
+        '',
+        '【重名检测】',
+        '  默认检测同名文档，已存在时返回错误',
+        '  使用 --force 强制创建（允许重名）',
+        '',
+        '【其他说明】',
+        '  --parent-id 与 --path 二选一，不能同时使用',
+        '  标题中的 / 会自动转换为全角 ／'
       ],
       options: [
-        { name: '--parent-id, --parent', description: '父文档/笔记本ID' },
-        { name: '--path', description: '文档路径（支持绝对路径或相对路径）' },
+        { name: '--parent-id, --parent', description: '父文档/笔记本ID（与 --path 二选一）' },
+        { name: '--path', description: '文档路径。末尾无/表示创建该文档；末尾有/表示在该目录下创建' },
+        { name: '--title, -t', description: '自定义标题（仅 --path 模式，覆盖路径中的标题）' },
         { name: '--force', description: '强制创建（忽略重名检测）' }
       ],
       examples: [
-        '# 基本用法',
-        'siyuan create "我的文档"',
-        'siyuan create "我的文档" "文档内容"',
+        '# 模式1：传统方式',
+        'siyuan create "我的文档" --parent-id <notebookId>',
+        'siyuan create "我的文档" "文档内容" --parent-id <notebookId>',
         '',
-        '# 指定目标位置（参数顺序灵活）',
-        'siyuan create "子文档" "内容" --parent <parentId>',
-        'siyuan create --parent-id <parentId> "子文档" "内容"',
-        'siyuan create "子文档" --path /笔记本/目录/文档名 "内容"',
+        '# 模式2：路径指定文档',
+        'siyuan create --path "AI/项目/需求文档" "这是文档内容"',
+        'siyuan create --path "AI/项目/需求文档" --title "需求文档v2" "内容"',
+        'siyuan create --path "AI/项目/空目录/空文档"  # 创建多级空目录',
         '',
-        '# 标题包含斜杠会自动转换',
-        'siyuan create "文档/子标题" "内容"',
-        '# 实际创建的标题为 "文档／子标题"'
+        '# 模式3：在目录下创建',
+        'siyuan create --path "AI/项目/" "新需求文档" "内容"',
+        '',
+        '# 重名处理',
+        'siyuan create --path "AI/测试" "内容"      # 已存在时报错',
+        'siyuan create --path "AI/测试" "内容" --force  # 强制创建'
       ]
     },
     'update-document': {
@@ -580,10 +622,10 @@ function showCommandHelp(command) {
     'exists': {
       aliases: ['check', 'check-exists'],
       description: '检查文档是否存在',
-      usage: 'siyuan exists --title <title> [--parent-id <parentId>] [--notebook-id <notebookId>]\n       siyuan exists --path <path> [--notebook-id <notebookId>]',
+      usage: 'siyuan exists (--title <title> [--parent-id <parentId>] | --path <path>) [--notebook-id <notebookId>]',
       options: [
         { name: '--title, -t', description: '文档标题（与 --path 二选一）' },
-        { name: '--path', description: '文档完整路径（如 /目录/子文档）' },
+        { name: '--path', description: '文档完整路径（与 --title 二选一）' },
         { name: '--parent-id, -p', description: '父文档ID（可选，不指定则检查笔记本根目录）' },
         { name: '--notebook-id, -n', description: '笔记本ID（可选，不指定则使用默认笔记本）' }
       ],
@@ -646,14 +688,22 @@ async function main(customArgs = null) {
   const skill = createSkill();
   
   try {
-    // 根据命令决定是否需要初始化高级功能
-    // 只有搜索相关命令才需要初始化向量搜索功能
-    // NLP命令需要初始化NLP功能
-    const needsAdvancedFeatures = ['search', 'find', 'index', 'index-documents'].includes(command);
+    // 根据命令和参数决定是否需要初始化高级功能
+    // 只有向量搜索模式才需要初始化向量功能
+    let needsVectorSearch = false;
+    
+    if (['search', 'find'].includes(command)) {
+      const modeIndex = args.indexOf('--mode');
+      const mode = modeIndex !== -1 && modeIndex + 1 < args.length ? args[modeIndex + 1] : 'legacy';
+      needsVectorSearch = ['semantic', 'hybrid'].includes(mode);
+    } else if (['index', 'index-documents'].includes(command)) {
+      needsVectorSearch = true;
+    }
+    
     const needsNLP = ['nlp', 'nlp-analyze'].includes(command);
     
     await skill.init({
-      initVectorSearch: needsAdvancedFeatures,
+      initVectorSearch: needsVectorSearch,
       initNLP: needsNLP
     });
     
@@ -682,7 +732,7 @@ async function main(customArgs = null) {
         console.log('获取文档结构...');
         const structureParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--notebook-id': { hasValue: true, aliases: ['--notebook'] }
+            '--path': { hasValue: true }
           },
           positionalCount: 1
         });
@@ -690,10 +740,15 @@ async function main(customArgs = null) {
         if (structureParsed.positional.length > 0) {
           structureArgs.notebookId = structureParsed.positional[0];
         }
-        if (structureParsed.options.notebookId) structureArgs.notebookId = structureParsed.options.notebookId;
-        if (!structureArgs.notebookId) {
-          console.error('错误: 请提供笔记本ID');
-          console.log('用法: siyuan structure <notebookId>');
+        if (structureParsed.options.path) structureArgs.path = structureParsed.options.path;
+        if (!structureArgs.notebookId && !structureArgs.path) {
+          console.error('错误: 请提供笔记本ID/文档ID 或 --path 参数');
+          console.log('用法: siyuan structure [<notebookId|docId>] [--path <path>]');
+          process.exit(1);
+        }
+        if (structureArgs.notebookId && structureArgs.path) {
+          console.error('错误: 位置参数和 --path 不能同时使用');
+          console.log('用法: siyuan structure [<notebookId|docId>] 或 siyuan structure --path <path>');
           process.exit(1);
         }
         const structure = await skill.executeCommand('get-doc-structure', structureArgs);
@@ -711,6 +766,7 @@ async function main(customArgs = null) {
         const contentParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--doc-id': { hasValue: true, aliases: ['--id'] },
+            '--path': { hasValue: true },
             '--format': { hasValue: true },
             '--raw': { isFlag: true }
           },
@@ -721,11 +777,12 @@ async function main(customArgs = null) {
           contentArgs.docId = contentParsed.positional[0];
         }
         if (contentParsed.options.docId) contentArgs.docId = contentParsed.options.docId;
+        if (contentParsed.options.path) contentArgs.path = contentParsed.options.path;
         if (contentParsed.options.format) contentArgs.format = contentParsed.options.format;
         if (contentParsed.options.raw) contentArgs.raw = true;
-        if (!contentArgs.docId) {
-          console.error('错误: 请提供文档ID');
-          console.log('用法: siyuan content <docId> [--format <format>] [--raw]');
+        if (!contentArgs.docId && !contentArgs.path) {
+          console.error('错误: 请提供 --doc-id 或 --path 参数');
+          console.log('用法: siyuan content (--doc-id <docId> | --path <path>) [--format <format>] [--raw]');
           process.exit(1);
         }
         const content = await skill.executeCommand('get-doc-content', contentArgs);
@@ -821,11 +878,11 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         
-        // 使用通用参数解析器
         const createParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--parent-id': { hasValue: true, aliases: ['--parent'] },
             '--path': { hasValue: true },
+            '--title': { hasValue: true, aliases: ['-t'] },
             '--force': { isFlag: true }
           },
           positionalCount: 2,
@@ -837,29 +894,61 @@ async function main(customArgs = null) {
           }
         });
         
-        if (createParsed.positional.length === 0) {
-          console.error('错误: 请提供文档标题');
-          console.log('用法: siyuan create <title> [content] [--parent-id <parentId>] [--path <path>] [--force]');
-          process.exit(1);
-        }
-        
-        let title = createParsed.positional[0];
-        let docContent = createParsed.positional[1] || '';
-        let parentId = createParsed.options.parentId || process.env.SIYUAN_DEFAULT_NOTEBOOK;
+        let createTitle = createParsed.options.title || '';
+        let createContent = '';
+        let createParentId = createParsed.options.parentId || '';
         let createPath = createParsed.options.path || '';
-        let force = createParsed.options.force || false;
+        let createForce = createParsed.options.force || false;
         
-        // 处理标题中的斜杠：将 / 转换为全角 ／（避免被误认为路径分隔符）
-        if (title.includes('/')) {
-          const originalTitle = title;
-          title = title.replace(/\//g, '／');
-          console.log(`⚠️ 标题包含斜杠，已自动转换: "${originalTitle}" → "${title}"`);
+        // 处理 --path 模式
+        if (createPath) {
+          const pathEndsWithSlash = createPath.endsWith('/');
+          const pathParts = createPath.split('/').filter(p => p.trim());
+          
+          if (pathEndsWithSlash || pathParts.length === 0) {
+            // 模式3：路径末尾有 /，表示在此目录下创建
+            // 需要 title 参数，位置参数1=标题，位置参数2=内容
+            if (!createTitle && createParsed.positional.length > 0) {
+              createTitle = createParsed.positional[0];
+              createContent = createParsed.positional[1] || '';
+            } else {
+              createContent = createParsed.positional[0] || '';
+            }
+            
+            if (!createTitle) {
+              console.error('错误: 使用 --path "路径/" 在目录下创建时，需要提供标题');
+              console.log('用法: siyuan create --path "笔记本/目录/" "标题" [内容]');
+              console.log('  或: siyuan create --path "笔记本/目录/" --title "标题" "内容"');
+              process.exit(1);
+            }
+          } else {
+            // 模式1/2：路径指向最终文档
+            // 标题从路径最后一段提取，可用 --title 覆盖
+            if (!createTitle) {
+              createTitle = pathParts[pathParts.length - 1];
+            }
+            createContent = createParsed.positional[0] || '';
+          }
+        } else {
+          // 无 --path 模式：位置参数1=标题，位置参数2=内容
+          if (createParsed.positional.length === 0) {
+            console.error('错误: 请提供文档标题');
+            console.log('用法: siyuan create <title> [content] [--parent-id <parentId>]');
+            process.exit(1);
+          }
+          createTitle = createParsed.positional[0];
+          createContent = createParsed.positional[1] || '';
         }
         
-        // 如果未提供 parentId，使用技能配置的默认笔记本
-        if (!parentId) {
-          parentId = skill.config.defaultNotebook;
-          if (!parentId) {
+        if (createTitle && createTitle.includes('/')) {
+          const originalTitle = createTitle;
+          createTitle = createTitle.replace(/\//g, '／');
+          console.log(`⚠️ 标题包含斜杠，已自动转换: "${originalTitle}" → "${createTitle}"`);
+        }
+        
+        if (!createParentId && !createPath) {
+          createParentId = skill.config.defaultNotebook;
+          if (!createParentId) {
             console.error('错误: 未设置默认笔记本 ID');
             console.log('请设置环境变量 SIYUAN_DEFAULT_NOTEBOOK 或在 config.json 文件中配置 defaultNotebook，或使用 --parent-id 参数');
             process.exit(1);
@@ -867,21 +956,21 @@ async function main(customArgs = null) {
         }
         
         console.log('创建文档...');
-        console.log('标题:', title);
-        console.log('内容:', docContent || '(空)');
-        if (parentId) {
-          console.log('父文档 ID:', parentId);
+        console.log('标题:', createTitle);
+        console.log('内容:', createContent || '(空)');
+        if (createParentId) {
+          console.log('父文档 ID:', createParentId);
         }
         if (createPath) {
           console.log('路径:', createPath);
         }
-        console.log('强制创建:', force);
+        console.log('强制创建:', createForce);
         
         const createResult = await skill.executeCommand('create-document', { 
-          parentId: parentId,
-          title: title,
-          content: docContent,
-          force: force,
+          parentId: createParentId,
+          title: createTitle,
+          content: createContent,
+          force: createForce,
           path: createPath
         });
         console.log(JSON.stringify(createResult, null, 2));

@@ -10,7 +10,7 @@
  * @param {boolean} force - 是否强制返回第一个结果（忽略多个匹配）
  * @returns {Promise<Object>} 转换结果
  */
-async function pathToId(connector, hPath, force = false) {
+async function pathToId(connector, hPath, force = false, defaultNotebook = null) {
   try {
     // 解析路径，获取笔记本 ID 和相对路径
     const pathParts = hPath.split('/').filter(p => p.trim() !== '');
@@ -59,15 +59,11 @@ async function pathToId(connector, hPath, force = false) {
     
     // 如果未找到匹配的笔记本，检查是否有默认笔记本配置
     if (!foundNotebook) {
-      // 检查是否配置了默认笔记本
-      const defaultNotebook = process.env.SIYUAN_DEFAULT_NOTEBOOK;
       if (defaultNotebook) {
         notebookId = defaultNotebook;
         const defaultNbInfo = notebooksResult.notebooks.find(nb => nb.id === defaultNotebook);
         notebookName = defaultNbInfo?.name || '默认笔记本';
-        console.log(`未找到名为 "${pathParts[0]}" 的笔记本，使用默认笔记本: ${notebookId}`);
       } else {
-        // 如果没有配置默认笔记本，使用第一个可用的笔记本
         if (notebooksResult.notebooks.length > 0) {
           notebookId = notebooksResult.notebooks[0].id;
           notebookName = notebooksResult.notebooks[0].name || '未命名笔记本';
@@ -334,13 +330,12 @@ const command = {
     
     try {
       if (id) {
-        // ID 转路径
         console.log('将文档 ID 转换为路径:', id);
         return await idToPath(skill.connector, id);
       } else if (path) {
-        // 路径转 ID
         console.log('将路径转换为文档 ID:', path);
-        return await pathToId(skill.connector, path, force);
+        const defaultNb = skill.config.defaultNotebook;
+        return await pathToId(skill.connector, path, force, defaultNb);
       }
     } catch (error) {
       console.error('转换失败:', error);

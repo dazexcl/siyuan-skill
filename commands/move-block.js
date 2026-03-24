@@ -55,9 +55,6 @@ const command = {
         
         console.log('API 响应:', JSON.stringify(result, null, 2));
         
-        // 思源 API 返回 null 表示成功
-        skill.clearCache();
-        
         return {
           success: true,
           data: {
@@ -79,7 +76,7 @@ const command = {
     }, {
       type: 'document',
       idParam: 'id',
-      defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
+      defaultNotebook: skill.config.defaultNotebook
     });
     
     return permissionHandler(skill, args);

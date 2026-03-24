@@ -138,20 +138,26 @@ const command = {
       // 检查源文档权限
       const sourcePermission = await Permission.checkDocumentPermission(skill, docId);
       if (!sourcePermission.hasPermission) {
+        const isNotFound = sourcePermission.reason === 'not_found' || 
+                           (sourcePermission.error && sourcePermission.error.includes('不存在'));
         return {
           success: false,
-          error: '权限不足',
-          message: sourcePermission.error || `无权访问文档 ${docId}`
+          error: isNotFound ? '资源不存在' : '权限不足',
+          message: sourcePermission.error || `无权访问文档 ${docId}`,
+          reason: isNotFound ? 'not_found' : 'permission_denied'
         };
       }
       
       // 检查目标位置权限
-      const targetPermission = await Permission.checkParentPermission(skill, targetParentId, process.env.SIYUAN_DEFAULT_NOTEBOOK);
+      const targetPermission = await Permission.checkParentPermission(skill, targetParentId, skill.config.defaultNotebook);
       if (!targetPermission.hasPermission) {
+        const isNotFound = targetPermission.reason === 'not_found' || 
+                           (targetPermission.error && targetPermission.error.includes('不存在'));
         return {
           success: false,
-          error: '权限不足',
-          message: targetPermission.error || `无权访问目标位置 ${targetParentId}`
+          error: isNotFound ? '资源不存在' : '权限不足',
+          message: targetPermission.error || `无权访问目标位置 ${targetParentId}`,
+          reason: isNotFound ? 'not_found' : 'permission_denied'
         };
       }
       
@@ -207,9 +213,6 @@ const command = {
       } else {
         console.error('移动失败:', moveResult);
       }
-      
-      // 清除缓存
-      skill.clearCache();
       
       // 如果提供了新标题，移动后重命名
       if (newTitle) {

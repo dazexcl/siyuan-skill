@@ -120,10 +120,13 @@ const command = {
       
       const pathPermission = await Permission.checkDocumentPermission(skill, parentId);
       if (!pathPermission.hasPermission) {
+        const isNotFound = pathPermission.reason === 'not_found' || 
+                           (pathPermission.error && pathPermission.error.includes('不存在'));
         return {
           success: false,
-          error: '权限不足',
-          message: `无权访问路径 ${path}`
+          error: isNotFound ? '资源不存在' : '权限不足',
+          message: pathPermission.error || `无权访问路径 ${path}`,
+          reason: isNotFound ? 'not_found' : 'permission_denied'
         };
       }
     }

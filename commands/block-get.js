@@ -83,7 +83,7 @@ const command = {
     }, {
       type: 'document',
       idParam: 'id',
-      defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
+      defaultNotebook: skill.config.defaultNotebook
     });
     
     return permissionHandler(skill, args);

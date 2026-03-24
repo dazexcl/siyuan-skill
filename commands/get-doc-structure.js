@@ -4,30 +4,40 @@
  */
 
 const Permission = require('../utils/permission');
+const { pathToId } = require('./convert-path');
 
 /**
  * 指令配置
  */
 const command = {
   name: 'get-doc-structure',
-  description: '获取指定笔记本的文档和文件夹结构，支持笔记本ID和文档ID',
-  usage: 'get-doc-structure --notebook-id <notebookId>',
+  description: '获取指定笔记本的文档和文件夹结构，支持笔记本ID、文档ID和路径',
+  usage: 'get-doc-structure (<notebookId|docId> | --path <path>)',
   
   /**
    * 执行指令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 指令参数
    * @param {string} args.notebookId - 笔记本ID或文档ID
+   * @param {string} args.path - 文档路径（与 notebookId 二选一）
    * @returns {Promise<Object>} 文档结构
    */
   async execute(skill, args = {}) {
-    const { notebookId } = args;
+    const { notebookId, path } = args;
     
-    if (!notebookId) {
+    if (!notebookId && !path) {
       return {
         success: false,
         error: '缺少必要参数',
-        message: '必须提供 notebookId 参数'
+        message: '必须提供 notebookId 或 path 参数'
+      };
+    }
+    
+    if (notebookId && path) {
+      return {
+        success: false,
+        error: '参数冲突',
+        message: 'notebookId 和 path 参数只能提供一个'
       };
     }
     
@@ -37,34 +47,82 @@ const command = {
     
     console.log('获取文档结构...');
     
-    try {
-      const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: notebookId });
+    // 如果提供了路径参数，先转换为ID
+    if (path) {
+      console.log('解析路径:', path);
+      const defaultNb = skill.config.defaultNotebook;
+      const pathResult = await pathToId(skill.connector, path, true, defaultNb);
       
-      if (pathInfo) {
-        isDocumentId = true;
-        documentId = notebookId;
-        actualNotebookId = pathInfo.box || pathInfo.notebook;
-        console.log(`检测到文档ID ${notebookId}，使用笔记本ID ${actualNotebookId}`);
-      } else {
-        console.log(`假设 ${notebookId} 是笔记本ID`);
+      if (!pathResult.success) {
+        return {
+          success: false,
+          error: pathResult.error,
+          message: pathResult.message
+        };
       }
-    } catch (error) {
-      if (error.message && error.message.includes('tree not found')) {
-        console.log(`无法获取文档路径信息，假设 ${notebookId} 是笔记本ID`);
-        
-        const notebooks = await skill.getNotebooks();
-        const notebookExists = notebooks && notebooks.data && 
-          notebooks.data.some(nb => nb.id === notebookId);
-        
-        if (!notebookExists) {
-          return {
-            success: false,
-            error: '笔记本不存在',
-            message: `笔记本 ${notebookId} 不存在或无法访问`
-          };
-        }
+      
+      const pathData = pathResult.data;
+      if (pathData.type === 'notebook') {
+        // 路径指向笔记本
+        actualNotebookId = pathData.id;
+        console.log(`路径 "${path}" 解析为笔记本ID: ${actualNotebookId}`);
       } else {
-        console.warn('获取文档路径信息失败:', error.message);
+        // 路径指向文档
+        actualNotebookId = pathData.notebook || pathData.parentId;
+        documentId = pathData.id;
+        isDocumentId = true;
+        console.log(`路径 "${path}" 解析为文档ID: ${documentId}, 笔记本ID: ${actualNotebookId}`);
+      }
+    }
+    
+    // 如果没有提供路径参数，才需要检测 notebookId 的类型
+    if (!path && notebookId) {
+      try {
+        const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: notebookId });
+        
+        if (pathInfo) {
+          isDocumentId = true;
+          documentId = notebookId;
+          actualNotebookId = pathInfo.box || pathInfo.notebook;
+          console.log(`检测到文档ID ${notebookId}，使用笔记本ID ${actualNotebookId}`);
+        } else {
+          // pathInfo 为 null，需要验证是否为有效的笔记本ID
+          const notebooks = await skill.getNotebooks();
+          const notebookExists = notebooks && notebooks.data && 
+            notebooks.data.some(nb => nb.id === notebookId);
+          
+          if (notebookExists) {
+            console.log(`检测到笔记本ID ${notebookId}`);
+          } else {
+            return {
+              success: false,
+              error: '资源不存在',
+              message: `文档或笔记本不存在: ${notebookId}`,
+              reason: 'not_found'
+            };
+          }
+        }
+      } catch (error) {
+        if (error.message && error.message.includes('tree not found')) {
+          console.log(`无法获取文档路径信息，验证是否为笔记本ID`);
+          
+          const notebooks = await skill.getNotebooks();
+          const notebookExists = notebooks && notebooks.data && 
+            notebooks.data.some(nb => nb.id === notebookId);
+          
+          if (notebookExists) {
+            console.log(`检测到笔记本ID ${notebookId}`);
+          } else {
+            return {
+              success: false,
+              error: '资源不存在',
+              message: `文档或笔记本不存在: ${notebookId}`,
+              reason: 'not_found'
+            };
+          }
+        } else {
+          console.warn('获取文档路径信息失败:', error.message);
+        }
       }
     }
     

@@ -99,8 +99,6 @@ const command = {
       
       console.log('重命名文档成功:', result);
       
-      skill.clearCache();
-      
       return {
         success: true,
         data: {

@@ -163,8 +163,6 @@ const command = {
         
         console.log('API 响应:', JSON.stringify(result, null, 2));
         
-        skill.clearCache();
-        
         return {
           success: true,
           data: {
@@ -206,8 +204,6 @@ const command = {
       }
       
       console.log('API 响应:', JSON.stringify(result, null, 2));
-      
-      skill.clearCache();
       
       return {
         success: true,

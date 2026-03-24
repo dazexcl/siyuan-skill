@@ -249,20 +249,62 @@ siyuan exists --path "/目录/文档标题"
 
 # 最佳实践
 
-## create 命令参数
+## create 命令
 
-参数顺序灵活，以下写法都支持：
+支持三种创建模式：
+
+### 模式选择
+
+| 场景 | 推荐模式 | 命令示例 |
+|------|---------|----------|
+| 简单创建，已知父ID | 模式1 | `siyuan create "标题" --parent-id <id>` |
+| 创建多级目录 | 模式2 | `siyuan create --path "笔记本/A/B/C"` |
+| 在目录下批量创建 | 模式3 | `siyuan create --path "笔记本/目录/" "标题"` |
+| 需要自定义标题 | 模式2 + --title | `siyuan create --path "A/B" --title "自定义"` |
+
+### 模式1：传统模式（无 --path）
 
 ```bash
-# 以下三种写法效果相同
-siyuan create "文档标题" "文档内容" --parent-id <parentId>
-siyuan create --parent-id <parentId> "文档标题" "文档内容"
-siyuan create "文档标题" --path "/笔记本/目录/文档名" "文档内容"
+# 位置参数1 = 标题，位置参数2 = 内容
+siyuan create "我的文档" --parent-id <notebookId>
+siyuan create "我的文档" "文档内容" --parent-id <docId>
 ```
 
-**指定目标位置的方式**（二选一）：
+### 模式2：路径指定文档（--path 末尾无 /）
+
+```bash
+# 标题从路径最后一段提取，位置参数 = 内容
+siyuan create --path "笔记本/目录/文档名" "内容"
+
+# 使用 --title 覆盖标题
+siyuan create --path "笔记本/目录/文档名" --title "自定义标题" "内容"
+
+# 创建多级空目录（不提供内容）
+siyuan create --path "笔记本/A/B/C/最终目录"
+```
+
+### 模式3：在目录下创建（--path 末尾有 /）
+
+```bash
+# 在指定目录下创建新文档，位置参数1 = 标题，位置参数2 = 内容
+siyuan create --path "笔记本/目录/" "新文档标题" "内容"
+```
+
+### 重名检测
+
+```bash
+# 默认检测重名，已存在时返回错误
+siyuan create --path "AI/测试" "内容"
+
+# 使用 --force 强制创建（允许重名）
+siyuan create --path "AI/测试" "内容" --force
+```
+
+### 参数说明
+
+**指定目标位置的方式**（二选一，不能同时使用）：
 - `--parent-id <id>` — 指定父文档/笔记本ID
-- `--path "/路径"` — 指定完整路径（推荐）
+- `--path "/路径"` — 指定完整路径
 
 **常见错误参数提示**：
 - ❌ `--parent-path` → ✅ 使用 `--path` 或 `--parent-id`
@@ -272,6 +314,15 @@ siyuan create "文档标题" --path "/笔记本/目录/文档名" "文档内容"
 **标题包含斜杠**：
 - 标题中的 `/` 会自动转换为全角 `／`，避免被误认为路径分隔符
 - 示例：`siyuan create "文档/子标题" "内容"` → 实际标题为 `文档／子标题`
+
+### 路径自动创建
+
+使用 `--path` 时，中间目录不存在会自动创建（空内容）：
+
+```bash
+# 如果 A、B、C 不存在，会自动创建空文档
+siyuan create --path "笔记本/A/B/C/最终文档" "内容"
+```
 
 ## 内容修改
 
@@ -340,6 +391,15 @@ siyuan create "标题" "第一段## 二级标题 内容"
 2. 识别多余的块（重复标题、Front Matter、引用块）
 3. 用 `bd <blockId>` 删除多余的块
 4. **不要**用 `bu` 或 `update` 来修复格式问题
+
+**思源特有语法**：
+
+| 语法 | 写法 | 说明 |
+|------|------|------|
+| 内部链接 | `((docId '标题'))` | 引用其他文档，导出时显示标题 |
+| SQL 嵌入块 | `{{ SELECT ... }}` | 动态查询并嵌入内容 |
+
+> 详细用法请参阅 [最佳实践 - 内容书写](doc/advanced/best-practices.md#内容书写最佳实践)
 
 **其他规范**：
 - 写入使用 Markdown 格式

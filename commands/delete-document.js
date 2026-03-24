@@ -108,9 +108,6 @@ const command = {
         }
       }
       
-      skill.clearCache();
-      console.log('缓存已清除');
-      
       return {
         success: true,
         data: {

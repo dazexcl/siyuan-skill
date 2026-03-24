@@ -9,16 +9,32 @@ const Permission = require('../utils/permission');
  * 检查文档是否存在
  * @param {Object} skill - SiyuanSkill 实例
  * @param {Object} args - 命令参数
- * @param {string} args.title - 文档标题
- * @param {string} [args.parentId] - 父文档ID（可选，不指定则检查笔记本根目录）
+ * @param {string} [args.title] - 文档标题（与 path 二选一）
+ * @param {string} [args.parentId] - 父文档ID（可选，配合 title 使用）
  * @param {string} [args.notebookId] - 笔记本ID（可选，不指定则使用默认笔记本）
- * @param {string} [args.path] - 文档路径（可选，与 title+parentId 二选一）
+ * @param {string} [args.path] - 文档路径（与 title 二选一）
  * @returns {Promise<Object>} 检查结果
  */
 async function checkExists(skill, args) {
   const { title, parentId, notebookId, path } = args;
   
   console.log('检查文档是否存在...');
+  
+  if (title && path) {
+    return {
+      success: false,
+      error: '参数冲突',
+      message: '--title 和 --path 参数只能二选一，不能同时使用'
+    };
+  }
+  
+  if (!title && !path) {
+    return {
+      success: false,
+      error: '缺少必要参数',
+      message: '必须提供 --title 或 --path 参数'
+    };
+  }
   
   // 确定笔记本ID
   let targetNotebookId = notebookId;
@@ -31,20 +47,22 @@ async function checkExists(skill, args) {
           targetNotebookId = pathInfo.notebook;
         }
       } catch (e) {
-        // 可能是笔记本ID
+        console.warn(`无法从父文档 ${parentId} 获取笔记本信息: ${e.message}`);
       }
     }
-    
+
+    // 如果仍未获取到笔记本ID，尝试使用默认配置
     if (!targetNotebookId) {
-      targetNotebookId = process.env.SIYUAN_DEFAULT_NOTEBOOK || skill.config?.defaultNotebook;
+      targetNotebookId = skill.config?.defaultNotebook || null;
     }
   }
-  
-  if (!targetNotebookId) {
+
+  // 最终验证：确保有有效的笔记本ID
+  if (!targetNotebookId || typeof targetNotebookId !== 'string' || targetNotebookId.trim() === '') {
     return {
       success: false,
       error: '缺少笔记本ID',
-      message: '请提供 --notebook-id 参数或设置 SIYUAN_DEFAULT_NOTEBOOK 环境变量'
+      message: '请提供 --notebook-id 参数，或设置 SIYUAN_DEFAULT_NOTEBOOK 环境变量，或确保父文档ID有效'
     };
   }
   
@@ -88,14 +106,6 @@ async function checkExists(skill, args) {
   }
   
   // 方式2：通过标题和父ID检查
-  if (!title) {
-    return {
-      success: false,
-      error: '缺少标题',
-      message: '请提供 --title 参数或使用 --path 参数'
-    };
-  }
-  
   const result = await skill.documentManager.checkDocumentExists(
     targetNotebookId,
     parentId || targetNotebookId,
@@ -130,7 +140,7 @@ const command = {
   name: 'exists',
   aliases: ['check', 'check-exists'],
   description: '检查文档是否存在',
-  usage: 'siyuan exists --title "文档标题" [--parent-id <父文档ID>] [--notebook-id <笔记本ID>]\n       siyuan exists --path "/路径/文档标题" [--notebook-id <笔记本ID>]',
+  usage: 'siyuan exists (--title <title> [--parent-id <parentId>] | --path <path>) [--notebook-id <notebookId>]',
   examples: [
     'siyuan exists --title "我的文档"',
     'siyuan exists --title "子文档" --parent-id 20260313203048-cjem96v',

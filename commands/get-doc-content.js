@@ -4,6 +4,7 @@
  */
 
 const Permission = require('../utils/permission');
+const { pathToId } = require('./convert-path');
 
 /**
  * 指令配置
@@ -11,19 +12,36 @@ const Permission = require('../utils/permission');
 const command = {
   name: 'get-doc-content',
   description: '获取指定文档的内容，支持 kramdown、markdown、text、html 格式',
-  usage: 'get-doc-content --doc-id <docId> [--format <format>] [--raw]',
+  usage: 'get-doc-content (--doc-id <docId> | --path <path>) [--format <format>] [--raw]',
   
   /**
    * 执行指令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 指令参数
-   * @param {string} args.docId - 文档ID
+   * @param {string} [args.docId] - 文档ID（与 path 二选一）
+   * @param {string} [args.path] - 文档路径（与 docId 二选一）
    * @param {string} args.format - 输出格式：kramdown、markdown、text、html（默认：kramdown）
    * @param {boolean} args.raw - 是否以纯文本格式返回（移除JSON外部结构）
    * @returns {Promise<Object|string>} 文档内容
    */
-  execute: Permission.createPermissionWrapper(async (skill, args, notebookId) => {
-    const { docId, format = 'kramdown', raw = false } = args;
+  execute: async (skill, args = {}) => {
+    let { docId, path, format = 'kramdown', raw = false } = args;
+    
+    if (docId && path) {
+      return {
+        success: false,
+        error: '参数冲突',
+        message: '--doc-id 和 --path 参数只能二选一，不能同时使用'
+      };
+    }
+    
+    if (!docId && !path) {
+      return {
+        success: false,
+        error: '缺少必要参数',
+        message: '必须提供 --doc-id 或 --path 参数'
+      };
+    }
     
     const validFormats = ['kramdown', 'markdown', 'text', 'html'];
     if (!validFormats.includes(format)) {
@@ -35,6 +53,42 @@ const command = {
     }
     
     try {
+      if (path) {
+        const defaultNb = skill.config.defaultNotebook;
+        const pathResult = await pathToId(skill.connector, path, true, defaultNb);
+        
+        if (!pathResult.success) {
+          return {
+            success: false,
+            error: pathResult.error,
+            message: pathResult.message
+          };
+        }
+        
+        if (pathResult.data.type === 'notebook') {
+          return {
+            success: false,
+            error: '参数错误',
+            message: `路径 "${path}" 指向笔记本，不是文档`
+          };
+        }
+        
+        docId = pathResult.data.id;
+      }
+      
+      const permCheck = await Permission.checkDocumentPermission(skill, docId);
+      if (!permCheck.hasPermission) {
+        const isNotFound = permCheck.reason === 'not_found' || 
+                           (permCheck.error && permCheck.error.includes('不存在'));
+        return {
+          success: false,
+          error: isNotFound ? '资源不存在' : '权限不足',
+          message: permCheck.error,
+          reason: isNotFound ? 'not_found' : 'permission_denied'
+        };
+      }
+      const notebookId = permCheck.notebookId;
+      
       if (format === 'kramdown') {
         const kramdownResult = await skill.connector.request('/api/block/getBlockKramdown', { id: docId });
         
@@ -115,10 +169,7 @@ const command = {
         message: '获取文档内容失败'
       };
     }
-  }, {
-    type: 'document',
-    idParam: 'docId'
-  })
+  }
 };
 
 /**

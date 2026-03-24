@@ -115,8 +115,6 @@ const command = {
           attrs: { tags: newTags }
         });
         
-        skill.clearCache();
-        
         return {
           success: true,
           data: {
@@ -137,8 +135,6 @@ const command = {
           id,
           attrs: { tags: newTags }
         });
-        
-        skill.clearCache();
         
         return {
           success: true,

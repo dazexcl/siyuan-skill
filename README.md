@@ -207,11 +207,25 @@ siyuan ls [notebook]         # 别名
 ### 文档操作
 
 ```bash
-# 创建文档
-siyuan create "我的文档"                           # 创建空文档
-siyuan create "我的文档" "这是文档内容"             # 创建带内容
-siyuan create "子文档" "内容" --path /AI/openclaw   # 指定路径
-siyuan new "标题" "内容"                          # 别名
+# 创建文档 - 三种模式
+# 模式1：传统模式（位置参数1=标题，位置参数2=内容）
+siyuan create "我的文档" --parent-id <notebookId>
+siyuan create "我的文档" "文档内容" --parent-id <docId>
+
+# 模式2：路径指定文档（路径末尾无/，标题从路径提取，位置参数=内容）
+siyuan create --path "AI/项目/需求文档" "文档内容"
+siyuan create --path "AI/项目/需求文档" --title "自定义标题" "内容"
+siyuan create --path "AI/A/B/C"  # 创建多级空目录
+
+# 模式3：在目录下创建（路径末尾有/，位置参数1=标题，位置参数2=内容）
+siyuan create --path "AI/项目/" "新文档标题" "内容"
+
+# 重名检测：默认检测同名文档
+siyuan create --path "AI/测试" "内容"      # 已存在时报错
+siyuan create --path "AI/测试" "内容" --force  # 强制创建
+
+# 别名
+siyuan new "标题" "内容"
 
 # 获取文档内容
 siyuan content <docId>                  # 默认 kramdown 格式
@@ -856,8 +870,16 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 ### 内容创建
 
 ```bash
+# 模式选择建议：
+# - 简单创建，已知父ID → 模式1
+# - 创建多级目录 → 模式2
+# - 在目录下批量创建 → 模式3
+
 # ✅ 推荐：直接创建
 siyuan create "标题" "第一段\n\n## 二级标题\n内容"
+
+# ✅ 创建多级目录
+siyuan create --path "笔记本/A/B/C" "内容"
 
 # ✅ 超长内容：两步法
 siyuan create "长文档" ""

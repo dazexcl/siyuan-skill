@@ -75,9 +75,18 @@ class Permission {
     try {
       const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: docId });
       
+      if (!pathInfo) {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: `文档不存在: ${docId}`,
+          reason: 'not_found'
+        };
+      }
+      
       const notebookId = pathInfo?.notebook || pathInfo?.box;
       
-      if (!pathInfo || !notebookId) {
+      if (!notebookId) {
         return {
           hasPermission: false,
           notebookId: null,
@@ -107,32 +116,30 @@ class Permission {
       console.warn('获取文档路径信息失败:', error.message);
       
       if (error.message && error.message.includes('tree not found')) {
-        if (this.isNotebookId(docId)) {
-          const hasPermission = skill.checkPermission(docId);
-          const { permissionMode, notebookList } = skill.config;
-          
-          let errorMessage = null;
-          if (!hasPermission) {
-            if (permissionMode === 'whitelist') {
-              errorMessage = `笔记本 ${docId} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
-            } else if (permissionMode === 'blacklist') {
-              errorMessage = `笔记本 ${docId} 在黑名单中，禁止访问`;
-            } else {
-              errorMessage = `无权访问笔记本 ${docId}`;
-            }
-          }
-          
+        const hasPermission = skill.checkPermission(docId);
+        const { permissionMode, notebookList } = skill.config;
+        
+        if (hasPermission) {
           return {
-            hasPermission,
+            hasPermission: true,
             notebookId: docId,
-            error: errorMessage
+            error: null
           };
+        }
+        
+        let errorMessage = null;
+        if (permissionMode === 'whitelist') {
+          errorMessage = `笔记本 ${docId} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
+        } else if (permissionMode === 'blacklist') {
+          errorMessage = `笔记本 ${docId} 在黑名单中，禁止访问`;
+        } else {
+          errorMessage = `无权访问 ${docId}`;
         }
         
         return {
           hasPermission: false,
-          notebookId: null,
-          error: '文档不存在或ID无效'
+          notebookId: docId,
+          error: errorMessage
         };
       }
       
@@ -158,11 +165,20 @@ class Permission {
     try {
       const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id });
       
-      if (!blockInfo || typeof blockInfo !== 'object') {
+      if (blockInfo === null) {
         return {
           hasPermission: false,
           notebookId: null,
-          error: '无法获取块信息'
+          error: `块不存在: ${id}`,
+          reason: 'not_found'
+        };
+      }
+      
+      if (typeof blockInfo !== 'object') {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: '块信息格式无效'
         };
       }
       
@@ -224,13 +240,20 @@ class Permission {
     try {
       const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id: blockId });
       
-      console.log('getBlockInfo 响应:', JSON.stringify(blockInfo, null, 2));
-      
-      if (!blockInfo || typeof blockInfo !== 'object') {
+      if (blockInfo === null) {
         return {
           hasPermission: false,
           notebookId: null,
-          error: '无法获取块信息'
+          error: `块不存在: ${blockId}`,
+          reason: 'not_found'
+        };
+      }
+      
+      if (typeof blockInfo !== 'object') {
+        return {
+          hasPermission: false,
+          notebookId: null,
+          error: '块信息格式无效'
         };
       }
       
@@ -295,114 +318,94 @@ class Permission {
     }
 
     try {
-      const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: parentId });
+      const notebooks = await skill.getNotebooks();
+      const notebookList = notebooks?.data || [];
+      const matchedNotebook = notebookList.find(nb => nb.id === parentId);
       
-      let notebookId = defaultNotebook;
-      const extractedNotebookId = pathInfo?.notebook || pathInfo?.box;
-      if (extractedNotebookId) {
-        notebookId = extractedNotebookId;
-      }
-      
-      if (!notebookId) {
-        return {
-          hasPermission: false,
-          notebookId: null,
-          error: '无法获取笔记本ID'
-        };
-      }
-      
-      const hasPermission = skill.checkPermission(notebookId);
-      const { permissionMode, notebookList } = skill.config;
-      
-      let errorMessage = null;
-      if (!hasPermission) {
-        if (permissionMode === 'whitelist') {
-          errorMessage = `笔记本 ${notebookId} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
-        } else if (permissionMode === 'blacklist') {
-          errorMessage = `笔记本 ${notebookId} 在黑名单中，禁止访问`;
-        } else {
-          errorMessage = `无权在笔记本 ${notebookId} 中操作`;
-        }
-      }
-      
-      return {
-        hasPermission,
-        notebookId,
-        error: errorMessage
-      };
-    } catch (error) {
-      console.warn('获取父文档路径信息失败:', error.message);
-      
-      if (error.message && error.message.includes('tree not found')) {
-        if (this.isNotebookId(parentId)) {
-          const hasPermission = skill.checkPermission(parentId);
-          const { permissionMode, notebookList } = skill.config;
-          
-          let errorMessage = null;
-          if (!hasPermission) {
-            if (permissionMode === 'whitelist') {
-              errorMessage = `笔记本 ${parentId} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
-            } else if (permissionMode === 'blacklist') {
-              errorMessage = `笔记本 ${parentId} 在黑名单中，禁止访问`;
-            } else {
-              errorMessage = `无权在笔记本 ${parentId} 中操作`;
-            }
-          }
-          
-          return {
-            hasPermission,
-            notebookId: parentId,
-            error: errorMessage
-          };
-        }
-        
-        if (defaultNotebook) {
-          const hasPermission = skill.checkPermission(defaultNotebook);
-          const { permissionMode, notebookList } = skill.config;
-          
-          let errorMessage = null;
-          if (!hasPermission) {
-            if (permissionMode === 'whitelist') {
-              errorMessage = `默认笔记本 ${defaultNotebook} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
-            } else if (permissionMode === 'blacklist') {
-              errorMessage = `默认笔记本 ${defaultNotebook} 在黑名单中，禁止访问`;
-            } else {
-              errorMessage = `无权在笔记本 ${defaultNotebook} 中操作`;
-            }
-          }
-          
-          return {
-            hasPermission,
-            notebookId: defaultNotebook,
-            error: errorMessage
-          };
-        }
-        
-        return {
-          hasPermission: false,
-          notebookId: null,
-          error: '文档不存在或ID无效'
-        };
-      }
-      
-      if (defaultNotebook) {
-        const hasPermission = skill.checkPermission(defaultNotebook);
-        const { permissionMode, notebookList } = skill.config;
+      if (matchedNotebook) {
+        const hasPermission = skill.checkPermission(parentId);
+        const { permissionMode, notebookList: configList } = skill.config;
         
         let errorMessage = null;
         if (!hasPermission) {
           if (permissionMode === 'whitelist') {
-            errorMessage = `默认笔记本 ${defaultNotebook} 不在白名单中。当前白名单: [${notebookList.join(', ')}]`;
+            errorMessage = `笔记本 "${matchedNotebook.name}" (${parentId}) 不在白名单中。当前白名单: [${configList.join(', ')}]`;
           } else if (permissionMode === 'blacklist') {
-            errorMessage = `默认笔记本 ${defaultNotebook} 在黑名单中，禁止访问`;
+            errorMessage = `笔记本 "${matchedNotebook.name}" (${parentId}) 在黑名单中，禁止访问`;
           } else {
-            errorMessage = `无权在笔记本 ${defaultNotebook} 中操作`;
+            errorMessage = `无权在笔记本 "${matchedNotebook.name}" (${parentId}) 中操作`;
           }
         }
         
         return {
           hasPermission,
-          notebookId: defaultNotebook,
+          notebookId: parentId,
+          error: errorMessage
+        };
+      }
+      
+      try {
+        const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: parentId });
+        
+        if (pathInfo && (pathInfo.notebook || pathInfo.box)) {
+          const notebookId = pathInfo.notebook || pathInfo.box;
+          const hasPermission = skill.checkPermission(notebookId);
+          const { permissionMode, notebookList: configList } = skill.config;
+          
+          let errorMessage = null;
+          if (!hasPermission) {
+            const nbInfo = notebookList.find(nb => nb.id === notebookId);
+            const nbName = nbInfo?.name || notebookId;
+            if (permissionMode === 'whitelist') {
+              errorMessage = `笔记本 "${nbName}" (${notebookId}) 不在白名单中。当前白名单: [${configList.join(', ')}]`;
+            } else if (permissionMode === 'blacklist') {
+              errorMessage = `笔记本 "${nbName}" (${notebookId}) 在黑名单中，禁止访问`;
+            } else {
+              errorMessage = `无权在笔记本 "${nbName}" (${notebookId}) 中操作`;
+            }
+          }
+          
+          return {
+            hasPermission,
+            notebookId,
+            error: errorMessage
+          };
+        }
+      } catch (pathError) {
+        if (pathError.message && pathError.message.includes('tree not found')) {
+          return {
+            hasPermission: false,
+            notebookId: null,
+            error: `目标位置不存在: ${parentId}`,
+            reason: 'not_found'
+          };
+        }
+        throw pathError;
+      }
+      
+      const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id: parentId });
+      
+      if (blockInfo && blockInfo.box) {
+        const notebookId = blockInfo.box;
+        const hasPermission = skill.checkPermission(notebookId);
+        const { permissionMode, notebookList: configList } = skill.config;
+        
+        let errorMessage = null;
+        if (!hasPermission) {
+          const nbInfo = notebookList.find(nb => nb.id === notebookId);
+          const nbName = nbInfo?.name || notebookId;
+          if (permissionMode === 'whitelist') {
+            errorMessage = `笔记本 "${nbName}" (${notebookId}) 不在白名单中。当前白名单: [${configList.join(', ')}]`;
+          } else if (permissionMode === 'blacklist') {
+            errorMessage = `笔记本 "${nbName}" (${notebookId}) 在黑名单中，禁止访问`;
+          } else {
+            errorMessage = `无权在笔记本 "${nbName}" (${notebookId}) 中操作`;
+          }
+        }
+        
+        return {
+          hasPermission,
+          notebookId,
           error: errorMessage
         };
       }
@@ -410,7 +413,17 @@ class Permission {
       return {
         hasPermission: false,
         notebookId: null,
-        error: '无法获取笔记本ID'
+        error: `父文档或笔记本不存在: ${parentId}`,
+        reason: 'not_found'
+      };
+    } catch (error) {
+      console.warn('获取父文档路径信息失败:', error.message);
+      
+      return {
+        hasPermission: false,
+        notebookId: null,
+        error: `目标位置不存在或无法访问: ${parentId}`,
+        reason: 'not_found'
       };
     }
   }

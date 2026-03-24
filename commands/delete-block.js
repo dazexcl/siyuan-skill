@@ -81,7 +81,6 @@ const command = {
             (Array.isArray(result) && result.length > 0) || 
             (result && result.code === 0) ||
             (result && typeof result === 'object' && !result.code)) {
-          skill.clearCache();
           
           return {
             success: true,
@@ -111,7 +110,7 @@ const command = {
     }, {
       type: 'block',
       idParam: 'id',
-      defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
+      defaultNotebook: skill.config.defaultNotebook
     });
     
     return permissionHandler(skill, args);

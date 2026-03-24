@@ -1,177 +1,210 @@
 # 创建文档命令
 
-创建思源笔记文档，支持自动处理换行符、路径自动创建和重名检测。
+创建思源笔记文档，支持三种使用模式、自动处理换行符、路径自动创建和重名检测。
 
 ## 命令格式
 
 ```bash
-siyuan create <title> [content] [options]
+siyuan create [options] [positional-args]
 ```
 
 **别名**：`new`
 
+## 三种使用模式
+
+### 模式1：传统模式（无 --path）
+
+```bash
+siyuan create <title> [content] --parent-id <parentId>
+```
+
+| 位置参数 | 说明 |
+|---------|------|
+| 参数1 | 文档标题 |
+| 参数2 | 文档内容（可选） |
+
+```bash
+# 在笔记本根目录创建
+siyuan create "我的文档" --parent-id <notebookId>
+
+# 在笔记本根目录创建带内容的文档
+siyuan create "我的文档" "文档内容" --parent-id <notebookId>
+
+# 在某个文档下创建子文档
+siyuan create "子文档" "内容" --parent-id <docId>
+```
+
+### 模式2：路径指定文档（--path 末尾无 /）
+
+```bash
+siyuan create --path "笔记本/目录/文档名" [content] [--title "自定义标题"]
+```
+
+| 位置参数 | 说明 |
+|---------|------|
+| 参数1 | 文档内容（可选） |
+
+**标题来源**：默认从路径最后一段提取，可用 `--title` 覆盖
+
+```bash
+# 创建文档，标题从路径提取
+siyuan create --path "AI/项目/需求文档" "这是文档内容"
+
+# 使用自定义标题覆盖
+siyuan create --path "AI/项目/需求文档" --title "需求文档v2" "内容"
+
+# 不提供内容，创建空文档
+siyuan create --path "AI/项目/空文档"
+
+# 创建多级空目录（所有层级都是空文档）
+siyuan create --path "AI/项目/目录1/目录2/最终目录"
+```
+
+### 模式3：在目录下创建（--path 末尾有 /）
+
+```bash
+siyuan create --path "笔记本/目录/" <title> [content]
+```
+
+| 位置参数 | 说明 |
+|---------|------|
+| 参数1 | 新文档标题 |
+| 参数2 | 文档内容（可选） |
+
+```bash
+# 在指定目录下创建新文档
+siyuan create --path "AI/项目/" "新需求文档" "文档内容"
+
+# 在目录下创建空文档
+siyuan create --path "AI/项目/" "空文档"
+```
+
 ## 参数说明
 
-| 参数 | 类型 | 必填 | 说明 |
-|-----|------|------|------|
-| `<title>` | string | ✅ | 文档标题 |
-| `[content]` | string | ❌ | 文档内容（可选） |
-| `--parent-id <parentId>` | string | ❌ | 父文档或笔记本 ID |
-| `--path <path>` | string | ❌ | 文档路径（支持绝对路径或相对路径） |
-| `--force` | boolean | ❌ | 强制创建，忽略重名检测 |
+| 参数                       | 类型      | 说明 |
+| ------------------------ | ------- | ---- |
+| `--parent-id, --parent`  | string  | 父文档或笔记本 ID（与 --path 二选一） |
+| `--path`                 | string  | 文档路径。末尾无/表示创建该文档；末尾有/表示在该目录下创建 |
+| `--title, -t`            | string  | 自定义标题（仅 --path 模式，覆盖路径中的标题） |
+| `--force`                | boolean | 强制创建（忽略重名检测） |
 
 ## 功能特性
 
-### ⚠️ 换行符使用说明
-
-**重要**：Markdown 语法要求标题、列表等块级元素前必须有空行才能正确解析。
-
-在命令行中传入多段内容时，**必须使用 `\n` 显式换行**：
-
-```bash
-# ❌ 错误 - 所有内容在一行，标题不会被正确解析
-siyuan create "标题" "第一段内容。## 二级标题 标题下的内容"
-
-# ✅ 正确 - 使用 \n 换行，标题正确解析为独立块
-siyuan create "标题" "第一段内容。\n\n## 二级标题\n标题下的内容"
-```
-
-**常见格式对应的换行符**：
-
-| 格式 | 换行符 | 示例 |
-|------|--------|------|
-| 段落分隔 | `\n\n` | `段落1\n\n段落2` |
-| 二级标题 | `\n\n## ` | `内容\n\n## 标题\n内容` |
-| 三级标题 | `\n\n### ` | `内容\n\n### 标题\n内容` |
-| 列表项 | `\n- ` | `列表项1\n- 列表项2` |
-
-### 自动换行符处理
-支持使用 `\n` 表示换行，系统会自动将其转换为实际的换行符。
-
-```bash
-siyuan create "多行文档" "第一行内容\n第二行内容\n第三行内容"
-```
-
 ### 路径自动创建
-如果指定的路径不存在，系统会自动创建中间的文件夹。
+
+使用 `--path` 时，中间目录不存在会自动创建（空内容）：
 
 ```bash
-siyuan create "用户管理" "用户管理模块的详细说明" --path /系统设计/用户管理
+# 如果 A、B、C 不存在，会自动创建
+# 最终创建 D 文档
+siyuan create --path "笔记本/A/B/C/D" "内容"
+
+# 目录结构：
+# 笔记本/
+# └── A/        (空，自动创建)
+#     └── B/    (空，自动创建)
+#         └── C/  (空，自动创建)
+#             └── D  (有内容)
 ```
 
 ### 重名检测
 
 创建文档前会自动检测目标位置是否存在同名文档：
 
-- **检测范围**：目标父文档下的所有子文档
-- **检测逻辑**：通过文档标题匹配
-- **冲突处理**：返回错误信息，提示使用 `--force` 参数
-
 ```bash
 # 检测到重名时的返回
 # {
 #   "success": false,
 #   "error": "文档已存在",
-#   "message": "在目标位置已存在标题为"测试文档"的文档（ID: xxx），请使用 --force 参数强制创建"
+#   "message": "文档 \"AI/测试\" 已存在 (ID: xxx)。使用 --force 强制创建。",
+#   "existingId": "xxx"
 # }
 
 # 正常创建（检测重名）
-siyuan create "测试文档" "内容"
+siyuan create --path "AI/测试" "内容"
 
-# 强制创建（跳过重名检测）
-siyuan create "测试文档" "内容" --force
+# 强制创建（跳过重名检测，允许重名）
+siyuan create --path "AI/测试" "内容" --force
+```
+
+### 换行符处理
+
+支持使用 `\n` 表示换行，系统会自动转换：
+
+```bash
+# 创建多行内容文档
+siyuan create "多行文档" "第一行\n第二行\n第三行"
+
+# 创建带格式的文档
+siyuan create "格式文档" "# 标题\n\n段落内容\n\n- 列表1\n- 列表2"
+```
+
+**重要**：Markdown 语法要求标题、列表等块级元素前必须有空行：
+
+```bash
+# ❌ 错误 - 标题不会被正确解析
+siyuan create "标题" "内容。## 二级标题 内容"
+
+# ✅ 正确 - 使用 \n\n 换行
+siyuan create "标题" "内容。\n\n## 二级标题\n内容"
 ```
 
 ## 使用示例
 
 ### 基本创建
-```bash
-# 创建空文档（在默认笔记本根目录）
-siyuan create "我的文档"
-
-# 创建带内容的文档（在默认笔记本根目录）
-siyuan create "我的文档" "文档内容"
-```
-
-### 在指定位置创建
-```bash
-# 在指定父文档下创建文档
-siyuan create "子文档" "文档内容" --parent-id <parentId>
-
-# 在指定路径下创建文档
-siyuan create "子文档" "文档内容" --path /AI/openclaw/插件
-
-# 在指定路径下强制创建（忽略重名检测）
-siyuan create "子文档" "文档内容" --path /AI/openclaw/插件 --force
-```
-
-### 使用路径参数
-```bash
-# 使用路径参数创建文档（简化版）
-siyuan create "API文档" "# API 文档内容" --path /技术文档/API
-
-# 在嵌套路径下创建文档
-siyuan create "用户管理" "用户管理模块的详细说明" --path /系统设计/用户管理
-```
-
-### 多行内容文档
-```bash
-# 创建多行内容文档（自动处理换行符）
-siyuan create "多行文档" "第一行内容\n第二行内容\n第三行内容"
-
-# 创建带格式的文档
-siyuan create "格式文档" "# 标题\n\n这是段落内容\n\n- 列表项1\n- 列表项2"
-```
-
-### Front Matter 使用
-```bash
-# 不添加 Front Matter（直接使用内容）
-siyuan create "我的文档" "# 这是文档内容"
-
-# 自定义 Front Matter（需要手动添加）
-siyuan create "自定义文档" '---
-title: 自定义标题
-date: 2024-01-01
-tags: [tag1, tag2]
----
-
-这是文档内容'
-
-# 混合使用 - 提供自定义 Front Matter
-siyuan create "高级文档" '---
-title: 高级文档
-author: 张三
-category: 技术
----
-
-# 详细内容
-
-这里是详细的内容描述...'
-```
-
-## 长内容处理最佳实践
-
-对于超长内容（超过 4000 字符），建议分两步操作：
 
 ```bash
-# 1. 先创建空文档
-siyuan create "长文档标题" "" --path /分类
+# 创建空文档
+siyuan create "我的文档" --parent-id <notebookId>
 
-# 2. 然后使用 update 命令更新完整内容
-siyuan update <docId> "完整的超长内容..."
-
-# 或者使用文件重定向
-siyuan create "文件文档" "$(cat content.md)" --path /分类
+# 创建带内容的文档
+siyuan create "我的文档" "文档内容" --parent-id <notebookId>
 ```
+
+### 多级目录创建
+
+```bash
+# 创建完整的多级目录结构
+siyuan create --path "AI/项目/模块A/功能B" "功能B的说明"
+
+# 只创建目录结构（全部为空文档）
+siyuan create --path "AI/项目/模块A/功能B"
+```
+
+### 在现有目录下创建
+
+```bash
+# 在现有目录下创建多个文档
+siyuan create --path "AI/项目/" "需求文档" "需求内容"
+siyuan create --path "AI/项目/" "设计文档" "设计内容"
+siyuan create --path "AI/项目/" "测试文档" "测试内容"
+```
+
+### 复杂内容文档
+
+```bash
+# 创建带完整 Markdown 格式的文档
+siyuan create --path "AI/项目/技术文档" "# 概述\n\n项目概述内容...\n\n## 架构设计\n\n架构说明...\n\n### 前端\n\n前端架构...\n\n### 后端\n\n后端架构...\n\n## API 列表\n\n- 用户接口\n- 数据接口\n- 管理接口"
+```
+
+## 模式选择建议
+
+| 场景 | 推荐模式 | 示例 |
+|------|---------|------|
+| 简单创建，已知父ID | 模式1 | `create "标题" --parent-id <id>` |
+| 创建多级目录 | 模式2 | `create --path "A/B/C/D"` |
+| 在目录下批量创建 | 模式3 | `create --path "A/B/" "文档1"` |
+| 需要自定义标题 | 模式2 + --title | `create --path "A/B" --title "自定义"` |
 
 ## 注意事项
 
-1. **内容长度限制**：单次创建的内容长度建议不超过 4000 字符，超长内容请使用 update 命令
-2. **路径格式**：路径以 `/` 开头，例如：`/AI/openclaw/插件`
-3. **重名检测**：默认会检测同名文档，使用 `--force` 可强制创建
-4. **换行符处理**：支持使用 `\n` 表示换行，系统会自动转换
-5. **Front Matter**：需要手动添加，系统不会自动添加 Front Matter
+1. **参数互斥**：`--parent-id` 与 `--path` 不能同时使用
+2. **内容长度**：单次创建的内容建议不超过 4000 字符，超长内容请使用 update 命令
+3. **标题斜杠**：标题中的 `/` 会自动转换为全角 `／`
+4. **重名检测**：默认检测同名文档，使用 `--force` 可强制创建
 
 ## 相关文档
+
 - [更新文档命令](update.md)
 - [最佳实践](../advanced/best-practices.md)
+- [删除文档命令](delete.md)

@@ -79,9 +79,6 @@ const command = {
         const result = await skill.connector.request('/api/block/insertBlock', requestData);
         console.log('API 响应:', JSON.stringify(result, null, 2));
         
-        // 清除缓存
-        skill.clearCache();
-        
         // 尝试从响应中提取块 ID
         let blockId = null;
         if (result && Array.isArray(result) && result.length > 0) {
@@ -112,7 +109,7 @@ const command = {
     }, {
       type: permissionType,
       idParam: parentId ? 'parentId' : (previousId ? 'previousId' : 'nextId'),
-      defaultNotebook: skill.config.defaultNotebook || process.env.SIYUAN_DEFAULT_NOTEBOOK
+      defaultNotebook: skill.config.defaultNotebook
     });
     
     return permissionHandler(skill, { ...args, idForPermission: idForPermission });
