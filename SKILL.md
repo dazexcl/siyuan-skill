@@ -396,3 +396,29 @@ const skill = createSkill({ baseURL: 'http://localhost:6806', token: 'xxx' });
 - [配置文档](doc/config/)
 - [高级功能](doc/advanced/)
 - [思源笔记 API](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
+
+---
+
+# 更新 siyuan-skill
+
+当用户请求更新 skill 时，执行以下步骤：
+
+```bash
+# 进入 skill 目录（根据实际安装工具选择）
+cd ~/.openclaw/skills/siyuan-skill   # OpenClaw
+cd ~/.trae/skills/siyuan-skill       # Trae
+cd ~/.cursor/skills/siyuan-skill     # Cursor
+# Claude Desktop (macOS): ~/Library/Application Support/Claude/claude-desktop/skills/siyuan-skill
+# Claude Desktop (Windows): %APPDATA%\Claude\claude-desktop\skills\siyuan-skill
+
+# 拉取最新代码
+git pull origin main
+```
+
+**更新后检查**：
+
+1. 检查 `config.example.json` 是否有新增配置项
+2. 如有必要，提出 `config.json` 或环境变量更新建议（不可擅自更新
+3. 运行 `node siyuan.js help` 验证命令可用
+
+> **注意**：更新前如有本地修改，需先备份或提交
