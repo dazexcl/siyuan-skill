@@ -35,23 +35,12 @@ class ConfigManager {
       token: '',
       timeout: 10000,
       
-      // 缓存配置
-      cacheExpiry: 300000, // 5分钟
-      syncInterval: 30000, // 30秒
-      
       // 默认值
       defaultNotebook: null,
-      defaultFormat: 'markdown',
       
       // 权限配置
       permissionMode: 'all', // all, blacklist, whitelist
       notebookList: [],
-      
-      // 功能配置
-      enableCache: true,
-      enableSync: false,
-      enableLogging: true,
-      debugMode: false,
       
       // Qdrant 向量数据库配置 - 无默认值
       qdrant: {
@@ -203,13 +192,8 @@ class ConfigManager {
     if (process.env.SIYUAN_TOKEN) envConfig.token = process.env.SIYUAN_TOKEN;
     if (process.env.SIYUAN_TIMEOUT) envConfig.timeout = parseInt(process.env.SIYUAN_TIMEOUT, 10);
     
-    // 缓存配置
-    if (process.env.SIYUAN_CACHE_EXPIRY) envConfig.cacheExpiry = parseInt(process.env.SIYUAN_CACHE_EXPIRY, 10);
-    if (process.env.SIYUAN_SYNC_INTERVAL) envConfig.syncInterval = parseInt(process.env.SIYUAN_SYNC_INTERVAL, 10);
-    
     // 默认值
     if (process.env.SIYUAN_DEFAULT_NOTEBOOK) envConfig.defaultNotebook = process.env.SIYUAN_DEFAULT_NOTEBOOK;
-    if (process.env.SIYUAN_DEFAULT_FORMAT) envConfig.defaultFormat = process.env.SIYUAN_DEFAULT_FORMAT;
     
     // 权限配置
     if (process.env.SIYUAN_PERMISSION_MODE) envConfig.permissionMode = process.env.SIYUAN_PERMISSION_MODE;
@@ -256,12 +240,6 @@ class ConfigManager {
         envConfig.notebookList = [];
       }
     }
-    
-    // 功能配置
-    if (process.env.SIYUAN_ENABLE_CACHE) envConfig.enableCache = process.env.SIYUAN_ENABLE_CACHE === 'true';
-    if (process.env.SIYUAN_ENABLE_SYNC) envConfig.enableSync = process.env.SIYUAN_ENABLE_SYNC === 'true';
-    if (process.env.SIYUAN_ENABLE_LOGGING) envConfig.enableLogging = process.env.SIYUAN_ENABLE_LOGGING === 'true';
-    if (process.env.SIYUAN_DEBUG_MODE) envConfig.debugMode = process.env.SIYUAN_DEBUG_MODE === 'true';
     
     // Qdrant 配置
     if (process.env.QDRANT_URL || process.env.QDRANT_API_KEY || process.env.QDRANT_COLLECTION_NAME) {
@@ -364,21 +342,6 @@ class ConfigManager {
       validatedConfig.timeout = this.defaultConfig.timeout;
     }
     
-    // 验证缓存配置
-    if (typeof validatedConfig.cacheExpiry !== 'number' || validatedConfig.cacheExpiry <= 0) {
-      validatedConfig.cacheExpiry = this.defaultConfig.cacheExpiry;
-    }
-    
-    if (typeof validatedConfig.syncInterval !== 'number' || validatedConfig.syncInterval <= 0) {
-      validatedConfig.syncInterval = this.defaultConfig.syncInterval;
-    }
-    
-    // 验证默认值
-    if (typeof validatedConfig.defaultFormat !== 'string' || 
-        !['markdown', 'text', 'html'].includes(validatedConfig.defaultFormat)) {
-      validatedConfig.defaultFormat = this.defaultConfig.defaultFormat;
-    }
-    
     // 验证权限配置
     if (typeof validatedConfig.permissionMode !== 'string' || 
         !['all', 'blacklist', 'whitelist'].includes(validatedConfig.permissionMode)) {
@@ -398,23 +361,6 @@ class ConfigManager {
       } else {
         validatedConfig.notebookList = this.defaultConfig.notebookList;
       }
-    }
-    
-    // 验证功能配置
-    if (typeof validatedConfig.enableCache !== 'boolean') {
-      validatedConfig.enableCache = this.defaultConfig.enableCache;
-    }
-    
-    if (typeof validatedConfig.enableSync !== 'boolean') {
-      validatedConfig.enableSync = this.defaultConfig.enableSync;
-    }
-    
-    if (typeof validatedConfig.enableLogging !== 'boolean') {
-      validatedConfig.enableLogging = this.defaultConfig.enableLogging;
-    }
-    
-    if (typeof validatedConfig.debugMode !== 'boolean') {
-      validatedConfig.debugMode = this.defaultConfig.debugMode;
     }
     
     // 验证 Qdrant 配置
@@ -573,9 +519,7 @@ class ConfigManager {
       timeout: config.timeout,
       defaultNotebook: config.defaultNotebook || '未设置',
       permissionMode: config.permissionMode,
-      notebookCount: config.notebookList.length,
-      cacheEnabled: config.enableCache,
-      syncEnabled: config.enableSync
+      notebookCount: config.notebookList.length
     };
   }
 }

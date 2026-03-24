@@ -9,14 +9,9 @@
   "baseURL": "http://localhost:6806",
   "token": "your-api-token-here",
   "timeout": 10000,
-  "cacheExpiry": 300000,
   "defaultNotebook": "your-notebook-id-here",
-  "defaultFormat": "markdown",
   "permissionMode": "all",
   "notebookList": [],
-  "enableCache": true,
-  "enableLogging": true,
-  "debugMode": false,
   "deleteProtection": {
     "safeMode": true,
     "requireConfirmation": false
@@ -59,24 +54,11 @@
 | `token` | string | `""` | API 令牌 |
 | `timeout` | number | `10000` | 请求超时（毫秒） |
 
-### 缓存配置
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `enableCache` | boolean | `true` | 启用缓存 |
-| `cacheExpiry` | number | `300000` | 缓存过期时间（5分钟） |
-
-### 默认值
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `defaultNotebook` | string | `null` | 默认笔记本 ID |
-| `defaultFormat` | string | `markdown` | 输出格式（markdown/text/html） |
-
 ### 权限控制
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| `defaultNotebook` | string | `null` | 默认笔记本 ID |
 | `permissionMode` | string | `all` | 权限模式：all/whitelist/blacklist |
 | `notebookList` | array | `[]` | 笔记本 ID 列表 |
 

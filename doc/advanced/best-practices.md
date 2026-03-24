@@ -160,25 +160,6 @@ siyuan protect <docId> --enable
 siyuan protect <docId> --disable
 ```
 
-## 缓存管理最佳实践
-
-### 缓存策略
-
-- 笔记本列表和文档结构自动缓存（默认 5 分钟）
-- 内容读取不缓存，保证实时性
-
-### 强制刷新
-
-```bash
-siyuan nb --force-refresh
-siyuan ls --force-refresh
-```
-
-### 建议
-
-- 批量操作时避免频繁刷新缓存
-- 文档结构变更后使用 `--force-refresh`
-
 ## 向量搜索最佳实践
 
 ### 服务部署

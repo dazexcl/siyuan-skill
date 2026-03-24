@@ -278,6 +278,57 @@ class SiyuanConnector {
   }
   
   /**
+   * 检测是否为 TLS 证书错误
+   * @param {Error} error - 错误对象
+   * @returns {Object|null} TLS 错误信息，如果不是 TLS 错误则返回 null
+   */
+  detectTlsError(error) {
+    const msg = error.message || '';
+    const code = error.code || '';
+    
+    const tlsErrorPatterns = [
+      { pattern: /unable to verify the first certificate/i, type: '自签名/不可信证书' },
+      { pattern: /UNABLE_TO_VERIFY_LEAF_SIGNATURE/i, type: '证书签名验证失败' },
+      { pattern: /CERT_HAS_EXPIRED/i, type: '证书已过期' },
+      { pattern: /DEPTH_ZERO_SELF_SIGNED_CERT/i, type: '自签名证书' },
+      { pattern: /SELF_SIGNED_CERT_IN_CHAIN/i, type: '证书链中包含自签名证书' },
+      { pattern: /ERR_TLS_CERT_ALTNAME_INVALID/i, type: '证书域名不匹配' },
+      { pattern: /certificate/i, type: '证书验证失败' }
+    ];
+    
+    for (const { pattern, type } of tlsErrorPatterns) {
+      if (pattern.test(msg) || pattern.test(code)) {
+        return {
+          isTlsError: true,
+          errorType: type,
+          solution: this.getTlsSolution()
+        };
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * 获取 TLS 错误的解决方案
+   * @returns {string} 解决方案说明
+   */
+  getTlsSolution() {
+    const host = this.hostname || 'your-host';
+    return `TLS 证书验证失败。解决方案：
+
+方法1 - 在 config.json 中添加 TLS 配置：
+  "tls": {
+    "allowSelfSignedCerts": true,
+    "allowedHosts": ["localhost", "${host}"]
+  }
+
+方法2 - 设置环境变量：
+  SIYUAN_TLS_ALLOW_SELF_SIGNED=true
+  SIYUAN_TLS_ALLOWED_HOSTS=localhost,${host}`;
+  }
+  
+  /**
    * 格式化错误信息
    * @param {Error} error - 原始错误
    * @param {string} endpoint - API 端点
@@ -301,7 +352,16 @@ class SiyuanConnector {
       errorInfo.requestData = safeData;
     }
     
-    const formattedError = new Error(`Siyuan API 错误: ${error.message}`);
+    let formattedMessage = `Siyuan API 错误: ${error.message}`;
+    
+    const tlsError = this.detectTlsError(error);
+    if (tlsError) {
+      errorInfo.isTlsError = true;
+      errorInfo.tlsErrorType = tlsError.errorType;
+      formattedMessage = `TLS 证书错误 [${tlsError.errorType}]: ${error.message}\n\n${tlsError.solution}`;
+    }
+    
+    const formattedError = new Error(formattedMessage);
     formattedError.details = errorInfo;
     formattedError.originalError = error;
     

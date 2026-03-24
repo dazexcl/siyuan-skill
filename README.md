@@ -1,7 +1,7 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.6.12-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.6.13-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->=14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
@@ -434,7 +434,6 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
   "token": "your-api-token-here",
   "timeout": 10000,
   "defaultNotebook": "your-notebook-id-here",
-  "defaultFormat": "markdown",
   "permissionMode": "all",
   "notebookList": [],
   "deleteProtection": {
@@ -447,10 +446,6 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
     "allowSelfSignedCerts": false,
     "allowedHosts": ["localhost"]
   },
-  "enableCache": true,
-  "enableSync": false,
-  "enableLogging": true,
-  "debugMode": false,
   "qdrant": {
     "url": "http://localhost:6333",
     "apiKey": "",
@@ -492,7 +487,6 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |--------|------|------|--------|------|
 | `defaultNotebook` | string | ✅ | `null` | 默认笔记本 ID |
-| `defaultFormat` | string | ❌ | `markdown` | 默认输出格式 |
 
 ### 3. 权限配置
 
@@ -531,16 +525,7 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 | `tls.allowSelfSignedCerts` | boolean | ❌ | `false` | 是否允许自签名证书 |
 | `tls.allowedHosts` | array | ❌ | `["localhost"]` | 允许的主机列表 |
 
-### 6. 功能配置
-
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `enableCache` | boolean | ❌ | `true` | 是否启用缓存 |
-| `enableSync` | boolean | ❌ | `false` | 是否启用同步 |
-| `enableLogging` | boolean | ❌ | `true` | 是否启用日志 |
-| `debugMode` | boolean | ❌ | `false` | 是否启用调试模式 |
-
-### 7. Qdrant 向量数据库配置（可选）
+### 6. Qdrant 向量数据库配置（可选）
 
 | 配置项 | 类型 | 必填 | 默认值 | 说明 |
 |--------|------|------|--------|------|
@@ -600,7 +585,6 @@ SIYUAN_BASE_URL="http://localhost:6806"
 SIYUAN_TOKEN="your-api-token-here"
 SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id-here"
 SIYUAN_TIMEOUT=10000
-SIYUAN_DEFAULT_FORMAT="markdown"
 ```
 
 ### 权限配置
@@ -622,15 +606,6 @@ SIYUAN_DELETE_REQUIRE_CONFIRMATION="false"
 ```bash
 SIYUAN_TLS_ALLOW_SELF_SIGNED="false"
 SIYUAN_TLS_ALLOWED_HOSTS="localhost,127.0.0.1"
-```
-
-### 功能配置
-
-```bash
-SIYUAN_ENABLE_CACHE="true"
-SIYUAN_ENABLE_SYNC="false"
-SIYUAN_ENABLE_LOGGING="true"
-SIYUAN_DEBUG_MODE="false"
 ```
 
 ### Qdrant 配置
@@ -915,10 +890,9 @@ siyuan create "标题" "第一段## 二级标题 内容"
 
 1. **首次使用**需要配置思源笔记 API 地址和 Token
 2. **权限模式**：根据实际需求选择合适的权限模式
-3. **缓存机制**：笔记本列表和文档结构会自动缓存，可使用 `--force-refresh` 强制刷新
-4. **向量搜索**：需要单独部署 Qdrant 服务，否则会回退到 SQL 搜索
-5. **NLP 功能**：完全本地实现，无外部依赖
-6. **Embedding**：使用 Ollama 服务，无需下载本地模型文件
+3. **向量搜索**：需要单独部署 Qdrant 服务，否则会回退到 SQL 搜索
+4. **NLP 功能**：完全本地实现，无外部依赖
+5. **Embedding**：使用 Ollama 服务，无需下载本地模型文件
 
 > 更多最佳实践请参阅 [doc/advanced/best-practices.md](doc/advanced/best-practices.md)
 

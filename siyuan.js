@@ -191,25 +191,20 @@ function showCommandHelp(command) {
     'notebooks': {
       aliases: ['nb'],
       description: '获取所有笔记本列表',
-      usage: 'siyuan notebooks [--force-refresh]',
-      options: [
-        { name: '--force-refresh', description: '强制刷新缓存' }
-      ],
+      usage: 'siyuan notebooks',
+      options: [],
       examples: [
         'siyuan notebooks',
-        'siyuan notebooks --force-refresh'
+        'siyuan nb'
       ]
     },
     'structure': {
       aliases: ['ls'],
       description: '获取指定笔记本的文档结构，支持笔记本ID和文档ID',
-      usage: 'siyuan structure <notebookId|docId> [--force-refresh]',
-      options: [
-        { name: '--force-refresh', description: '强制刷新缓存' }
-      ],
+      usage: 'siyuan structure <notebookId|docId>',
+      options: [],
       examples: [
         'siyuan structure <notebook-id>',
-        'siyuan structure <notebook-id> --force-refresh',
         'siyuan structure <doc-id>  # 使用文档ID获取子文档结构'
       ]
     },
@@ -673,11 +668,7 @@ async function main(customArgs = null) {
           process.exit(0);
         }
         console.log('获取笔记本列表...');
-        const notebookArgs = {};
-        if (args.includes('--force-refresh')) {
-          notebookArgs.forceRefresh = true;
-        }
-        const notebooks = await skill.executeCommand('get-notebooks', notebookArgs);
+        const notebooks = await skill.executeCommand('get-notebooks', {});
         console.log(JSON.stringify(notebooks, null, 2));
         break;
         
@@ -691,8 +682,7 @@ async function main(customArgs = null) {
         console.log('获取文档结构...');
         const structureParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--notebook-id': { hasValue: true, aliases: ['--notebook'] },
-            '--force-refresh': { isFlag: true }
+            '--notebook-id': { hasValue: true, aliases: ['--notebook'] }
           },
           positionalCount: 1
         });
@@ -701,10 +691,9 @@ async function main(customArgs = null) {
           structureArgs.notebookId = structureParsed.positional[0];
         }
         if (structureParsed.options.notebookId) structureArgs.notebookId = structureParsed.options.notebookId;
-        if (structureParsed.options.forceRefresh) structureArgs.forceRefresh = true;
         if (!structureArgs.notebookId) {
           console.error('错误: 请提供笔记本ID');
-          console.log('用法: siyuan structure <notebookId> [--force-refresh]');
+          console.log('用法: siyuan structure <notebookId>');
           process.exit(1);
         }
         const structure = await skill.executeCommand('get-doc-structure', structureArgs);

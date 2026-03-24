@@ -11,18 +11,17 @@ const Permission = require('../utils/permission');
 const command = {
   name: 'get-doc-structure',
   description: '获取指定笔记本的文档和文件夹结构，支持笔记本ID和文档ID',
-  usage: 'get-doc-structure --notebook-id <notebookId> [--force-refresh]',
+  usage: 'get-doc-structure --notebook-id <notebookId>',
   
   /**
    * 执行指令
    * @param {SiyuanNotesSkill} skill - 技能实例
    * @param {Object} args - 指令参数
    * @param {string} args.notebookId - 笔记本ID或文档ID
-   * @param {boolean} args.forceRefresh - 是否强制刷新缓存
    * @returns {Promise<Object>} 文档结构
    */
   async execute(skill, args = {}) {
-    const { notebookId, forceRefresh = false } = args;
+    const { notebookId } = args;
     
     if (!notebookId) {
       return {
@@ -85,7 +84,7 @@ const command = {
       }
       
       // 如果是笔记本ID，返回整个笔记本的文档结构
-      return await this.getNotebookStructure(skill, actualNotebookId, forceRefresh);
+      return await this.getNotebookStructure(skill, actualNotebookId);
     } catch (error) {
       console.error('获取文档结构失败:', error);
       return {
@@ -188,7 +187,6 @@ const command = {
     return {
       success: true,
       data: structure,
-      cached: false,
       timestamp: Date.now(),
       documentCount: structure.documents.length,
       folderCount: structure.folders.length,
@@ -200,22 +198,9 @@ const command = {
    * 获取笔记本的文档结构
    * @param {Object} skill - 技能实例
    * @param {string} notebookId - 笔记本ID
-   * @param {boolean} forceRefresh - 是否强制刷新缓存
    * @returns {Promise<Object>} 文档结构
    */
-  async getNotebookStructure(skill, notebookId, forceRefresh) {
-    // 检查缓存
-    if (!forceRefresh && skill.cache.docStructure[notebookId] && 
-        (Date.now() - skill.cache.docStructure[notebookId].timestamp) < skill.cache.cacheExpiry) {
-      return {
-        success: true,
-        data: skill.cache.docStructure[notebookId].data,
-        cached: true,
-        timestamp: skill.cache.docStructure[notebookId].timestamp,
-        type: 'notebook'
-      };
-    }
-    
+  async getNotebookStructure(skill, notebookId) {
     // 构建文档结构
     const structure = {
       notebookId: notebookId,
@@ -432,16 +417,9 @@ const command = {
         }
       }
       
-      // 更新缓存
-      skill.cache.docStructure[notebookId] = {
-        data: structure,
-        timestamp: Date.now()
-      };
-      
       return {
         success: true,
         data: structure,
-        cached: false,
         timestamp: Date.now(),
         documentCount: structure.documents.length,
         folderCount: structure.folders.length,

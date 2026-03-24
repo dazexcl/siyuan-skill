@@ -19,14 +19,6 @@
 | `SIYUAN_PERMISSION_MODE` | 权限模式 | `all` / `whitelist` / `blacklist` |
 | `SIYUAN_NOTEBOOK_LIST` | 笔记本 ID 列表 | `id1,id2,id3` |
 
-### 功能开关
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `SIYUAN_ENABLE_CACHE` | 启用缓存 | `true` |
-| `SIYUAN_CACHE_EXPIRY` | 缓存过期时间（毫秒） | `300000` |
-| `SIYUAN_DEBUG_MODE` | 调试模式 | `false` |
-
 ### 删除保护
 
 | 变量 | 说明 | 默认值 |

@@ -2,16 +2,9 @@
   "baseURL": "http://localhost:6806",
   "token": "your-api-token-here",
   "timeout": 10000,
-  "cacheExpiry": 300000,
-  "syncInterval": 30000,
   "defaultNotebook": "your-notebook-id-here",
-  "defaultFormat": "markdown",
   "permissionMode": "all",
   "notebookList": [],
-  "enableCache": true,
-  "enableSync": false,
-  "enableLogging": true,
-  "debugMode": false,
   "deleteProtection": {
     "safeMode": true,
     "requireConfirmation": false

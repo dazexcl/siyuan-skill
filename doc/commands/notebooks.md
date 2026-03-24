@@ -5,16 +5,10 @@
 ## 命令格式
 
 ```bash
-siyuan notebooks [options]
+siyuan notebooks
 ```
 
 **别名**：`nb`
-
-## 参数说明
-
-| 参数 | 类型 | 必填 | 说明 |
-|-----|------|------|------|
-| `--force-refresh` | boolean | ❌ | 强制刷新缓存 |
 
 ## 使用示例
 
@@ -25,12 +19,6 @@ siyuan notebooks
 
 # 使用别名
 siyuan nb
-```
-
-### 强制刷新缓存
-```bash
-# 强制刷新缓存
-siyuan notebooks --force-refresh
 ```
 
 ## 返回格式
@@ -54,10 +42,7 @@ siyuan notebooks --force-refresh
 
 ## 注意事项
 
-1. **缓存机制**：笔记本列表会自动缓存，默认缓存5分钟
-2. **强制刷新**：使用 `--force-refresh` 可强制刷新缓存
-3. **权限限制**：根据权限配置，可能只返回部分笔记本
+1. **权限限制**：根据权限配置，可能只返回部分笔记本
 
 ## 相关文档
 - [权限管理](../advanced/permission.md)
-- [缓存机制](../advanced/caching.md)
