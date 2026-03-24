@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-version: "1.6.13"
+version: "1.6.14"
 description: "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能"
 skillType: "cli"
 runtime: "node"
