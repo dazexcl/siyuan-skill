@@ -112,9 +112,12 @@ const ALIAS_MAP = {
   'bg': 'block-get',
   'ba': 'block-attrs',
   'attrs': 'block-attrs',
+  'block-attributes': 'block-attrs',
   'bf': 'block-fold',
   'buu': 'block-fold',
   'block-unfold': 'block-fold',
+  'fold-block': 'block-fold',
+  'unfold-block': 'block-fold',
   'btr': 'block-transfer-ref',
   'st': 'tags',
   'check': 'exists',
@@ -808,9 +811,12 @@ async function main(customArgs = null) {
             '--notebook-id': { hasValue: true, aliases: ['-n', '--notebook'] },
             '--path': { hasValue: true }
           },
-          positionalCount: 0
+          positionalCount: 1
         });
         const existsArgs = {};
+        if (existsParsed.positional.length > 0) {
+          existsArgs.title = existsParsed.positional[0];
+        }
         if (existsParsed.options.title) existsArgs.title = existsParsed.options.title;
         if (existsParsed.options.parentId) existsArgs.parentId = existsParsed.options.parentId;
         if (existsParsed.options.notebookId) existsArgs.notebookId = existsParsed.options.notebookId;

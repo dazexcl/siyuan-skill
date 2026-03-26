@@ -218,10 +218,11 @@ const command = {
       if (newTitle) {
         console.log('重命名文档为:', newTitle);
         try {
-          await skill.connector.request('/api/filetree/renameDoc', {
+          const renameResult = await skill.connector.request('/api/filetree/renameDocByID', {
             id: docId,
             title: newTitle
           });
+          console.log('重命名结果:', renameResult);
         } catch (error) {
           console.warn('重命名文档失败:', error.message);
         }

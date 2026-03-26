@@ -12,23 +12,30 @@ const Permission = require('../utils/permission');
  * 检查块是否为文档块
  * @param {SiyuanNotesSkill} skill - 技能实例
  * @param {string} blockId - 块ID
- * @returns {Promise<{isDocument: boolean, blockInfo: Object|null}>}
+ * @returns {Promise<{isDocument: boolean, blockInfo: Object|null, error?: string}>}
  */
 async function checkIfDocumentBlock(skill, blockId) {
   try {
     const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id: blockId });
     
+    console.log('getBlockInfo API 响应:', JSON.stringify(blockInfo, null, 2));
+    
     if (!blockInfo || typeof blockInfo !== 'object') {
-      return { isDocument: false, blockInfo: null };
+      return { isDocument: false, blockInfo: null, error: '无法获取块信息' };
     }
     
     const rootId = blockInfo.rootID || blockInfo.root_id || blockInfo.rootChildID;
-    const isDocument = rootId === blockId;
+    const type = blockInfo.type;
     
-    return { isDocument, blockInfo };
+    if (type === 'd' || (rootId && rootId === blockId)) {
+      console.log('检测到文档块:', { blockId, rootId, type });
+      return { isDocument: true, blockInfo };
+    }
+    
+    return { isDocument: false, blockInfo };
   } catch (error) {
-    console.warn('获取块信息失败:', error.message);
-    return { isDocument: false, blockInfo: null };
+    console.error('获取块信息失败:', error.message);
+    return { isDocument: false, blockInfo: null, error: error.message };
   }
 }
 
@@ -60,7 +67,15 @@ const command = {
     
     const permissionHandler = Permission.createPermissionWrapper(async (skill, args, notebookId) => {
       try {
-        const { isDocument, blockInfo } = await checkIfDocumentBlock(skill, id);
+        const { isDocument, blockInfo, error: checkError } = await checkIfDocumentBlock(skill, id);
+        
+        if (checkError && !blockInfo) {
+          return {
+            success: false,
+            error: '获取块信息失败',
+            message: `无法获取块信息: ${checkError}。请确认块ID是否正确。`
+          };
+        }
         
         if (isDocument) {
           const docTitle = blockInfo?.rootTitle || blockInfo?.content || id;
@@ -77,28 +92,26 @@ const command = {
         const result = await skill.connector.request('/api/block/deleteBlock', { id });
         console.log('deleteBlock API 响应:', JSON.stringify(result, null, 2));
         
-        if (result === null || result === true || 
-            (Array.isArray(result) && result.length > 0) || 
-            (result && result.code === 0) ||
-            (result && typeof result === 'object' && !result.code)) {
-          
-          return {
-            success: true,
-            data: {
-              id,
-              operation: 'delete',
-              timestamp: Date.now(),
-              notebookId
-            },
-            message: '块删除成功'
-          };
-        } else {
+        const verifyResult = await skill.connector.request('/api/block/getBlockInfo', { id }).catch(() => null);
+        if (verifyResult && verifyResult.rootID) {
+          console.warn('块删除后仍存在，验证失败');
           return {
             success: false,
-            error: result?.msg || '块删除失败',
-            message: '块删除失败'
+            error: '删除验证失败',
+            message: '块删除命令已执行，但块仍然存在。可能是权限问题或 API 异常。'
           };
         }
+        
+        return {
+          success: true,
+          data: {
+            id,
+            operation: 'delete',
+            timestamp: Date.now(),
+            notebookId
+          },
+          message: '块删除成功'
+        };
       } catch (error) {
         console.error('删除块失败:', error);
         return {

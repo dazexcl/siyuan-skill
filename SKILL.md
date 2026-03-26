@@ -26,83 +26,21 @@ optional_env_vars:
     description: "权限模式 (all/whitelist/blacklist)"
     default: "all"
   - name: "SIYUAN_NOTEBOOK_LIST"
-    description: "白名单/黑名单笔记本列表（JSON数组或逗号分隔）"
+    description: "白名单/黑名单笔记本列表（逗号分隔）"
   - name: "SIYUAN_TIMEOUT"
     description: "API 请求超时时间（毫秒）"
     default: "10000"
   - name: "QDRANT_URL"
     description: "Qdrant 向量数据库地址（语义搜索需要）"
-  - name: "QDRANT_API_KEY"
-    description: "Qdrant API 密钥（云服务需要）"
-  - name: "QDRANT_COLLECTION_NAME"
-    description: "Qdrant 集合名称"
-    default: "siyuan_notes"
   - name: "OLLAMA_BASE_URL"
     description: "Ollama 服务地址（语义搜索需要）"
-  - name: "OLLAMA_EMBED_MODEL"
-    description: "Embedding 模型名称"
-    default: "nomic-embed-text"
-  - name: "EMBEDDING_DIMENSION"
-    description: "Embedding 向量维度"
-    default: "768"
-  - name: "EMBEDDING_BATCH_SIZE"
-    description: "Embedding 批处理大小"
-    default: "5"
-  - name: "SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH"
-    description: "Embedding 最大内容长度"
-    default: "4000"
-  - name: "SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH"
-    description: "Embedding 最大分块长度"
-    default: "4000"
-  - name: "SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH"
-    description: "Embedding 最小分块长度"
-    default: "200"
-  - name: "SIYUAN_SKIP_INDEX_ATTRS"
-    description: "跳过索引的文档属性（逗号分隔）"
-  - name: "HYBRID_DENSE_WEIGHT"
-    description: "混合搜索稠密向量权重"
-    default: "0.7"
-  - name: "HYBRID_SPARSE_WEIGHT"
-    description: "混合搜索稀疏向量权重"
-    default: "0.3"
-  - name: "HYBRID_SEARCH_LIMIT"
-    description: "混合搜索结果限制"
-    default: "20"
-  - name: "NLP_LANGUAGE"
-    description: "NLP 语言"
-    default: "zh"
-  - name: "NLP_EXTRACT_ENTITIES"
-    description: "NLP 提取实体"
-    default: "true"
-  - name: "NLP_EXTRACT_KEYWORDS"
-    description: "NLP 提取关键词"
-    default: "true"
-  - name: "SIYUAN_DELETE_SAFE_MODE"
-    description: "删除安全模式"
-    default: "true"
-  - name: "SIYUAN_DELETE_REQUIRE_CONFIRMATION"
-    description: "删除需要确认"
-    default: "false"
-  - name: "SIYUAN_TLS_ALLOW_SELF_SIGNED"
-    description: "允许自签名 TLS 证书"
-    default: "false"
-  - name: "SIYUAN_TLS_ALLOWED_HOSTS"
-    description: "TLS 验证豁免的主机列表（逗号分隔）"
-    default: "localhost"
 ---
+
+> 📋 完整环境变量配置见 [环境变量文档](doc/config/environment.md)
 
 # Siyuan Skill
 
 **思源笔记 CLI 工具** - 为 AI Agent 提供笔记本管理、文档操作、内容搜索、块控制等功能。
-
-## 环境变量
-
-| 变量 | 必需 | 说明 |
-|------|------|------|
-| `SIYUAN_BASE_URL` | ✅ | API 地址，建议 `http://localhost:6806` |
-| `SIYUAN_TOKEN` | ✅ | API 令牌 |
-| `SIYUAN_DEFAULT_NOTEBOOK` | ✅ | 默认笔记本 ID |
-| `SIYUAN_PERMISSION_MODE` | ❌ | 权限模式，默认 `all` |
 
 ---
 
@@ -119,6 +57,31 @@ optional_env_vars:
 node siyuan.js <command> [options]
 siyuan help <command>  # 查看命令帮助
 ```
+
+---
+
+# 快速决策表
+
+根据用户需求快速选择正确的命令：
+
+| 用户需求 | 使用命令 | 关键参数 | 示例 |
+|----------|----------|----------|------|
+| 查看笔记本列表 | `notebooks` / `nb` | 无 | `siyuan nb` |
+| 查看文档结构 | `structure` / `ls` | `--depth` | `siyuan ls <notebookId>` |
+| 查看文档内容 | `content` / `cat` | 无 | `siyuan cat <docId>` |
+| 创建新文档 | `create` / `new` | `--parent-id` 或 `--path` | `siyuan create "标题" --parent-id xxx` |
+| 修改整个文档 | `update` / `edit` | 文档ID | `siyuan update <docId> "完整内容"` |
+| 修改单个块 | `block-update` / `bu` | 块ID（非文档ID） | `siyuan bu <blockId> "块内容"` |
+| 删除文档 | `delete` / `rm` | 文档ID | `siyuan rm <docId>` |
+| 删除单个块 | `block-delete` / `bd` | 块ID | `siyuan bd <blockId>` |
+| 搜索内容 | `search` / `find` | `--mode` | `siyuan search "关键词"` |
+| 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
+| 设置文档属性 | `block-attrs` / `ba` | `--set` | `siyuan ba <docId> --set "status=done"` |
+| 设置标签 | `tags` / `st` | `--tags` | `siyuan st <docId> --tags "A,B"` |
+| 移动文档 | `move` / `mv` | `--new-title`（可选） | `siyuan mv <docId> <targetId>` |
+| 重命名文档 | `rename` | 新标题 | `siyuan rename <docId> "新标题"` |
+| 保护/取消保护 | `protect` | `--on` / `--off` | `siyuan protect <docId> --on` |
+| 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
 
 ---
 
@@ -153,6 +116,7 @@ siyuan help <command>  # 查看命令帮助
 | `block-move` | `bm` | 移动块 |
 | `block-get` | `bg` | 获取块信息 |
 | `block-fold` | `bf`, `buu` | 折叠/展开块 |
+| `block-transfer-ref` | `btr` | 转移块引用 |
 
 > **重要区分**：
 > - `update` 命令：仅接受**文档ID**，用于更新整个文档内容
@@ -249,80 +213,94 @@ siyuan exists --path "/目录/文档标题"
 
 # 最佳实践
 
+## 标准工作流
+
+### 创建文档工作流
+
+```
+1. 检查文档是否存在
+   └─ siyuan exists --title "标题" [--parent-id <父ID>]
+   
+2a. 如不存在 → 直接创建
+    └─ siyuan create "标题" "内容" --parent-id <id>
+    
+2b. 如存在 → 询问用户
+    ├─ 覆盖？ → siyuan update <docId> "新内容"
+    └─ 新建同名？ → siyuan create "标题" "内容" --force
+    
+3. 设置属性（可选）
+   └─ siyuan ba <docId> --set "status=draft"
+   └─ siyuan st <docId> --tags "标签1,标签2"
+```
+
+### 修改文档工作流
+
+```
+1. 获取当前内容
+   └─ siyuan content <docId>
+   
+2. 判断修改范围
+   ├─ 全文替换 → siyuan update <docId> "完整新内容"
+   └─ 仅修改部分块 → 继续步骤3
+   
+3. 查看块结构（块级修改）
+   └─ siyuan bg <docId> --mode kramdown
+   
+4. 根据需求选择操作
+   ├─ 更新单个块 → siyuan bu <blockId> "新内容"
+   ├─ 删除多余块 → siyuan bd <blockId>
+   └─ 插入新块 → siyuan bi <parentId> "内容"
+   
+5. 验证结果
+   └─ siyuan content <docId>
+```
+
+### 搜索文档工作流
+
+```
+1. 选择搜索模式
+   ├─ 精确匹配 → siyuan search "关键词"
+   ├─ 语义搜索 → siyuan search "概念" --mode semantic
+   └─ 混合搜索 → siyuan search "查询" --mode hybrid
+   
+2. 根据结果定位文档
+   └─ siyuan content <docId>
+```
+
+### 批量操作工作流
+
+```
+1. 获取目标列表
+   └─ siyuan ls <notebookId> --depth 3
+   
+2. 逐个处理（避免并发问题）
+   └─ for doc in docs: siyuan update <doc.id> "内容"
+   
+3. 验证结果
+   └─ siyuan ls <notebookId>
+```
+
 ## create 命令
 
-支持三种创建模式：
+**三种创建模式**：
 
-### 模式选择
+| 模式 | 场景 | 示例 |
+|------|------|------|
+| 传统模式 | 已知父ID | `siyuan create "标题" "内容" --parent-id <id>` |
+| 路径指定 | 创建多级目录 | `siyuan create --path "笔记本/A/B/C" "内容"` |
+| 目录下创建 | 批量创建 | `siyuan create --path "笔记本/目录/" "标题" "内容"` |
 
-| 场景 | 推荐模式 | 命令示例 |
-|------|---------|----------|
-| 简单创建，已知父ID | 模式1 | `siyuan create "标题" --parent-id <id>` |
-| 创建多级目录 | 模式2 | `siyuan create --path "笔记本/A/B/C"` |
-| 在目录下批量创建 | 模式3 | `siyuan create --path "笔记本/目录/" "标题"` |
-| 需要自定义标题 | 模式2 + --title | `siyuan create --path "A/B" --title "自定义"` |
-
-### 模式1：传统模式（无 --path）
-
-```bash
-# 位置参数1 = 标题，位置参数2 = 内容
-siyuan create "我的文档" --parent-id <notebookId>
-siyuan create "我的文档" "文档内容" --parent-id <docId>
-```
-
-### 模式2：路径指定文档（--path 末尾无 /）
-
-```bash
-# 标题从路径最后一段提取，位置参数 = 内容
-siyuan create --path "笔记本/目录/文档名" "内容"
-
-# 使用 --title 覆盖标题
-siyuan create --path "笔记本/目录/文档名" --title "自定义标题" "内容"
-
-# 创建多级空目录（不提供内容）
-siyuan create --path "笔记本/A/B/C/最终目录"
-```
-
-### 模式3：在目录下创建（--path 末尾有 /）
-
-```bash
-# 在指定目录下创建新文档，位置参数1 = 标题，位置参数2 = 内容
-siyuan create --path "笔记本/目录/" "新文档标题" "内容"
-```
-
-### 重名检测
-
-```bash
-# 默认检测重名，已存在时返回错误
-siyuan create --path "AI/测试" "内容"
-
-# 使用 --force 强制创建（允许重名）
-siyuan create --path "AI/测试" "内容" --force
-```
-
-### 参数说明
-
-**指定目标位置的方式**（二选一，不能同时使用）：
+**关键参数**：
 - `--parent-id <id>` — 指定父文档/笔记本ID
-- `--path "/路径"` — 指定完整路径
+- `--path "/路径"` — 指定完整路径（中间目录自动创建）
+- `--force` — 强制创建同名文档
 
-**常见错误参数提示**：
-- ❌ `--parent-path` → ✅ 使用 `--path` 或 `--parent-id`
-- ❌ `--notebook` → ✅ 使用 `--parent-id`（笔记本ID也可作为父ID）
-- ❌ `--folder` / `--dir` → ✅ 使用 `--parent-id` 或 `--path`
+**注意事项**：
+- 标题中的 `/` 自动转为 `／`
+- 默认检测重名，已存在时用 `--force`
+- ❌ 不要用 `--parent-path`、`--notebook`、`--folder`
 
-**标题包含斜杠**：
-- 标题中的 `/` 会自动转换为全角 `／`，避免被误认为路径分隔符
-- 示例：`siyuan create "文档/子标题" "内容"` → 实际标题为 `文档／子标题`
-
-### 路径自动创建
-
-使用 `--path` 时，中间目录不存在会自动创建（空内容）：
-
-```bash
-# 如果 A、B、C 不存在，会自动创建空文档
-siyuan create --path "笔记本/A/B/C/最终文档" "内容"
-```
+> 📋 详细用法见 [create 命令文档](doc/commands/create.md)
 
 ## 内容修改
 
@@ -375,6 +353,17 @@ siyuan create "标题" "第一段## 二级标题 内容"
 
 ## 内容规范
 
+**常见错误预防表**：
+
+| 错误场景 | 错误做法 | 正确做法 |
+|----------|----------|----------|
+| 标题包含 `/` | 手动转义 | 自动转为 `／`，无需处理 |
+| 文档已存在 | 直接 create | 先 `exists` 检查，再用 `--force` |
+| 删除被阻止 | 反复尝试 | 告知用户修改配置或使用 `protect` |
+| ID 类型混淆 | `update` 用块ID | `update` 只用文档ID，`bu` 只用块ID |
+| 修改部分内容 | 删了重建 | 用 `bu` 或 `bd` 进行块级操作 |
+| 格式问题 | 用 `bu` 覆盖 | 先 `bg` 查看结构，再用 `bd` 删除多余块 |
+
 **文档属性**（通过文档设置，不是正文内容）：
 - 标题 (`title`) — 在文档属性中设置，**正文中不重复**
 - 标签 (`tags`) — 用 `st` 命令设置，**不用 Front Matter**
@@ -411,68 +400,23 @@ siyuan create "标题" "第一段## 二级标题 内容"
 
 ## 向量搜索（可选）
 
-需部署 Qdrant + Ollama，配置环境变量：
-- `QDRANT_URL`
-- `OLLAMA_BASE_URL`
+需配置 `QDRANT_URL` + `OLLAMA_BASE_URL`。
 
-### 索引配置
-
-在 `config.json` 的 `embedding` 配置中可设置：
-
-```json
-{
-  "embedding": {
-    "maxContentLength": 4000,
-    "maxChunkLength": 4000,
-    "minChunkLength": 200,
-    "skipIndexAttrs": ["custom-skip-index", "custom-draft"]
-  }
-}
-```
-
-| 参数 | 说明 |
-|------|------|
-| `maxContentLength` | 超过此长度的文档将被分块索引 |
-| `maxChunkLength` | 每个分块的最大长度 |
-| `minChunkLength` | 每个分块的最小长度（避免碎片化） |
-| `skipIndexAttrs` | 包含指定属性的文档将跳过索引 |
-
-也可通过环境变量配置：`SIYUAN_SKIP_INDEX_ATTRS=custom-skip-index,custom-draft`
-
-### 向量索引
-
-```bash
-siyuan index                            # 增量索引（默认，自动清理孤立索引）
-siyuan index --force                    # 强制重建索引
-siyuan index --remove                   # 只移除索引，不重新索引
-siyuan index <notebook-id>              # 索引指定笔记本
-siyuan index --notebook <notebookId>    # 索引指定笔记本
-```
-
-### 搜索模式
+**搜索模式**：
 
 | 模式 | 说明 | 适用场景 |
 |------|------|----------|
-| `legacy`（默认） | SQL LIKE 精确匹配 | 精确关键词搜索 |
-| `keyword` | 稀疏向量（BM25）+ N-gram | 关键词匹配，支持未登录词 |
-| `semantic` | 稠密向量（语义） | 同义词、概念关联 |
+| `legacy` | SQL LIKE 精确匹配 | 精确关键词 |
+| `keyword` | BM25 + N-gram | 关键词匹配 |
+| `semantic` | 语义向量 | 同义词、概念 |
 | `hybrid` | 稠密 + 稀疏 | 综合搜索 |
 
-### 搜索示例
-
 ```bash
-# 默认 Legacy 模式（精确匹配）
-siyuan search "关键词"
-
-# 关键词搜索（支持 N-gram）
-siyuan search "长颈鹿" --mode keyword
-
-# 语义搜索
-siyuan search "人工智能" --mode semantic
-
-# 混合搜索
-siyuan search "AI" --mode hybrid
+siyuan index                        # 增量索引
+siyuan search "关键词" --mode semantic
 ```
+
+> 📋 详细配置见 [向量搜索文档](doc/advanced/vector-search.md)
 
 ## NLP 分析
 
@@ -480,37 +424,17 @@ siyuan search "AI" --mode hybrid
 siyuan nlp "文本" --tasks tokenize,keywords
 ```
 
+> 📋 详细用法见 [NLP 文档](doc/commands/nlp.md)
+
 ---
 
-# 安全建议
+# 安全要点
 
-- 仅将 `SIYUAN_BASE_URL` 设置为本地实例（`http://localhost:6806`）
-- 推荐使用 `whitelist` 权限模式限制可访问的笔记本
-- 生产环境不启用 `DEBUG` 环境变量
-- 敏感信息（token、password、apiKey）在日志中自动脱敏
-- TLS 证书验证默认启用
-- **SQL 注入防护**：搜索功能已实现完整的参数转义和验证
+- 仅使用本地实例 (`http://localhost:6806`)
+- 推荐使用 `whitelist` 权限模式
+- 删除功能默认禁用，需用户手动配置
 
-## 搜索安全特性
-
-| 特性 | 说明 |
-|------|------|
-| 查询转义 | 所有搜索查询都经过 `escapeSql` 转义 |
-| ID 验证 | 笔记本/文档 ID 必须符合 14-32 位字母数字格式 |
-| 类型白名单 | 类型参数只接受预定义值 |
-| 权重归一化 | 权重参数自动归一化到 0-1 范围 |
-| 并发控制 | 批量请求最多 5 个并发，每批 10 个结果 |
-
-## 程序化 API
-
-本 skill 导出 `createSkill` 和 `executeSingleCommand` 函数供高级用户使用：
-
-```javascript
-const { createSkill } = require('./index.js');
-const skill = createSkill({ baseURL: 'http://localhost:6806', token: 'xxx' });
-```
-
-> ⚠️ 程序化 API 仅供高级用户在受控环境中使用。普通 AI Agent 应仅使用 CLI 命令。
+> 📋 详细安全配置见 [配置文档](doc/config/advanced.md)
 
 ---
 
@@ -523,26 +447,17 @@ const skill = createSkill({ baseURL: 'http://localhost:6806', token: 'xxx' });
 
 ---
 
-# 更新 siyuan-skill
-
-当用户请求更新 skill 时，执行以下步骤：
+# 更新
 
 ```bash
 # 进入 skill 目录（根据实际安装工具选择）
-cd ~/.openclaw/skills/siyuan-skill   # OpenClaw
-cd ~/.trae/skills/siyuan-skill       # Trae
-cd ~/.cursor/skills/siyuan-skill     # Cursor
-# Claude Desktop (macOS): ~/Library/Application Support/Claude/claude-desktop/skills/siyuan-skill
-# Claude Desktop (Windows): %APPDATA%\Claude\claude-desktop\skills\siyuan-skill
+# OpenClaw: cd ~/.openclaw/skills/siyuan-skill
+# Trae:     cd ~/.trae/skills/siyuan-skill
+# Cursor:   cd ~/.cursor/skills/siyuan-skill
+# Claude Desktop (macOS): cd ~/Library/Application\ Support/Claude/claude-desktop/skills/siyuan-skill
 
-# 拉取最新代码
 git pull origin main
+node siyuan.js help  # 验证
 ```
 
-**更新后检查**：
-
-1. 检查 `config.example.json` 是否有新增配置项
-2. 如有必要，提出 `config.json` 或环境变量更新建议（不可擅自更新
-3. 运行 `node siyuan.js help` 验证命令可用
-
-> **注意**：更新前如有本地修改，需先备份或提交
+> 📋 详细安装说明见 [INSTALL.md](INSTALL.md)
