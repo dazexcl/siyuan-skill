@@ -57,6 +57,7 @@ optional_env_vars:
 ```bash
 node siyuan.js <command> [options]
 siyuan help <command>  # 查看命令帮助
+siyuan --version       # 显示版本信息
 ```
 
 ---

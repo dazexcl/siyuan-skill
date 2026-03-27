@@ -1,17 +1,17 @@
 # Siyuan Skill
 
-[![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.6.16-blue.svg)](https://github.com/dazexcl/siyuan-skill)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Node](https://img.shields.io/badge/node->=14-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Features](https://img.shields.io/badge/features-NLP-orange.svg)](https://github.com/dazexcl/siyuan-skill)
+[!\[GitHub\](https://img.shields.io/badge/GitHub-Source-green.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Version\](https://img.shields.io/badge/version-1.6.16-blue.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[License\](https://img.shields.io/badge/license-MIT-green.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Node\](https://img.shields.io/badge/node->=14-green.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Features\](https://img.shields.io/badge/features-Vector%20Search-blue.svg null)](https://github.com/dazexcl/siyuan-skill)
+[!\[Features\](https://img.shields.io/badge/features-NLP-orange.svg null)](https://github.com/dazexcl/siyuan-skill)
 
 > **思源笔记命令行工具** - 为 AI Agent 和人类用户提供笔记本管理、文档操作、内容搜索、块控制等功能。
 
 `纯Node环境` `无外部依赖` `开箱即用` `Agent友好` `灵活拔插` `黑白名单` `渐进式披露`
 
----
+***
 
 ## 目录
 
@@ -31,7 +31,7 @@
 - [安全审计](#安全审计)
 - [文档目录](#文档目录)
 
----
+***
 
 ## 核心价值
 
@@ -57,16 +57,16 @@
 - **memory 文件** = 私密记录
 - **MEMORY.md** = 长期记忆
 
----
+***
 
 ## 运行时要求
 
-| 要求 | 版本 | 说明 |
-|------|------|------|
-| **Node.js** | >= 14.0.0 | 必需 |
-| **思源笔记** | >= 3.6.0 | 运行中的本地实例（推荐 `http://localhost:6806`） |
+| 要求          | 版本        | 说明                                   |
+| ----------- | --------- | ------------------------------------ |
+| **Node.js** | >= 14.0.0 | 必需                                   |
+| **思源笔记**    | >= 3.6.0  | 运行中的本地实例（推荐 `http://localhost:6806`） |
 
----
+***
 
 ## 快速开始
 
@@ -152,7 +152,7 @@ node siyuan.js notebooks
 node siyuan.js help
 ```
 
----
+***
 
 ## 使用方式
 
@@ -176,7 +176,7 @@ siyuan <command>
 node <skills-directory>/siyuan-skill/siyuan.js <command>
 ```
 
----
+***
 
 ## 命令详解
 
@@ -263,12 +263,12 @@ siyuan rename <docId> "新标题"
 
 **格式说明：**
 
-| 格式 | 说明 |
-|------|------|
+| 格式         | 说明             |
+| ---------- | -------------- |
 | `kramdown` | 包含块 ID 和属性（默认） |
 | `markdown` | 标准 Markdown 格式 |
-| `text` | 纯文本格式 |
-| `html` | HTML 格式 |
+| `text`     | 纯文本格式          |
+| `html`     | HTML 格式        |
 
 ### 搜索操作
 
@@ -362,10 +362,10 @@ siyuan tags <blockId> --clear
 
 **属性前缀说明：**
 
-| 模式 | 前缀 | 可见性 |
-|------|------|--------|
-| 默认 | `custom-` | 在思源笔记界面可见 |
-| `--hide` | 无前缀 | 内部属性，界面不可见 |
+| 模式       | 前缀        | 可见性        |
+| -------- | --------- | ---------- |
+| 默认       | `custom-` | 在思源笔记界面可见  |
+| `--hide` | 无前缀       | 内部属性，界面不可见 |
 
 **注意：** `--set`、`--get`、`--remove` 三者互斥，每次只能使用其中一个。
 
@@ -440,7 +440,7 @@ siyuan nlp "文本内容" --tasks all
 siyuan nlp "文本内容" --tasks keywords --top-n 5
 ```
 
----
+***
 
 ## 配置说明
 
@@ -494,41 +494,41 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 
 ### 1. 基础连接配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `baseURL` | string | ✅ | `http://localhost:6806` | 思源笔记 API 地址 |
-| `token` | string | ✅ | `""` | API 认证令牌 |
-| `timeout` | number | ❌ | `10000` | 请求超时时间（毫秒） |
+| 配置项       | 类型     | 必填 | 默认值                     | 说明          |
+| --------- | ------ | -- | ----------------------- | ----------- |
+| `baseURL` | string | ✅  | `http://localhost:6806` | 思源笔记 API 地址 |
+| `token`   | string | ✅  | `""`                    | API 认证令牌    |
+| `timeout` | number | ❌  | `10000`                 | 请求超时时间（毫秒）  |
 
 ### 2. 默认值配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `defaultNotebook` | string | ✅ | `null` | 默认笔记本 ID |
+| 配置项               | 类型     | 必填 | 默认值    | 说明       |
+| ----------------- | ------ | -- | ------ | -------- |
+| `defaultNotebook` | string | ✅  | `null` | 默认笔记本 ID |
 
 ### 3. 权限配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `permissionMode` | string | ❌ | `all` | 权限模式 |
-| `notebookList` | array | ❌ | `[]` | 笔记本 ID 列表 |
+| 配置项              | 类型     | 必填 | 默认值   | 说明        |
+| ---------------- | ------ | -- | ----- | --------- |
+| `permissionMode` | string | ❌  | `all` | 权限模式      |
+| `notebookList`   | array  | ❌  | `[]`  | 笔记本 ID 列表 |
 
 **权限模式说明：**
 
-| 模式 | 说明 |
-|------|------|
-| `all` | 无限制访问所有笔记本 |
+| 模式          | 说明                         |
+| ----------- | -------------------------- |
+| `all`       | 无限制访问所有笔记本                 |
 | `whitelist` | 只允许访问 `notebookList` 中的笔记本 |
-| `blacklist` | 禁止访问 `notebookList` 中的笔记本 |
+| `blacklist` | 禁止访问 `notebookList` 中的笔记本  |
 
 ### 4. 删除保护配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `deleteProtection.safeMode` | boolean | ❌ | `true` | 安全模式（默认禁止删除） |
-| `deleteProtection.requireConfirmation` | boolean | ❌ | `false` | 删除确认机制 |
-| `deleteProtection.protectedNotebooks` | array | ❌ | `[]` | 受保护的笔记本 ID |
-| `deleteProtection.protectedPaths` | array | ❌ | `[]` | 受保护的路径 |
+| 配置项                                    | 类型      | 必填 | 默认值     | 说明           |
+| -------------------------------------- | ------- | -- | ------- | ------------ |
+| `deleteProtection.safeMode`            | boolean | ❌  | `true`  | 安全模式（默认禁止删除） |
+| `deleteProtection.requireConfirmation` | boolean | ❌  | `false` | 删除确认机制       |
+| `deleteProtection.protectedNotebooks`  | array   | ❌  | `[]`    | 受保护的笔记本 ID   |
+| `deleteProtection.protectedPaths`      | array   | ❌  | `[]`    | 受保护的路径       |
 
 **保护层级：**
 
@@ -538,43 +538,43 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 
 ### 5. TLS 配置
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `tls.allowSelfSignedCerts` | boolean | ❌ | `false` | 是否允许自签名证书 |
-| `tls.allowedHosts` | array | ❌ | `["localhost"]` | 允许的主机列表 |
+| 配置项                        | 类型      | 必填 | 默认值             | 说明        |
+| -------------------------- | ------- | -- | --------------- | --------- |
+| `tls.allowSelfSignedCerts` | boolean | ❌  | `false`         | 是否允许自签名证书 |
+| `tls.allowedHosts`         | array   | ❌  | `["localhost"]` | 允许的主机列表   |
 
 ### 6. Qdrant 向量数据库配置（可选）
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `qdrant.url` | string | ❌ | `null` | Qdrant 服务地址 |
-| `qdrant.apiKey` | string | ❌ | `""` | Qdrant API 密钥 |
-| `qdrant.collectionName` | string | ❌ | `siyuan_notes` | 集合名称 |
+| 配置项                     | 类型     | 必填 | 默认值            | 说明            |
+| ----------------------- | ------ | -- | -------------- | ------------- |
+| `qdrant.url`            | string | ❌  | `null`         | Qdrant 服务地址   |
+| `qdrant.apiKey`         | string | ❌  | `""`           | Qdrant API 密钥 |
+| `qdrant.collectionName` | string | ❌  | `siyuan_notes` | 集合名称          |
 
 **说明：** 向量搜索功能需要单独部署 Qdrant 服务。如果 Qdrant 不可用，系统会自动回退到 SQL 搜索。
 
 ### 8. Embedding 模型配置（可选）
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `embedding.model` | string | ❌ | `nomic-embed-text` | Embedding 模型名称 |
-| `embedding.dimension` | number | ❌ | `768` | 向量维度 |
-| `embedding.batchSize` | number | ❌ | `5` | 批处理大小 |
-| `embedding.maxContentLength` | number | ❌ | `4000` | 触发分块的内容长度阈值 |
-| `embedding.maxChunkLength` | number | ❌ | `4000` | 单个分块最大长度 |
-| `embedding.minChunkLength` | number | ❌ | `200` | 单个分块最小长度 |
-| `embedding.baseUrl` | string | ❌ | `null` | Embedding 服务地址 |
-| `embedding.skipIndexAttrs` | array | ❌ | `[]` | 跳过索引的属性名列表 |
+| 配置项                          | 类型     | 必填 | 默认值                | 说明             |
+| ---------------------------- | ------ | -- | ------------------ | -------------- |
+| `embedding.model`            | string | ❌  | `nomic-embed-text` | Embedding 模型名称 |
+| `embedding.dimension`        | number | ❌  | `768`              | 向量维度           |
+| `embedding.batchSize`        | number | ❌  | `5`                | 批处理大小          |
+| `embedding.maxContentLength` | number | ❌  | `4000`             | 触发分块的内容长度阈值    |
+| `embedding.maxChunkLength`   | number | ❌  | `4000`             | 单个分块最大长度       |
+| `embedding.minChunkLength`   | number | ❌  | `200`              | 单个分块最小长度       |
+| `embedding.baseUrl`          | string | ❌  | `null`             | Embedding 服务地址 |
+| `embedding.skipIndexAttrs`   | array  | ❌  | `[]`               | 跳过索引的属性名列表     |
 
 **说明：** 当前版本使用 Ollama Embedding 服务，无需下载本地模型文件。`skipIndexAttrs` 用于指定哪些属性的文档应跳过索引，如 `["custom-skip-index", "custom-draft"]`。
 
 ### 9. 混合搜索配置（可选）
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `hybridSearch.denseWeight` | number | ❌ | `0.7` | 语义搜索权重（0-1） |
-| `hybridSearch.sparseWeight` | number | ❌ | `0.3` | 关键词搜索权重（0-1） |
-| `hybridSearch.limit` | number | ❌ | `20` | 搜索结果数量限制 |
+| 配置项                         | 类型     | 必填 | 默认值   | 说明           |
+| --------------------------- | ------ | -- | ----- | ------------ |
+| `hybridSearch.denseWeight`  | number | ❌  | `0.7` | 语义搜索权重（0-1）  |
+| `hybridSearch.sparseWeight` | number | ❌  | `0.3` | 关键词搜索权重（0-1） |
+| `hybridSearch.limit`        | number | ❌  | `20`  | 搜索结果数量限制     |
 
 **说明：** `denseWeight + sparseWeight` 应该等于 1。
 
@@ -582,15 +582,15 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 
 > ⚠️ **实验性功能**：NLP 功能目前处于实验阶段，API 可能会发生变化。
 
-| 配置项 | 类型 | 必填 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `nlp.language` | string | ❌ | `zh` | NLP 语言（zh/en） |
-| `nlp.extractEntities` | boolean | ❌ | `true` | 是否提取实体 |
-| `nlp.extractKeywords` | boolean | ❌ | `true` | 是否提取关键词 |
+| 配置项                   | 类型      | 必填 | 默认值    | 说明            |
+| --------------------- | ------- | -- | ------ | ------------- |
+| `nlp.language`        | string  | ❌  | `zh`   | NLP 语言（zh/en） |
+| `nlp.extractEntities` | boolean | ❌  | `true` | 是否提取实体        |
+| `nlp.extractKeywords` | boolean | ❌  | `true` | 是否提取关键词       |
 
 **说明：** NLP 功能完全本地实现，无外部依赖。
 
----
+***
 
 ## 环境变量
 
@@ -662,7 +662,7 @@ NLP_EXTRACT_ENTITIES="true"
 NLP_EXTRACT_KEYWORDS="true"
 ```
 
----
+***
 
 ## 权限管理
 
@@ -670,11 +670,11 @@ NLP_EXTRACT_KEYWORDS="true"
 
 当前系统支持三种权限模式（基于笔记本级别）：
 
-| 模式 | 说明 | 适用场景 |
-|------|------|----------|
-| `all` | 无限制访问所有笔记本 | 开发/测试环境 |
-| `whitelist` | 只允许访问指定笔记本 | 生产环境 |
-| `blacklist` | 禁止访问指定笔记本 | 受限访问 |
+| 模式          | 说明         | 适用场景    |
+| ----------- | ---------- | ------- |
+| `all`       | 无限制访问所有笔记本 | 开发/测试环境 |
+| `whitelist` | 只允许访问指定笔记本 | 生产环境    |
+| `blacklist` | 禁止访问指定笔记本  | 受限访问    |
 
 ### 配置示例
 
@@ -698,17 +698,17 @@ SIYUAN_NOTEBOOK_LIST=notebook-id-1,notebook-id-2
 
 > 计划中
 
----
+***
 
 ## 重名检测
 
 以下命令在执行前会自动检测目标位置是否存在同名文档：
 
-| 命令 | 检测时机 | 冲突处理 |
-|------|----------|----------|
-| `create` | 创建前 | 返回错误，使用 `--force` 强制创建 |
-| `move` | 移动前 | 返回错误，使用 `--new-title` 指定新标题 |
-| `rename` | 重命名前 | 返回错误，需更换新标题 |
+| 命令       | 检测时机 | 冲突处理                        |
+| -------- | ---- | --------------------------- |
+| `create` | 创建前  | 返回错误，使用 `--force` 强制创建      |
+| `move`   | 移动前  | 返回错误，使用 `--new-title` 指定新标题 |
+| `rename` | 重命名前 | 返回错误，需更换新标题                 |
 
 ### 示例
 
@@ -738,7 +738,7 @@ siyuan exists --title "文档标题" [--parent-id <父文档ID>]
 siyuan exists --path "/目录/文档标题"
 ```
 
----
+***
 
 ## 删除保护
 
@@ -768,7 +768,7 @@ siyuan protect <docId> --enable
 siyuan protect <docId> --disable
 ```
 
----
+***
 
 ## 高级功能
 
@@ -801,12 +801,12 @@ siyuan search "人工智能应用" --mode hybrid
 
 ### 搜索模式对比
 
-| 模式 | 命令 | 适用场景 | 依赖 |
-|------|------|----------|------|
-| 关键词 | `--mode keyword` | 精确匹配 | 无 |
-| SQL | `--sql "SELECT..."` | 复杂查询 | 无 |
-| 语义 | `--mode semantic` | 概念查找 | Qdrant + Ollama |
-| 混合 | `--mode hybrid` | 综合搜索 | Qdrant + Ollama |
+| 模式  | 命令                  | 适用场景 | 依赖              |
+| --- | ------------------- | ---- | --------------- |
+| 关键词 | `--mode keyword`    | 精确匹配 | 无               |
+| SQL | `--sql "SELECT..."` | 复杂查询 | 无               |
+| 语义  | `--mode semantic`   | 概念查找 | Qdrant + Ollama |
+| 混合  | `--mode hybrid`     | 综合搜索 | Qdrant + Ollama |
 
 ### NLP 分析
 
@@ -824,7 +824,7 @@ siyuan nlp "文本内容" --tasks all
 siyuan nlp "文本内容" --tasks keywords --top-n 5
 ```
 
----
+***
 
 ## 书写规范
 
@@ -867,7 +867,7 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 20260304051123-doaxgi4
 ```
 
----
+***
 
 ## 最佳实践
 
@@ -922,20 +922,20 @@ siyuan create "标题" "第一段## 二级标题 内容"
 
 > 更多最佳实践请参阅 [doc/advanced/best-practices.md](doc/advanced/best-practices.md)
 
----
+***
 
 ## 故障排除
 
 ### 常见错误
 
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| `ECONNREFUSED` | 服务未启动 | 检查思源笔记是否运行 |
-| `401 Unauthorized` | Token 无效 | 检查 `SIYUAN_TOKEN` |
-| `404 Not Found` | 文档不存在 | 检查 ID 或路径 |
-| `403 Forbidden` | 权限不足 | 检查权限模式配置 |
-| `删除被阻止` | 安全模式 | 配置 `deleteProtection` |
-| `Qdrant API 错误: 409 Conflict` | 集合已存在 | 系统会继续使用现有集合 |
+| 错误                            | 原因       | 解决方案                  |
+| ----------------------------- | -------- | --------------------- |
+| `ECONNREFUSED`                | 服务未启动    | 检查思源笔记是否运行            |
+| `401 Unauthorized`            | Token 无效 | 检查 `SIYUAN_TOKEN`     |
+| `404 Not Found`               | 文档不存在    | 检查 ID 或路径             |
+| `403 Forbidden`               | 权限不足     | 检查权限模式配置              |
+| `删除被阻止`                       | 安全模式     | 配置 `deleteProtection` |
+| `Qdrant API 错误: 409 Conflict` | 集合已存在    | 系统会继续使用现有集合           |
 
 ### 调试模式
 
@@ -951,7 +951,7 @@ DEBUG=* node siyuan.js <command>
 node siyuan.js notebooks
 ```
 
----
+***
 
 ## 安全审计
 
@@ -963,7 +963,7 @@ node siyuan.js notebooks
 
 > 🔒 **安全建议**：仅连接本地实例 `http://localhost:6806`
 
----
+***
 
 ## 文档目录
 
@@ -983,7 +983,7 @@ doc/
     └── vector-search.md   # 向量搜索
 ```
 
----
+***
 
 ## 许可证
 

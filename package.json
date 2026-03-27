@@ -1,7 +1,7 @@
 {
   "name": "siyuan-skill",
   "version": "1.6.16",
-  "description": "Siyuan Notes connector skill for AI Agents",
+  "description": "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能",
   "main": "siyuan.js",
   "bin": {
     "siyuan": "./siyuan.js"
@@ -39,39 +39,6 @@
   },
   "peerDependencies": {
     "siyuan-notes": ">=3.6.0"
-  },
-  "config": {
-    "requiredEnvVars": [
-      "SIYUAN_BASE_URL",
-      "SIYUAN_TOKEN",
-      "SIYUAN_DEFAULT_NOTEBOOK"
-    ],
-    "optionalEnvVars": [
-      "SIYUAN_PERMISSION_MODE",
-      "SIYUAN_NOTEBOOK_LIST",
-      "SIYUAN_TIMEOUT",
-      "QDRANT_URL",
-      "QDRANT_API_KEY",
-      "QDRANT_COLLECTION_NAME",
-      "OLLAMA_BASE_URL",
-      "OLLAMA_EMBED_MODEL",
-      "EMBEDDING_DIMENSION",
-      "EMBEDDING_BATCH_SIZE",
-      "SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH",
-      "SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH",
-      "SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH",
-      "SIYUAN_SKIP_INDEX_ATTRS",
-      "HYBRID_DENSE_WEIGHT",
-      "HYBRID_SPARSE_WEIGHT",
-      "HYBRID_SEARCH_LIMIT",
-      "NLP_LANGUAGE",
-      "NLP_EXTRACT_ENTITIES",
-      "NLP_EXTRACT_KEYWORDS",
-      "SIYUAN_DELETE_SAFE_MODE",
-      "SIYUAN_DELETE_REQUIRE_CONFIRMATION",
-      "SIYUAN_TLS_ALLOW_SELF_SIGNED",
-      "SIYUAN_TLS_ALLOWED_HOSTS"
-    ]
   },
   "skill": {
     "skillType": "cli",

@@ -13,6 +13,14 @@ if (process.platform === 'win32') {
 }
 
 const { createSkill } = require('./index');
+const { version } = require('./package.json');
+
+/**
+ * 显示版本信息
+ */
+function showVersion() {
+  console.log(`siyuan-skill v${version}`);
+}
 
 /**
  * 通用命令行参数解析器
@@ -149,6 +157,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
 用法:
   siyuan <command> [options]
   siyuan help <command>    # 查看特定命令的详细帮助
+  siyuan --version         # 显示版本信息
 
 命令:
   notebooks, nb                    获取所有笔记本列表
@@ -716,6 +725,11 @@ ${'='.repeat(60)}
  */
 async function main(customArgs = null) {
   const args = customArgs || process.argv.slice(2);
+
+  if (args.includes('--version') || args.includes('-v')) {
+    showVersion();
+    process.exit(0);
+  }
 
   if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
     const helpCommand = args[1];
