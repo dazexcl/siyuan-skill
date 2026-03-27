@@ -18,6 +18,7 @@ siyuan nlp <text> [options]
 |-----|------|------|------|
 | `<text>` | string | ✅ | 需要分析的文本内容 |
 | `--tasks <tasks>` | string | ❌ | 分析任务（逗号分隔）：tokenize,entities,keywords,summary |
+| `--top-n` | number | ❌ | 返回前 N 个关键词（默认：10） |
 
 ## 使用示例
 

@@ -5,22 +5,26 @@
 ## 用法
 
 ```bash
-# 通过标题检查
+# 通过标题检查（位置参数）
+siyuan exists "文档标题" [--parent-id <父文档ID>] [--notebook-id <笔记本ID>]
+
+# 通过标题检查（命名参数）
 siyuan exists --title "文档标题" [--parent-id <父文档ID>] [--notebook-id <笔记本ID>]
 
 # 通过路径检查
 siyuan exists --path "/目录/文档标题" [--notebook-id <笔记本ID>]
 
 # 别名
-siyuan check --title "文档标题"
+siyuan check "文档标题"
 ```
 
 ## 参数
 
 | 参数 | 别名 | 必填 | 说明 |
 |------|------|------|------|
-| `--title` | `-t` | 二选一 | 文档标题 |
-| `--path` | - | 二选一 | 文档完整路径（如 `/目录/子文档`） |
+| `<title>` | - | 三选一 | 文档标题（位置参数） |
+| `--title` | `-t` | 三选一 | 文档标题（命名参数） |
+| `--path` | - | 三选一 | 文档完整路径（如 `/目录/子文档`） |
 | `--parent-id` | `-p` | 否 | 父文档ID，不指定则检查笔记本根目录 |
 | `--notebook-id` | `-n` | 否 | 笔记本ID，不指定则使用默认笔记本 |
 

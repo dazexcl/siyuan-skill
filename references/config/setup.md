@@ -1,17 +1,15 @@
-# Siyuan Skill 安装说明
+# 安装配置指南
 
-> 适用于通用 AI 工具（OpenClaw、Trae、Claude Desktop、Cursor 等）的 Skill 安装指南
-
-***
+本文档包含安装步骤、前置要求和不同 AI 工具的配置位置。
 
 ## 前置条件
 
-| 要求          | 版本        | 说明       |
-| ----------- | --------- | -------- |
-| **Node.js** | >= 14.0.0 | 必需       |
-| **思源笔记**    | >= 3.6.0   | 运行中的本地实例 |
+| 要求 | 版本 | 说明 |
+| --- | --- | --- |
+| **Node.js** | >= 14.0.0 | 必需 |
+| **思源笔记** | >= 3.6.0 | 运行中的本地实例 |
 
-***
+---
 
 ## 安装步骤
 
@@ -21,24 +19,13 @@
 
 ```bash
 # 进入对应 AI 工具的 skills 目录
-
-# OpenClaw
-cd ~/.openclaw/skills
-
-# Trae
-cd ~/.trae/skills
-
-# Claude Desktop (macOS)
-cd ~/Library/Application\ Support/Claude/claude-desktop/skills
-
-# Claude Desktop (Windows)
-cd %APPDATA%\Claude\claude-desktop\skills
-
-# Cursor
-cd ~/.cursor/skills
+cd <skills-directory>
 
 # 克隆仓库
 git clone https://github.com/dazexcl/siyuan-skill.git
+
+# 进入技能目录
+cd siyuan-skill
 ```
 
 **方式 B：手动复制**
@@ -86,15 +73,6 @@ SIYUAN_DEFAULT_NOTEBOOK=你的笔记本ID
 SIYUAN_PERMISSION_MODE=all
 ```
 
-**不同 AI 工具的配置方式：**
-
-| AI 工具          | 配置位置                                           |
-| -------------- | ---------------------------------------------- |
-| OpenClaw       | `.openclaw/skills/` 目录或 `~/.openclaw/env` 环境变量 |
-| Trae           | `.trae/rules/project_rules.md` 或系统环境变量         |
-| Claude Desktop | `claude_desktop_config.json`                   |
-| Cursor         | `.cursor/rules` 或系统环境变量                        |
-
 ### 步骤 4：验证安装
 
 ```bash
@@ -113,7 +91,18 @@ node siyuan.js notebooks
 }
 ```
 
-***
+---
+
+## 不同 AI 工具的配置位置
+
+| AI 工具 | 配置位置 |
+| --- | --- |
+| OpenClaw | `.openclaw/skills/` 目录或 `~/.openclaw/env` 环境变量 |
+| Trae | `.trae/rules/project_rules.md` 或系统环境变量 |
+| Claude Desktop | `claude_desktop_config.json` |
+| Cursor | `.cursor/rules` 或系统环境变量 |
+
+---
 
 ## 配置文件方式（可选）
 
@@ -136,7 +125,7 @@ cp config.example.json config.json
 
 > **注意：** 环境变量优先级高于配置文件。
 
-***
+---
 
 ## 高级功能配置（可选）
 
@@ -160,35 +149,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_EMBED_MODEL=nomic-embed-text
 ```
 
-***
-
-## 目录结构
-
-```
-siyuan-skill/
-├── siyuan.js          # CLI 入口文件
-├── index.js           # Skill 主入口
-├── config.js          # 配置管理
-├── connector.js       # API 连接器
-├── config.example.json # 配置示例
-├── commands/          # 命令实现
-├── lib/               # 核心库
-├── utils/             # 工具函数
-└── doc/               # 文档
-```
-
-***
-
-## 常见问题
-
-| 问题                 | 解决方案                     |
-| ------------------ | ------------------------ |
-| `ECONNREFUSED`     | 确保思源笔记正在运行               |
-| `401 Unauthorized` | 检查 `SIYUAN_TOKEN` 是否正确   |
-| `404 Not Found`    | 检查笔记本 ID 是否正确            |
-| 命令找不到              | 确保在 `siyuan-skill` 目录下运行 |
-
-***
+---
 
 ## 快速测试命令
 
@@ -206,28 +167,3 @@ node siyuan.js structure --path "/笔记本名"
 # 搜索内容
 node siyuan.js search "关键词"
 ```
-
-***
-
-## 安全建议
-
-- 仅将 `SIYUAN_BASE_URL` 设置为本地实例（`http://localhost:6806`）
-- 不要在公网环境暴露 API Token
-- 生产环境推荐使用 `whitelist` 权限模式
-
-***
-
-## 相关文档
-
-- [完整 README](README.md)
-- [SKILL 配置](SKILL.md)
-- [命令文档](doc/commands/)
-- [配置说明](doc/config/)
-
-***
-
-## 获取帮助
-
-- [GitHub Issues](https://github.com/dazexcl/siyuan-skill/issues)
-- [思源笔记 API 文档](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
-

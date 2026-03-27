@@ -14,7 +14,8 @@ siyuan content <docId> [options]
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `<docId>` | string | ✅ | 文档 ID |
+| `<docId>` | string | 二选一 | 文档 ID |
+| `--path <path>` | string | 二选一 | 文档路径（如 `/目录/文档标题`） |
 | `--format <format>` | string | ❌ | 输出格式：kramdown、markdown、text、html（默认：kramdown） |
 | `--raw` | boolean | ❌ | 以纯文本格式返回（移除JSON外部结构） |
 
@@ -23,8 +24,11 @@ siyuan content <docId> [options]
 ### 基本用法
 
 ```bash
-# 获取文档内容（kramdown格式）
+# 通过文档ID获取内容（kramdown格式）
 siyuan content <docId>
+
+# 通过文档路径获取内容
+siyuan content --path "/目录/文档标题"
 
 # 使用别名
 siyuan cat <docId>

@@ -311,8 +311,9 @@ SIYUAN_NOTEBOOK_LIST=notebook-id-1,notebook-id-2
 ### 设置文档保护
 
 ```bash
-siyuan protect <docId> --enable
-siyuan protect <docId> --disable
+siyuan protect <docId>              # 设置保护
+siyuan protect <docId> --permanent  # 设置永久保护
+siyuan protect <docId> --remove     # 移除保护
 ```
 
 ## 向量搜索最佳实践
@@ -390,5 +391,4 @@ fi
 - [命令详细文档](../commands/)
 - [环境变量配置](../config/environment.md)
 - [高级配置](../config/advanced.md)
-- [权限管理](permission.md)
 - [向量搜索](vector-search.md)
