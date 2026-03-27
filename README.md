@@ -1,11 +1,11 @@
 # Siyuan Skill
 
-[!\[GitHub\](https://img.shields.io/badge/GitHub-Source-green.svg null)](https://github.com/dazexcl/siyuan-skill)
-[!\[Version\](https://img.shields.io/badge/version-1.6.16-blue.svg null)](https://github.com/dazexcl/siyuan-skill)
-[!\[License\](https://img.shields.io/badge/license-MIT-green.svg null)](https://github.com/dazexcl/siyuan-skill)
-[!\[Node\](https://img.shields.io/badge/node->=14-green.svg null)](https://github.com/dazexcl/siyuan-skill)
-[!\[Features\](https://img.shields.io/badge/features-Vector%20Search-blue.svg null)](https://github.com/dazexcl/siyuan-skill)
-[!\[Features\](https://img.shields.io/badge/features-NLP-orange.svg null)](https://github.com/dazexcl/siyuan-skill)
+[![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.6.17-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Node](https://img.shields.io/badge/node->=14-green.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Features](https://img.shields.io/badge/features-NLP-orange.svg)](https://github.com/dazexcl/siyuan-skill)
 
 > **思源笔记命令行工具** - 为 AI Agent 和人类用户提供笔记本管理、文档操作、内容搜索、块控制等功能。
 
