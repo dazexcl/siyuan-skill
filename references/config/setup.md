@@ -15,6 +15,8 @@
 
 ### 步骤 1：获取 Skill 文件
 
+**下载地址：** [ClawHub - Siyuan Skill](https://clawhub.ai/dazexcl/siyuan-skill)
+
 **方式 A：Git 克隆（推荐）**
 
 ```bash
@@ -28,9 +30,10 @@ git clone https://github.com/dazexcl/siyuan-skill.git
 cd siyuan-skill
 ```
 
-**方式 B：手动复制**
+**方式 B：手动安装**
 
-将 `siyuan-skill` 目录复制到你的 AI 工具的 skills 目录中。
+1. 从 [ClawHub](https://clawhub.ai/dazexcl/siyuan-skill) 下载 skill 文件包
+2. 将 `siyuan-skill` 目录解压到你的 AI 工具的 skills 目录中
 
 ### 步骤 2：获取思源笔记凭证
 
@@ -166,4 +169,14 @@ node siyuan.js structure --path "/笔记本名"
 
 # 搜索内容
 node siyuan.js search "关键词"
+```
+
+
+
+# 更新
+
+```bash
+cd <skills-directory>/siyuan-skill
+git pull origin main
+node siyuan.js help  # 验证
 ```

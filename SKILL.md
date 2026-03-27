@@ -1,16 +1,34 @@
 ---
 name: "siyuan-skill"
 description: "思源笔记CLI工具，支持笔记本管理、文档操作、内容搜索、块控制。当用户操作思源笔记、管理笔记本、创建/更新/删除文档、搜索内容、管理块时调用。"
-installType: "clone"
-installSpec:
-  method: "git-clone"
-  source: "https://github.com/dazexcl/siyuan-skill.git"
-  directory: "siyuan-skill"
+skillType: "cli"
+homepage: "https://github.com/dazexcl/siyuan-skill"
+required_env_vars:
+  - name: "SIYUAN_BASE_URL"
+    description: "思源笔记 API 地址"
+    required: true
+    example: "http://localhost:6806"
+  - name: "SIYUAN_TOKEN"
+    description: "API 认证令牌"
+    required: true
+  - name: "SIYUAN_DEFAULT_NOTEBOOK"
+    description: "默认笔记本 ID"
+    required: true
+optional_env_vars:
+  - name: "SIYUAN_PERMISSION_MODE"
+    description: "权限模式 (all/whitelist/blacklist)"
+    default: "all"
+  - name: "SIYUAN_NOTEBOOK_LIST"
+    description: "白名单/黑名单笔记本列表（逗号分隔）"
+  - name: "QDRANT_URL"
+    description: "Qdrant 向量数据库地址（语义搜索需要）"
+  - name: "OLLAMA_BASE_URL"
+    description: "Ollama 服务地址（语义搜索需要）"
 ---
 
 > **运行要求：** Node.js >= 14.0.0，思源笔记 >= 3.6.0
 > 
-> **安装：** Git 克隆到 AI 工具的 skills 目录，详见 [安装配置指南](references/config/setup.md)
+> **安装：** 从 [ClawHub](https://clawhub.ai/dazexcl/siyuan-skill) 下载，详见 [安装配置指南](references/config/setup.md)
 > 
 > **环境变量：** 参考 [环境变量文档](references/config/environment.md)
 
@@ -18,8 +36,9 @@ installSpec:
 
 # 重要约束
 
-- **必须使用 CLI 命令操作思源笔记**
-- **禁止自动修改配置文件和环境变量**
+- **必须通过 CLI 命令操作思源笔记**（`node siyuan.js <command>`）
+- **禁止绕过 CLI 直接调用思源 API**（不要自行拼接 HTTP 请求）
+- **禁止自动修改配置文件和环境变量，如需修改必须手动配置**
 
 ---
 
@@ -38,6 +57,8 @@ siyuan --version       # 显示版本信息
 
 根据用户需求快速选择正确的命令：
 
+## 笔记本与文档操作
+
 | 用户需求 | 使用命令 | 关键参数 | 示例 |
 |----------|----------|----------|------|
 | 查看笔记本列表 | `notebooks` / `nb` | 无 | `siyuan nb` |
@@ -46,58 +67,31 @@ siyuan --version       # 显示版本信息
 | 获取文档信息 | `info` | 文档ID | `siyuan info <docId>` |
 | 创建新文档 | `create` / `new` | `--parent-id` 或 `--path` | `siyuan create "标题" --parent-id xxx` |
 | 修改整个文档 | `update` / `edit` | 文档ID | `siyuan update <docId> "完整内容"` |
-| 修改单个块 | `block-update` / `bu` | 块ID（非文档ID） | `siyuan bu <blockId> "块内容"` |
 | 删除文档 | `delete` / `rm` | 文档ID | `siyuan rm <docId>` |
-| 删除单个块 | `block-delete` / `bd` | 块ID | `siyuan bd <blockId>` |
-| 搜索内容 | `search` / `find` | `--mode` | `siyuan search "关键词"` |
-| 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
-| 设置文档属性 | `block-attrs` / `ba` | `--set` | `siyuan ba <docId> --set "status=done"` |
-| 设置标签 | `tags` / `st` | `--tags` | `siyuan st <docId> --tags "A,B"` |
 | 移动文档 | `move` / `mv` | `--new-title`（可选） | `siyuan mv <docId> <targetId>` |
 | 重命名文档 | `rename` | 新标题 | `siyuan rename <docId> "新标题"` |
 | 保护/取消保护 | `protect` | `--on` / `--off` | `siyuan protect <docId> --on` |
+| 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
 | 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
+| 设置文档属性 | `block-attrs` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
+| 设置标签 | `tags` / `st` | `--tags` | `siyuan st <docId> --tags "A,B"` |
+| 搜索内容 | `search` / `find` | `--mode` / `--threshold` | `siyuan search "关键词" --mode semantic` |
+
+## 块操作
+
+| 用户需求 | 使用命令 | 关键参数 | 示例 |
+|----------|----------|----------|------|
+| 获取块信息 | `block-get` / `bg` | `--mode` | `siyuan bg <blockId> --mode kramdown` |
+| 修改单个块 | `block-update` / `bu` | 块ID（非文档ID） | `siyuan bu <blockId> "块内容"` |
+| 插入新块 | `block-insert` / `bi` | `--parent-id` / `--next-id` | `siyuan bi "内容" --parent-id xxx` |
+| 删除单个块 | `block-delete` / `bd` | 块ID | `siyuan bd <blockId>` |
+| 移动块 | `block-move` / `bm` | `--parent-id` / `--next-id` | `siyuan bm <blockId> --parent-id xxx` |
+| 折叠/展开块 | `block-fold` / `bf` | `--fold` / `--unfold` | `siyuan bf <blockId> --fold` |
+| 转移块引用 | `block-transfer-ref` / `btr` | 源块ID、目标块ID | `siyuan btr <srcId> <tgtId>` |
+
+> **重要区分**：`update` 只接受文档ID，`block-update` 只接受块ID
 
 ---
-
-# 命令列表
-
-## 常用命令
-
-| 命令 | 别名 | 说明 |
-|------|------|------|
-| `notebooks` | `nb` | 获取笔记本列表 |
-| `structure` | `ls` | 获取文档结构 |
-| `content` | `cat` | 获取文档内容 |
-| `info` | - | 获取文档基础信息（ID、标题、路径、属性、标签） |
-| `create` | `new` | 创建文档（自动重名检测） |
-| `update` | `edit` | 更新文档内容（仅接受文档ID） |
-| `delete` | `rm` | 删除文档（受保护） |
-| `protect` | - | 设置/移除文档保护 |
-| `move` | `mv` | 移动文档（自动重名检测） |
-| `rename` | - | 重命名文档（自动重名检测） |
-| `search` | `find` | 搜索内容 |
-| `convert` | `path` | 转换 ID 和路径 |
-| `block-attrs` | `ba`, `attrs` | 管理块/文档属性（设置/获取/移除） |
-| `tags` | `st` | 设置标签 |
-| `exists` | `check` | 检查文档是否存在 |
-
-## 块操作命令
-
-| 命令 | 别名 | 说明 |
-|------|------|------|
-| `block-insert` | `bi` | 插入块 |
-| `block-update` | `bu` | 更新块内容（仅接受块ID） |
-| `block-delete` | `bd` | 删除块（仅限普通块） |
-| `block-move` | `bm` | 移动块 |
-| `block-get` | `bg` | 获取块信息 |
-| `block-fold` | `bf`, `buu` | 折叠/展开块 |
-| `block-transfer-ref` | `btr` | 转移块引用 |
-
-> **重要区分**：
-> - `update` 命令：仅接受**文档ID**，用于更新整个文档内容
-> - `block-update` 命令：仅接受**块ID**（非文档ID），用于更新单个块内容
-> - 两个命令不能混用，传入错误类型的ID会返回错误提示
 
 ## 块操作决策流程
 
@@ -340,11 +334,3 @@ siyuan nlp "文本" --tasks tokenize,keywords
 - [思源笔记 API](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
 
 ---
-
-# 更新
-
-```bash
-cd <skills-directory>/siyuan-skill
-git pull origin main
-node siyuan.js help  # 验证
-```

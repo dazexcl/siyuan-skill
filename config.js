@@ -214,29 +214,20 @@ class ConfigManager {
           if (innerContent) {
             // 检查是否是有效的JSON数组，不是则尝试修复
             try {
-              // 尝试直接解析
               envConfig.notebookList = JSON.parse(notebookListStr);
             } catch (jsonError) {
-              // 尝试修复：给数组元素添加引号
               const fixedStr = '["' + innerContent.replace(/["']/g, '').split(/\s*,\s*/).join('","') + '"]';
               envConfig.notebookList = JSON.parse(fixedStr);
-              console.log('环境变量 SIYUAN_NOTEBOOK_LIST 解析成功（已修复格式）:', envConfig.notebookList);
             }
           } else {
             envConfig.notebookList = [];
           }
         } else if (notebookListStr.includes(',')) {
-          // 逗号分隔格式：id1,id2,id3
           envConfig.notebookList = notebookListStr.split(',').map(id => id.trim().replace(/['"]/g, '')).filter(id => id);
-          console.log('环境变量 SIYUAN_NOTEBOOK_LIST 解析成功（逗号分隔）:', envConfig.notebookList);
         } else {
-          // 单个笔记本ID
           envConfig.notebookList = [notebookListStr.replace(/['"]/g, '')];
-          console.log('环境变量 SIYUAN_NOTEBOOK_LIST 解析成功（单个ID）:', envConfig.notebookList);
         }
       } catch (error) {
-        console.warn('环境变量 SIYUAN_NOTEBOOK_LIST 解析失败:', error.message);
-        console.warn('原始值:', process.env.SIYUAN_NOTEBOOK_LIST);
         envConfig.notebookList = [];
       }
     }
