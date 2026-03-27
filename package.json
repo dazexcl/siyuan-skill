@@ -37,6 +37,9 @@
   "engines": {
     "node": ">=14.0.0"
   },
+  "peerDependencies": {
+    "siyuan-notes": ">=3.6.0"
+  },
   "config": {
     "requiredEnvVars": [
       "SIYUAN_BASE_URL",

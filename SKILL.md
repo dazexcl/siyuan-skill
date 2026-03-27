@@ -5,6 +5,7 @@ description: "思源笔记命令行工具，提供便捷的命令行操作方式
 skillType: "cli"
 runtime: "node"
 runtimeVersion: ">=14.0.0"
+siyuanVersion: ">=3.6.0"
 installType: "clone"
 installSpec:
   method: "git-clone"
