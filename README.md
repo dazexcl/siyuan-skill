@@ -166,7 +166,8 @@ node siyuan.js <command>
 ### 方式 2：使用 npm link 全局安装（推荐）
 
 ```bash
-npm link -g
+cd skills/siyuan-skill
+npm link
 siyuan <command>
 ```
 

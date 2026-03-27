@@ -55,6 +55,7 @@ optional_env_vars:
 # 快速开始
 
 ```bash
+cd skills/siyuan-skill
 node siyuan.js <command> [options]
 siyuan help <command>  # 查看命令帮助
 siyuan --version       # 显示版本信息
