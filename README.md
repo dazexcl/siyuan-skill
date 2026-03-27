@@ -235,6 +235,10 @@ siyuan content <docId> --format html
 siyuan content <docId> --raw            # 纯文本输出
 siyuan cat <docId>                      # 别名
 
+# 获取文档信息（ID、标题、路径、属性、标签）
+siyuan info <docId>                     # 摘要格式
+siyuan info <docId> --format json       # 完整格式（含原始属性）
+
 # 更新文档（仅接受文档ID）
 siyuan update <docId> "新的文档内容"
 siyuan edit <docId> "新内容"            # 别名

@@ -6,6 +6,7 @@
 const getNotebooks = require('./get-notebooks');
 const getDocStructure = require('./get-doc-structure');
 const getDocContent = require('./get-doc-content');
+const getDocInfo = require('./get-doc-info');
 const searchContent = require('./search-content');
 const createDocument = require('./create-document');
 const updateDocument = require('./update-document');
@@ -31,6 +32,7 @@ const commands = {
   'get-notebooks': getNotebooks,
   'get-doc-structure': getDocStructure,
   'get-doc-content': getDocContent,
+  'get-doc-info': getDocInfo,
   'search-content': searchContent,
   'create-document': createDocument,
   'update-document': updateDocument,

@@ -69,6 +69,7 @@ siyuan help <command>  # 查看命令帮助
 | 查看笔记本列表 | `notebooks` / `nb` | 无 | `siyuan nb` |
 | 查看文档结构 | `structure` / `ls` | `--depth` | `siyuan ls <notebookId>` |
 | 查看文档内容 | `content` / `cat` | 无 | `siyuan cat <docId>` |
+| 获取文档信息 | `info` | 文档ID | `siyuan info <docId>` |
 | 创建新文档 | `create` / `new` | `--parent-id` 或 `--path` | `siyuan create "标题" --parent-id xxx` |
 | 修改整个文档 | `update` / `edit` | 文档ID | `siyuan update <docId> "完整内容"` |
 | 修改单个块 | `block-update` / `bu` | 块ID（非文档ID） | `siyuan bu <blockId> "块内容"` |
@@ -94,6 +95,7 @@ siyuan help <command>  # 查看命令帮助
 | `notebooks` | `nb` | 获取笔记本列表 |
 | `structure` | `ls` | 获取文档结构 |
 | `content` | `cat` | 获取文档内容 |
+| `info` | - | 获取文档基础信息（ID、标题、路径、属性、标签） |
 | `create` | `new` | 创建文档（自动重名检测） |
 | `update` | `edit` | 更新文档内容（仅接受文档ID） |
 | `delete` | `rm` | 删除文档（受保护） |
@@ -279,6 +281,16 @@ siyuan exists --path "/目录/文档标题"
 3. 验证结果
    └─ siyuan ls <notebookId>
 ```
+
+## info 命令
+
+获取文档基础信息（ID、标题、路径、属性、标签）。
+
+```bash
+siyuan info <docId> [--format json]
+```
+
+> 📋 详细用法见 [info 命令文档](doc/commands/info.md)
 
 ## create 命令
 

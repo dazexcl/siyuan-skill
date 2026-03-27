@@ -76,7 +76,11 @@ class SiyuanConnector {
           console.log(`请求失败，${delay}ms 后重试 (${retryCount}/${this.maxRetries}):`, endpoint);
           await new Promise(resolve => setTimeout(resolve, delay));
         } else {
-          console.error(`请求失败: ${endpoint}`, error.message);
+          const businessErrors = ['tree not found', 'block not found', 'invalid ID argument', '未找到 ID 为'];
+          const isBusinessError = businessErrors.some(e => error.message && error.message.includes(e));
+          if (!isBusinessError) {
+            console.error(`请求失败: ${endpoint}`, error.message);
+          }
           throw this.formatError(error, endpoint, data);
         }
       }

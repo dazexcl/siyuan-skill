@@ -20,10 +20,11 @@ const command = {
    * @param {Object} args - 指令参数
    * @param {string} args.notebookId - 笔记本ID或文档ID
    * @param {string} args.path - 文档路径（与 notebookId 二选一）
+   * @param {number} args.depth - 递归深度（默认1，-1表示无限）
    * @returns {Promise<Object>} 文档结构
    */
   async execute(skill, args = {}) {
-    const { notebookId, path } = args;
+    const { notebookId, path, depth = 1 } = args;
     
     if (!notebookId && !path) {
       return {
@@ -44,10 +45,10 @@ const command = {
     let actualNotebookId = notebookId;
     let isDocumentId = false;
     let documentId = null;
+    let startPath = '/';
     
     console.log('获取文档结构...');
     
-    // 如果提供了路径参数，先转换为ID
     if (path) {
       console.log('解析路径:', path);
       const defaultNb = skill.config.defaultNotebook;
@@ -63,19 +64,17 @@ const command = {
       
       const pathData = pathResult.data;
       if (pathData.type === 'notebook') {
-        // 路径指向笔记本
         actualNotebookId = pathData.id;
         console.log(`路径 "${path}" 解析为笔记本ID: ${actualNotebookId}`);
       } else {
-        // 路径指向文档
         actualNotebookId = pathData.notebook || pathData.parentId;
         documentId = pathData.id;
         isDocumentId = true;
+        startPath = pathData.path || '/';
         console.log(`路径 "${path}" 解析为文档ID: ${documentId}, 笔记本ID: ${actualNotebookId}`);
       }
     }
     
-    // 如果没有提供路径参数，才需要检测 notebookId 的类型
     if (!path && notebookId) {
       try {
         const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: notebookId });
@@ -84,9 +83,9 @@ const command = {
           isDocumentId = true;
           documentId = notebookId;
           actualNotebookId = pathInfo.box || pathInfo.notebook;
+          startPath = pathInfo.path || '/';
           console.log(`检测到文档ID ${notebookId}，使用笔记本ID ${actualNotebookId}`);
         } else {
-          // pathInfo 为 null，需要验证是否为有效的笔记本ID
           const notebooks = await skill.getNotebooks();
           const notebookExists = notebooks && notebooks.data && 
             notebooks.data.some(nb => nb.id === notebookId);
@@ -136,13 +135,18 @@ const command = {
     }
     
     try {
-      // 如果是文档ID，返回该文档的子文档结构
-      if (isDocumentId) {
-        return await this.getDocumentStructure(skill, documentId, actualNotebookId);
-      }
+      await skill.connector.request('/api/notebook/openNotebook', { notebook: actualNotebookId });
       
-      // 如果是笔记本ID，返回整个笔记本的文档结构
-      return await this.getNotebookStructure(skill, actualNotebookId);
+      const structure = await this.buildDocStructure(skill, actualNotebookId, startPath, depth);
+      
+      return {
+        success: true,
+        data: structure,
+        timestamp: Date.now(),
+        documentCount: this.countDocuments(structure),
+        folderCount: this.countFolders(structure),
+        type: isDocumentId ? 'doc' : 'notebook'
+      };
     } catch (error) {
       console.error('获取文档结构失败:', error);
       return {
@@ -154,343 +158,177 @@ const command = {
   },
   
   /**
-   * 获取文档的子文档结构
+   * 构建文档结构（使用正确的 listDocsByPath API）
+   * @param {Object} skill - 技能实例
+   * @param {string} notebookId - 笔记本ID
+   * @param {string} startPath - 起始路径（系统路径）
+   * @param {number} depth - 递归深度
+   * @param {string} parentHPath - 父级可读路径
+   * @returns {Promise<Object>} 文档结构
+   */
+  async buildDocStructure(skill, notebookId, startPath = '/', depth = 1, parentHPath = '') {
+    const structure = {
+      notebookId: notebookId,
+      path: startPath,
+      hpath: parentHPath || '/',
+      documents: [],
+      folders: []
+    };
+    
+    if (depth === 0) {
+      return structure;
+    }
+    
+    try {
+      const result = await skill.connector.request('/api/filetree/listDocsByPath', {
+        notebook: notebookId,
+        path: startPath
+      });
+      
+      if (!result || !result.files || !Array.isArray(result.files)) {
+        console.log(`路径 ${startPath} 下没有文档`);
+        return structure;
+      }
+      
+      for (const file of result.files) {
+        const docName = file.name.replace(/\.sy$/, '');
+        const docPath = file.path;
+        const docId = file.id;
+        const hasChildren = file.subFileCount > 0;
+        const docHPath = parentHPath ? `${parentHPath}/${docName}` : `/${docName}`;
+        
+        const docInfo = {
+          id: docId,
+          title: docName,
+          path: docPath,
+          hpath: docHPath,
+          updated: file.mtime ? new Date(file.mtime * 1000).toISOString() : null,
+          created: file.ctime ? new Date(file.ctime * 1000).toISOString() : null,
+          size: file.size || 0
+        };
+        
+        if (hasChildren && depth !== 1) {
+          console.log(`获取子文档: ${docPath}`);
+          const childStructure = await this.buildDocStructure(
+            skill, 
+            notebookId, 
+            docPath, 
+            depth === -1 ? -1 : depth - 1,
+            docHPath
+          );
+          
+          structure.folders.push({
+            ...docInfo,
+            type: 'folder',
+            documents: childStructure.documents,
+            folders: childStructure.folders,
+            subFileCount: file.subFileCount
+          });
+        } else {
+          structure.documents.push({
+            ...docInfo,
+            type: 'doc',
+            hasChildren: hasChildren,
+            subFileCount: file.subFileCount || 0
+          });
+        }
+      }
+      
+      return structure;
+    } catch (error) {
+      console.error(`获取路径 ${startPath} 的文档结构失败:`, error.message);
+      return structure;
+    }
+  },
+  
+  /**
+   * 统计文档数量
+   * @param {Object} structure - 文档结构
+   * @returns {number} 文档数量
+   */
+  countDocuments(structure) {
+    let count = structure.documents ? structure.documents.length : 0;
+    if (structure.folders) {
+      for (const folder of structure.folders) {
+        count += this.countDocuments(folder);
+      }
+    }
+    return count;
+  },
+  
+  /**
+   * 统计文件夹数量
+   * @param {Object} structure - 文档结构
+   * @returns {number} 文件夹数量
+   */
+  countFolders(structure) {
+    let count = structure.folders ? structure.folders.length : 0;
+    if (structure.folders) {
+      for (const folder of structure.folders) {
+        count += this.countFolders(folder);
+      }
+    }
+    return count;
+  },
+  
+  /**
+   * 获取文档的子文档结构（兼容旧接口）
    * @param {Object} skill - 技能实例
    * @param {string} documentId - 文档ID
    * @param {string} notebookId - 笔记本ID
    * @returns {Promise<Object>} 文档结构
    */
   async getDocumentStructure(skill, documentId, notebookId) {
-    console.log(`获取文档 ${documentId} 的子文档结构`);
-    
-    // 获取文档的基本信息
+    let docPath = '/';
     let docTitle = documentId;
-    let docPath = '';
-    try {
-      const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: documentId });
-      if (attrs && attrs.title) {
-        docTitle = attrs.title;
-      }
-    } catch (error) {
-      console.warn('获取文档标题失败:', error.message);
-    }
     
     try {
       const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: documentId });
       if (pathInfo) {
-        docPath = pathInfo;
+        docPath = pathInfo.path || '/';
+        docTitle = pathInfo.title || documentId;
       }
     } catch (error) {
       console.warn('获取文档路径失败:', error.message);
     }
     
-    // 获取文档的子块
-    const childBlocks = await skill.connector.request('/api/block/getChildBlocks', { id: documentId });
-    
-    const structure = {
-      id: documentId,
-      name: docTitle,
-      title: docTitle,
-      path: docPath,
-      notebookId: notebookId,
-      type: 'document',
-      documents: [],
-      folders: []
-    };
-    
-    if (childBlocks && Array.isArray(childBlocks)) {
-      for (const block of childBlocks) {
-        // 获取块属性
-        let blockName = '';
-        try {
-          const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: block.id });
-          if (attrs && attrs.title) {
-            blockName = attrs.title;
-          } else {
-            blockName = `文档 ${block.id.substring(0, 8)}`;
-          }
-        } catch (error) {
-          console.warn('获取块属性失败:', error.message);
-          blockName = `文档 ${block.id.substring(0, 8)}`;
-        }
-        
-        if (block.type === 'd') {
-          // 子文档（作为文件夹）
-          const subDocStructure = await this.getDocumentStructure(skill, block.id, notebookId);
-          structure.folders.push(subDocStructure);
-        } else if (block.type === 'p' || block.type === 'h') {
-          // 段落或标题（作为文档）
-          let docSize = 0;
-          try {
-            const content = await skill.connector.request('/api/export/exportMdContent', { id: block.id });
-            if (content && content.content) {
-              docSize = content.content.length;
-            }
-          } catch (error) {
-            console.warn('获取文档大小失败:', error.message);
-          }
-          
-          structure.documents.push({
-            id: block.id,
-            name: blockName,
-            title: blockName,
-            path: docPath ? `${docPath}/${blockName}` : blockName,
-            updated: block.updated,
-            size: docSize
-          });
-        }
-      }
-    }
+    const structure = await this.buildDocStructure(skill, notebookId, docPath, 2);
     
     return {
       success: true,
-      data: structure,
+      data: {
+        id: documentId,
+        title: docTitle,
+        path: docPath,
+        notebookId: notebookId,
+        type: 'doc',
+        documents: structure.documents,
+        folders: structure.folders
+      },
       timestamp: Date.now(),
       documentCount: structure.documents.length,
       folderCount: structure.folders.length,
-      type: 'document'
+      type: 'doc'
     };
   },
   
   /**
-   * 获取笔记本的文档结构
+   * 获取笔记本的文档结构（兼容旧接口）
    * @param {Object} skill - 技能实例
    * @param {string} notebookId - 笔记本ID
    * @returns {Promise<Object>} 文档结构
    */
   async getNotebookStructure(skill, notebookId) {
-    // 构建文档结构
-    const structure = {
-      notebookId: notebookId,
-      documents: [],
-      folders: []
-    };
+    const structure = await this.buildDocStructure(skill, notebookId, '/', 2);
     
-    try {
-      // 先尝试打开笔记本
-      await skill.connector.request('/api/notebook/openNotebook', { notebook: notebookId });
-      
-      // 使用 /api/file/readDir 接口列出笔记本目录下的文件
-      try {
-        const notebookPath = `/data/${notebookId}`;
-        const files = await skill.connector.request('/api/file/readDir', { path: notebookPath });
-        
-        if (files && Array.isArray(files)) {
-          for (const file of files) {
-            if (file.isDir && file.name !== '.siyuan') {
-              // 处理目录
-              const folderPath = file.name;
-              const folderId = folderPath;
-              
-              // 递归处理子目录
-              const childFiles = await skill.connector.request('/api/file/readDir', { 
-                path: `${notebookPath}/${file.name}` 
-              });
-              const childDocs = [];
-              
-              if (childFiles && Array.isArray(childFiles)) {
-                for (const childFile of childFiles) {
-                  if (!childFile.isDir && childFile.name.endsWith('.sy')) {
-                    // 处理文档文件
-                    const docName = childFile.name.replace('.sy', '');
-                    
-                    // 尝试获取文档 ID
-                    let docId = docName;
-                    try {
-                      const pathInfo = await skill.connector.request('/api/filetree/getIDsByHPath', {
-                        path: `/${file.name}/${docName}`,
-                        notebook: notebookId
-                      });
-                      if (pathInfo && pathInfo.length > 0) {
-                        docId = pathInfo[0];
-                      }
-                    } catch (error) {
-                      console.warn('获取文档 ID 失败:', error.message);
-                    }
-                    
-                    // 尝试获取文档标题
-                    let docTitle = docName;
-                    try {
-                      const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
-                      if (attrs && attrs.title) {
-                        docTitle = attrs.title;
-                      }
-                    } catch (error) {
-                      console.warn('获取文档标题失败:', error.message);
-                    }
-                    
-                    // 尝试获取文档大小
-                    let docSize = 0;
-                    try {
-                      const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
-                      if (content && content.content) {
-                        docSize = content.content.length;
-                      }
-                    } catch (error) {
-                      console.warn('获取文档大小失败:', error.message);
-                    }
-                    
-                    childDocs.push({
-                      id: docId,
-                      name: docName,
-                      title: docTitle,
-                      path: `${folderPath}/${docName}`,
-                      updated: childFile.updated,
-                      size: docSize
-                    });
-                  }
-                }
-              }
-              
-              structure.folders.push({
-                id: folderId,
-                name: file.name,
-                path: folderPath,
-                documents: childDocs,
-                folders: []
-              });
-            } else if (!file.isDir && file.name.endsWith('.sy')) {
-              // 处理根目录下的文档
-              const docName = file.name.replace('.sy', '');
-              
-              // 尝试获取文档 ID
-              let docId = docName;
-              try {
-                const pathInfo = await skill.connector.request('/api/filetree/getIDsByHPath', {
-                  path: `/${docName}`,
-                  notebook: notebookId
-                });
-                if (pathInfo && pathInfo.length > 0) {
-                  docId = pathInfo[0];
-                }
-              } catch (error) {
-                console.warn('获取文档 ID 失败:', error.message);
-              }
-              
-              // 尝试获取文档标题
-              let docTitle = docName;
-              try {
-                const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
-                if (attrs && attrs.title) {
-                  docTitle = attrs.title;
-                }
-              } catch (error) {
-                console.warn('获取文档标题失败:', error.message);
-              }
-              
-              // 尝试获取文档大小
-              let docSize = 0;
-              try {
-                const content = await skill.connector.request('/api/export/exportMdContent', { id: docId });
-                if (content && content.content) {
-                  docSize = content.content.length;
-                }
-              } catch (error) {
-                console.warn('获取文档大小失败:', error.message);
-              }
-              
-              structure.documents.push({
-                id: docId,
-                name: docName,
-                title: docTitle,
-                path: docName,
-                updated: file.updated,
-                size: docSize
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('使用 /api/file/readDir 失败，尝试其他方法:', error.message);
-        
-        // 回退到使用 /api/block/getChildBlocks 接口
-        const rootBlocks = await skill.connector.request('/api/block/getChildBlocks', { id: notebookId });
-        
-        if (rootBlocks && rootBlocks.length > 0) {
-          // 递归构建文档结构
-          async function buildStructure(blocks, parentPath = '') {
-            const docs = [];
-            const folders = [];
-            
-            for (const block of blocks) {
-              // 获取块属性，以获取文档标题
-              let blockName = '';
-              try {
-                const attrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: block.id });
-                if (attrs && attrs.title) {
-                  blockName = attrs.title;
-                } else {
-                  blockName = `文档 ${block.id.substring(0, 8)}`;
-                }
-              } catch (error) {
-                console.warn('获取块属性失败:', error.message);
-                blockName = `文档 ${block.id.substring(0, 8)}`;
-              }
-              
-              if (block.type === 'd') {
-                // 目录
-                const folderPath = parentPath ? `${parentPath}/${blockName}` : blockName;
-                const childBlocks = await skill.connector.request('/api/block/getChildBlocks', { id: block.id });
-                const childStructure = await buildStructure(childBlocks, folderPath);
-                
-                folders.push({
-                  id: block.id,
-                  name: blockName,
-                  path: folderPath,
-                  documents: childStructure.docs,
-                  folders: childStructure.folders
-                });
-              } else if (block.type === 'p') {
-                // 文档
-                const docPath = parentPath ? `${parentPath}/${blockName}` : blockName;
-                
-                // 尝试获取文档大小
-                let docSize = 0;
-                try {
-                  const content = await skill.connector.request('/api/export/exportMdContent', { id: block.id });
-                  if (content && content.content) {
-                    docSize = content.content.length;
-                  }
-                } catch (error) {
-                  console.warn('获取文档大小失败:', error.message);
-                }
-                
-                docs.push({
-                  id: block.id,
-                  name: blockName,
-                  title: blockName,
-                  path: docPath,
-                  updated: block.updated,
-                  size: docSize
-                });
-              }
-            }
-            
-            return { docs, folders };
-          }
-          
-          const rootStructure = await buildStructure(rootBlocks);
-          structure.documents = rootStructure.docs;
-          structure.folders = rootStructure.folders;
-        }
-      }
-      
-      return {
-        success: true,
-        data: structure,
-        timestamp: Date.now(),
-        documentCount: structure.documents.length,
-        folderCount: structure.folders.length,
-        type: 'notebook'
-      };
-    } catch (error) {
-      console.error('获取笔记本结构失败:', error);
-      return {
-        success: false,
-        error: error.message,
-        message: '获取笔记本结构失败'
-      };
-    }
+    return {
+      success: true,
+      data: structure,
+      timestamp: Date.now(),
+      documentCount: this.countDocuments(structure),
+      folderCount: this.countFolders(structure),
+      type: 'notebook'
+    };
   }
 };
 

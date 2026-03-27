@@ -96,6 +96,7 @@ const ALIAS_MAP = {
   'nb': 'notebooks',
   'ls': 'structure',
   'cat': 'content',
+  'info': 'get-doc-info',
   'find': 'search',
   'new': 'create',
   'edit': 'update-document',
@@ -153,6 +154,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
   notebooks, nb                    获取所有笔记本列表
   structure, ls                    获取指定笔记本的文档结构
   content, cat                     获取文档内容
+  info                             获取文档基础信息
   create, new                      创建文档（自动重名检测）
   update, edit                     更新文档内容（仅接受文档ID）
   delete, rm                       删除文档（受保护机制约束）
@@ -205,19 +207,22 @@ function showCommandHelp(command) {
     'structure': {
       aliases: ['ls'],
       description: '获取指定笔记本或文档的文档结构',
-      usage: 'siyuan structure (<notebookId|docId> | --path <path>)',
+      usage: 'siyuan structure (<notebookId|docId> | --path <path>) [--depth <depth>]',
       notes: [
         '第一个位置参数默认为笔记本ID或文档ID',
         '--path 与位置参数二选一，不能同时使用',
-        '路径格式支持首位存在或不存在笔记本名称'
+        '路径格式支持首位存在或不存在笔记本名称',
+        '--depth 控制递归深度（默认1，-1表示无限）'
       ],
       options: [
         { name: '<notebookId|docId>', description: '笔记本ID或文档ID（位置参数，与 --path 二选一）' },
-        { name: '--path', description: '文档路径（与位置参数二选一）' }
+        { name: '--path', description: '文档路径（与位置参数二选一）' },
+        { name: '--depth', description: '递归深度（默认1，-1表示无限）' }
       ],
       examples: [
         'siyuan structure <notebook-id>',
         'siyuan structure <doc-id>',
+        'siyuan ls --depth 2 <notebook-id>',
         'siyuan ls --path "/笔记本名"',
         'siyuan ls --path "/笔记本名/文档路径"',
         'siyuan ls --path "文档路径"  # 不含笔记本名时使用默认笔记本'
@@ -243,6 +248,36 @@ function showCommandHelp(command) {
         'siyuan content <doc-id> --format text',
         'siyuan content --path "/目录/文档"',
         'siyuan content <doc-id> --raw'
+      ]
+    },
+    'get-doc-info': {
+      aliases: ['info'],
+      description: '获取文档基础信息（ID、标题、路径、属性、标签）',
+      usage: 'siyuan info <docId> [--format <format>]',
+      notes: [
+        '仅支持文档ID，不支持笔记本ID',
+        'attributes 已去除 custom- 前缀'
+      ],
+      options: [
+        { name: '<docId>', description: '文档ID（必需，位置参数）' },
+        { name: '--id', description: '文档ID（可选，等同于位置参数）' },
+        { name: '--format', description: '输出格式：summary（默认）、json' }
+      ],
+      returns: [
+        'id - 文档ID',
+        'title - 文档标题',
+        'type - 块类型（doc为文档块）',
+        'notebook - 所属笔记本（id和name）',
+        'path - 人类可读路径',
+        'attributes - 自定义属性（已去除custom-前缀）',
+        'tags - 标签数组',
+        'created/updated - 时间戳',
+        '[json格式] path为对象，含rawAttributes原始属性'
+      ],
+      examples: [
+        'siyuan info <doc-id>',
+        'siyuan info <doc-id> --format json',
+        'siyuan get-doc-info <doc-id>'
       ]
     },
     'search': {
@@ -663,6 +698,9 @@ ${help.notes ? '\n注意事项:\n' : ''}${help.notes ? help.notes.map(note =>
 ${help.options ? '\n选项:\n' : ''}${help.options ? help.options.map(opt => 
     `  ${opt.name.padEnd(20)} ${opt.description}`
   ).join('\n') : ''}
+${help.returns ? '\n返回字段:\n' : ''}${help.returns ? help.returns.map(ret => 
+    `  ${ret}`
+  ).join('\n') : ''}
 
 示例:
 ${help.examples.map(ex => `  ${ex}`).join('\n')}
@@ -735,7 +773,8 @@ async function main(customArgs = null) {
         console.log('获取文档结构...');
         const structureParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--path': { hasValue: true }
+            '--path': { hasValue: true },
+            '--depth': { hasValue: true }
           },
           positionalCount: 1
         });
@@ -744,6 +783,7 @@ async function main(customArgs = null) {
           structureArgs.notebookId = structureParsed.positional[0];
         }
         if (structureParsed.options.path) structureArgs.path = structureParsed.options.path;
+        if (structureParsed.options.depth) structureArgs.depth = parseInt(structureParsed.options.depth, 10);
         if (!structureArgs.notebookId && !structureArgs.path) {
           console.error('错误: 请提供笔记本ID/文档ID 或 --path 参数');
           console.log('用法: siyuan structure [<notebookId|docId>] [--path <path>]');
@@ -794,6 +834,35 @@ async function main(customArgs = null) {
         } else {
           console.log(JSON.stringify(content, null, 2));
         }
+        break;
+        
+      case 'get-doc-info':
+      case 'info':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('get-doc-info');
+          process.exit(0);
+        }
+        console.log('获取文档信息...');
+        const infoParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--id': { hasValue: true },
+            '--format': { hasValue: true }
+          },
+          positionalCount: 1
+        });
+        const infoArgs = {};
+        if (infoParsed.positional.length > 0) {
+          infoArgs.id = infoParsed.positional[0];
+        }
+        if (infoParsed.options.id) infoArgs.id = infoParsed.options.id;
+        if (infoParsed.options.format) infoArgs.format = infoParsed.options.format;
+        if (!infoArgs.id) {
+          console.error('错误: 请提供文档ID');
+          console.log('用法: siyuan info <docId> [--format <format>]');
+          process.exit(1);
+        }
+        const infoResult = await skill.executeCommand('get-doc-info', infoArgs);
+        console.log(JSON.stringify(infoResult, null, 2));
         break;
         
       case 'check-exists':

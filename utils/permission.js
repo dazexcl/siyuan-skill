@@ -113,8 +113,6 @@ class Permission {
         error: errorMessage
       };
     } catch (error) {
-      console.warn('获取文档路径信息失败:', error.message);
-      
       if (error.message && error.message.includes('tree not found')) {
         const hasPermission = skill.checkPermission(docId);
         const { permissionMode, notebookList } = skill.config;
@@ -212,7 +210,6 @@ class Permission {
         error: errorMessage
       };
     } catch (fallbackError) {
-      console.warn('后备方案获取块信息失败:', fallbackError.message);
       return {
         hasPermission: false,
         notebookId: null,
