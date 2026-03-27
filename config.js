@@ -438,39 +438,6 @@ class ConfigManager {
   }
   
   /**
-   * 保存配置到文件
-   * @returns {boolean} 保存是否成功
-   */
-  saveConfig() {
-    try {
-      const configDir = path.dirname(this.configPath);
-      
-      // 确保目录存在
-      if (!fs.existsSync(configDir)) {
-        fs.mkdirSync(configDir, { recursive: true });
-      }
-      
-      // 保存配置
-      fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2), 'utf8');
-      console.log('配置已保存到:', this.configPath);
-      return true;
-    } catch (error) {
-      console.error('保存配置失败:', error);
-      return false;
-    }
-  }
-  
-  /**
-   * 更新配置
-   * @param {Object} newConfig - 新配置
-   * @returns {boolean} 更新是否成功
-   */
-  updateConfig(newConfig) {
-    this.config = this.validateConfig({ ...this.config, ...newConfig });
-    return this.saveConfig();
-  }
-  
-  /**
    * 获取配置
    * @returns {Object} 当前配置
    */
@@ -485,26 +452,6 @@ class ConfigManager {
    */
   get(key) {
     return this.config[key];
-  }
-  
-  /**
-   * 设置配置值
-   * @param {string} key - 配置键
-   * @param {any} value - 配置值
-   * @returns {boolean} 设置是否成功
-   */
-  set(key, value) {
-    this.config[key] = value;
-    return this.saveConfig();
-  }
-  
-  /**
-   * 重置为默认配置
-   * @returns {boolean} 重置是否成功
-   */
-  resetToDefault() {
-    this.config = { ...this.defaultConfig };
-    return this.saveConfig();
   }
   
   /**

@@ -225,29 +225,6 @@ class SiyuanNotesSkill {
   }
 
   /**
-   * 更新配置
-   * @param {Object} newConfig - 新配置
-   */
-  setConfig(newConfig) {
-    this.configManager.updateConfig(newConfig);
-    this.config = this.configManager.getConfig();
-
-    if (newConfig.baseURL) {
-      this.connector.setBaseURL(newConfig.baseURL);
-    }
-
-    if (newConfig.token) {
-      this.connector.setToken(newConfig.token);
-    }
-
-    if (newConfig.timeout) {
-      this.connector.setTimeout(newConfig.timeout);
-    }
-
-    this.initialized = false;
-  }
-
-  /**
    * 检查权限
    * @param {string} notebookId - 笔记本 ID
    * @returns {boolean} 是否有权限

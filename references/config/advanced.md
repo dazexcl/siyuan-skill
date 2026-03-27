@@ -172,6 +172,29 @@ node siyuan.js notebooks
 }
 ```
 
+## 安全声明
+
+### 配置只读保护
+
+本技能采用**配置只读**设计原则。ConfigManager 不提供任何配置写入方法。
+
+**安全设计**：
+- 所有敏感配置（token、API密钥等）仅通过环境变量或 config.json 读取
+- 技能本身不提供任何配置写入能力
+- 配置变更需要用户手动修改环境变量或配置文件
+
+### 环境变量优先级
+
+| 环境变量 | 对应配置项 | 说明 |
+|----------|-----------|------|
+| `SIYUAN_BASE_URL` | `baseURL` | API 地址 |
+| `SIYUAN_TOKEN` | `token` | API 令牌 |
+| `SIYUAN_DEFAULT_NOTEBOOK` | `defaultNotebook` | 默认笔记本 |
+| `SIYUAN_PERMISSION_MODE` | `permissionMode` | 权限模式 |
+| `SIYUAN_NOTEBOOK_LIST` | `notebookList` | 笔记本列表 |
+
+环境变量优先级高于配置文件，推荐使用环境变量管理敏感配置。
+
 ## 配置最佳实践
 
 1. **敏感信息**：Token 等敏感信息建议使用环境变量

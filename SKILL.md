@@ -1,6 +1,11 @@
 ---
 name: "siyuan-skill"
 description: "思源笔记CLI工具，支持笔记本管理、文档操作、内容搜索、块控制。当用户操作思源笔记、管理笔记本、创建/更新/删除文档、搜索内容、管理块时调用。"
+installType: "clone"
+installSpec:
+  method: "git-clone"
+  source: "https://github.com/dazexcl/siyuan-skill.git"
+  directory: "siyuan-skill"
 ---
 
 > **运行要求：** Node.js >= 14.0.0，思源笔记 >= 3.6.0
@@ -295,8 +300,33 @@ siyuan nlp "文本" --tasks tokenize,keywords
 - 仅使用本地实例 (`http://localhost:6806`)
 - 推荐使用 `whitelist` 权限模式
 - 删除功能默认禁用，需用户手动配置
+- **配置只读保护**：CLI 命令集不暴露任何配置修改 API，敏感配置（token 等）仅通过环境变量注入，不会持久化到配置文件
+- **Token 安全**：SIYUAN_TOKEN 仅从环境变量或 config.json 读取，技能本身绝不会修改或写入 token
+- **可选功能**：QDRANT_URL、OLLAMA_BASE_URL 为可选配置，如不需要向量搜索/NLP 功能，无需配置这些变量
 
 > 📋 详细安全配置见 [配置文档](references/config/advanced.md)
+
+## 安全声明
+
+### 配置只读保护
+
+**重要**：本技能采用**配置只读**设计原则。
+
+- 所有敏感配置（token、API 密钥等）**仅通过环境变量或 config.json 读取**
+- 技能本身**不提供任何配置写入能力**
+- 配置变更需要用户**手动修改**环境变量或配置文件
+
+### Token 处理
+
+- `SIYUAN_TOKEN` **仅从环境变量或 config.json 读取**
+- 技能本身**绝不修改或写入 token**
+- Token 变更需要用户手动操作
+
+### 可选功能
+
+- `QDRANT_URL`、`OLLAMA_BASE_URL` 为**可选配置**
+- 如不需要向量搜索/NLP 功能，**无需配置**这些变量
+- 不配置时，技能将使用基础的 SQL 搜索模式
 
 ---
 

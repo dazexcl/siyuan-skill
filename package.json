@@ -50,6 +50,12 @@
     },
     "runtime": "node",
     "runtimeVersion": ">=14.0.0",
+    "homepage": "https://github.com/dazexcl/siyuan-skill",
+    "securityStatement": {
+      "configPersistence": "This skill uses a config-READONLY design. It does NOT provide any config-write capability. All config changes require manual user action.",
+      "tokenHandling": "SIYUAN_TOKEN is read ONLY from environment variables and config.json. It is NEVER written to disk by the skill. Token changes require manual user action.",
+      "optionalFeatures": "QDRANT_URL, OLLAMA_BASE_URL are optional. If vector search/NLP is not needed, simply do not configure these variables."
+    },
     "requiredEnvVars": [
       {
         "name": "SIYUAN_BASE_URL",
