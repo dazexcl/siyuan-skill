@@ -24,10 +24,10 @@ docker run -p 6333:6333 qdrant/qdrant
 需要部署 Ollama 服务用于生成向量嵌入。
 
 **安装 Ollama**：
-```bash
-# macOS/Linux
-curl -fsSL https://ollama.com/install.sh | sh
 
+请访问 [Ollama 官网](https://ollama.com) 下载并安装。
+
+```bash
 # 下载模型（推荐 nomic-embed-text）
 ollama pull nomic-embed-text
 ```

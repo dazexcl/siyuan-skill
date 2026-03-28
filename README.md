@@ -1,7 +1,7 @@
 # Siyuan Skill
 
 [![GitHub](https://img.shields.io/badge/GitHub-Source-green.svg)](https://github.com/dazexcl/siyuan-skill)
-[![Version](https://img.shields.io/badge/version-1.7.5-blue.svg)](https://github.com/dazexcl/siyuan-skill)
+[![Version](https://img.shields.io/badge/version-1.7.7-blue.svg)](https://github.com/dazexcl/siyuan-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Node](https://img.shields.io/badge/node->=14-green.svg)](https://github.com/dazexcl/siyuan-skill)
 [![Features](https://img.shields.io/badge/features-Vector%20Search-blue.svg)](https://github.com/dazexcl/siyuan-skill)
@@ -939,13 +939,6 @@ siyuan create "标题" "第一段## 二级标题 内容"
 | `403 Forbidden`               | 权限不足     | 检查权限模式配置              |
 | `删除被阻止`                       | 安全模式     | 配置 `deleteProtection` |
 | `Qdrant API 错误: 409 Conflict` | 集合已存在    | 系统会继续使用现有集合           |
-
-### 调试模式
-
-```bash
-# 启用调试输出
-DEBUG=* node siyuan.js <command>
-```
 
 ### 连接测试
 

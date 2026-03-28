@@ -15,15 +15,15 @@
 
 ### 内容块类型
 
-| 类型 | 说明 | kramdown type |
-|------|------|---------------|
-| 文档块 | 文档本身 | `d` |
-| 标题块 | `# ## ###` 等 | `h` |
-| 段落块 | 普通文本段落 | `p` |
-| 列表块 | 有序/无序/任务列表 | `l` |
-| 代码块 | 代码片段 | `c` |
-| 表格块 | 表格内容 | `t` |
-| 引用块 | 块引用 | `blockquote` |
+| 类型  | 说明           | kramdown type |
+| --- | ------------ | ------------- |
+| 文档块 | 文档本身         | `d`           |
+| 标题块 | `# ## ###` 等 | `h`           |
+| 段落块 | 普通文本段落       | `p`           |
+| 列表块 | 有序/无序/任务列表   | `l`           |
+| 代码块 | 代码片段         | `c`           |
+| 表格块 | 表格内容         | `t`           |
+| 引用块 | 块引用          | `blockquote`  |
 
 ### 容器块
 
@@ -43,10 +43,10 @@
 
 ### 锚文本类型
 
-| 语法 | 类型 | 说明 |
-|------|------|------|
+| 语法            | 类型    | 说明            |
+| ------------- | ----- | ------------- |
 | `((id "文本"))` | 静态锚文本 | 固定显示，不跟随定义块变化 |
-| `((id '文本'))` | 动态锚文本 | 跟随定义块内容自动更新 |
+| `((id '文本'))` | 动态锚文本 | 跟随定义块内容自动更新   |
 
 ### 示例
 
@@ -93,13 +93,13 @@
 
 ### 数据库表
 
-| 表名 | 说明 |
-|------|------|
-| `blocks` | 内容块表（最常用） |
-| `attributes` | 属性表 |
-| `refs` | 引用关系表 |
-| `assets` | 资源引用表 |
-| `spans` | 行内元素表 |
+| 表名           | 说明        |
+| ------------ | --------- |
+| `blocks`     | 内容块表（最常用） |
+| `attributes` | 属性表       |
+| `refs`       | 引用关系表     |
+| `assets`     | 资源引用表     |
+| `spans`      | 行内元素表     |
 
 ## 排版元素
 
@@ -135,23 +135,25 @@
 
 ### 代码块
 
-```markdown
+````markdown
 带语法高亮：
-​```javascript
+
+```javascript
 function hello() {
   console.log("Hello World");
 }
-​```
+````
 
 支持的语言：ruby, python, js, html, css, bash, json, yml, xml, go, java 等
-```
+
+````
 
 ### 引用块
 
 ```markdown
 > 这是普通引用块
 > 可以多行
-```
+````
 
 ### 提示块（Callout）
 
@@ -202,81 +204,81 @@ $$
 
 #### 脑图
 
-```markdown
-​```mindmap
+````markdown
+```mindmap
 - 根节点
   - 子节点1
   - 子节点2
     - 孙节点
-​```
 ```
+````
 
 #### 流程图（Mermaid）
 
-```markdown
-​```mermaid
+````markdown
+```mermaid
 graph TB
     A --> B
     B --> C
-​```
 ```
+````
 
 #### 时序图
 
-```markdown
-​```mermaid
+````markdown
+```mermaid
 sequenceDiagram
     Alice->>John: Hello
     John-->>Alice: Hi
-​```
 ```
+````
 
 #### 甘特图
 
-```markdown
-​```mermaid
+````markdown
+```mermaid
 gantt
     title 项目计划
     dateFormat  YYYY-MM-DD
     section 阶段1
     任务1 :a1, 2024-01-01, 30d
-​```
 ```
+````
 
 #### 类图
 
-```markdown
-​```mermaid
+````markdown
+```mermaid
 classDiagram
     Class01 <|-- Class02
     Class01 : +func()
-​```
 ```
+````
 
 #### Git 图
 
-```markdown
-​```mermaid
+````markdown
+```mermaid
 gitGraph
     commit
     commit
     branch develop
     commit
-​```
 ```
+````
 
 #### ECharts 图表
 
-```markdown
-​```echarts
+````markdown
+```echarts
 {
   "title": { "text": "图表标题" },
   "xAxis": { "type": "category", "data": ["A", "B", "C"] },
   "yAxis": { "type": "value" },
   "series": [{ "type": "line", "data": [1, 2, 3] }]
 }
-​```
 ```
+````
 
 ### 多媒体
 
@@ -363,3 +365,4 @@ iframe：
 - [最佳实践](best-practices.md)
 - [使用指南](usage-guide.md)
 - [命令详细文档](../commands/)
+

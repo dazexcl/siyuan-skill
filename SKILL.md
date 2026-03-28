@@ -1,29 +1,9 @@
 ---
 name: "siyuan-skill"
-description: "思源笔记CLI工具，支持笔记本管理、文档操作、内容搜索、块控制。当用户操作思源笔记、管理笔记本、创建/更新/删除文档、搜索内容、管理块时调用。"
+description: "思源笔记API转CLI工具，支持笔记本管理、文档操作、内容搜索、块控制。当用户操作思源笔记、管理笔记本、创建/更新/删除文档、搜索内容、管理块时调用。"
 skillType: "cli"
 homepage: "https://github.com/dazexcl/siyuan-skill"
-required_env_vars:
-  - name: "SIYUAN_BASE_URL"
-    description: "思源笔记 API 地址"
-    required: true
-    example: "http://localhost:6806"
-  - name: "SIYUAN_TOKEN"
-    description: "API 认证令牌"
-    required: true
-  - name: "SIYUAN_DEFAULT_NOTEBOOK"
-    description: "默认笔记本 ID"
-    required: true
-optional_env_vars:
-  - name: "SIYUAN_PERMISSION_MODE"
-    description: "权限模式 (all/whitelist/blacklist)"
-    default: "all"
-  - name: "SIYUAN_NOTEBOOK_LIST"
-    description: "白名单/黑名单笔记本列表（逗号分隔）"
-  - name: "QDRANT_URL"
-    description: "Qdrant 向量数据库地址（语义搜索需要）"
-  - name: "OLLAMA_BASE_URL"
-    description: "Ollama 服务地址（语义搜索需要）"
+metadata: {"openclaw":{"emoji":"📝","requires":{"bins":["node"],"env":["SIYUAN_BASE_URL","SIYUAN_TOKEN","SIYUAN_DEFAULT_NOTEBOOK"],"optionalEnv":["SIYUAN_TIMEOUT","SIYUAN_PERMISSION_MODE","SIYUAN_NOTEBOOK_LIST","QDRANT_URL","QDRANT_API_KEY","QDRANT_COLLECTION_NAME","OLLAMA_BASE_URL","OLLAMA_EMBED_MODEL","EMBEDDING_MODEL","EMBEDDING_BASE_URL","EMBEDDING_DIMENSION","EMBEDDING_BATCH_SIZE","SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH","SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH","SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH","SIYUAN_SKIP_INDEX_ATTRS","HYBRID_DENSE_WEIGHT","HYBRID_SPARSE_WEIGHT","HYBRID_SEARCH_LIMIT","NLP_LANGUAGE","NLP_EXTRACT_ENTITIES","NLP_EXTRACT_KEYWORDS","SIYUAN_DELETE_SAFE_MODE","SIYUAN_DELETE_REQUIRE_CONFIRMATION","SIYUAN_TLS_ALLOW_SELF_SIGNED","SIYUAN_TLS_ALLOWED_HOSTS"]},"primaryEnv":"SIYUAN_TOKEN"}}
 ---
 
 > **运行要求：** Node.js >= 14.0.0，思源笔记 >= 3.6.0
@@ -34,21 +14,14 @@ optional_env_vars:
 
 ---
 
-# 重要约束
-
-- **必须通过 CLI 命令操作思源笔记**（`node siyuan.js <command>`）
-- **禁止绕过 CLI 直接调用思源 API**（不要自行拼接 HTTP 请求）
-- **禁止自动修改配置文件和环境变量，如需修改必须手动配置**
-
----
 
 # 快速开始
 
 ```bash
 cd skills/siyuan-skill
 node siyuan.js <command> [options]
-siyuan help <command>  # 查看命令帮助
-siyuan --version       # 显示版本信息
+node siyuan.js help <command>  # 查看命令帮助
+node siyuan.js --version       # 显示版本信息
 ```
 
 ---

@@ -39,8 +39,8 @@ siyuan icon <docId> --remove
 
 ### 编码转换
 
-- 单个 emoji：`📄` → `1f4c4`
-- 多个码点：`👨‍💻` → `1f468-200d-1f4bb`
+- 单个 emoji：`📄` -> `1f4c4`
+- 多个码点：`👨💻` -> `1f468-1f4bb` (复合 emoji 示例)
 
 CLI 支持直接传入 emoji 字符，会自动转换为编码。
 

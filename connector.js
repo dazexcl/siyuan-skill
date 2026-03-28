@@ -144,15 +144,6 @@ class SiyuanConnector {
               }
               return;
             }
-            
-            // 记录响应（调试用）- 已过滤敏感信息
-            if (process.env.DEBUG) {
-              const sanitizedData = responseData.replace(/"token"\s*:\s*"[^"]*"/gi, '"token":"***"')
-                .replace(/"password"\s*:\s*"[^"]*"/gi, '"password":"***"')
-                .replace(/"Authorization"\s*:\s*"[^"]*"/gi, '"Authorization":"***"');
-              console.log(`API响应 [${statusCode}]:`, sanitizedData.substring(0, 200) + (sanitizedData.length > 200 ? '...' : ''));
-            }
-            
             const parsedData = JSON.parse(responseData);
             
             // 检查响应格式
@@ -235,25 +226,6 @@ class SiyuanConnector {
         baseURL: this.baseURL
       };
     }
-  }
-  
-  /**
-   * 设置 API 令牌
-   * @param {string} token - 新的 API 令牌
-   */
-  setToken(token) {
-    this.token = token;
-    console.log('API令牌已更新');
-  }
-  
-  /**
-   * 设置基础 URL
-   * @param {string} url - 新的基础 URL
-   */
-  setBaseURL(url) {
-    this.baseURL = url;
-    this.updateURL(url);
-    console.log('基础URL已更新:', url);
   }
   
   /**
