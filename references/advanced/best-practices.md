@@ -60,13 +60,24 @@ siyuan create --path "AI/测试" "内容" --force
 #### 超长内容处理
 
 ```bash
-# 方式1：直接创建（支持长内容）
-siyuan create "文档标题" "很长的内容..."
+# 方式1：使用 --file 参数（推荐，最可靠）
+siyuan create "文档标题" --file long-content.md --parent-id <id>
+siyuan update <docId> --file long-content.md
 
-# 方式2：两步法（从文件读取）
-siyuan create "长文档标题" --parent-id <id>
+# 方式2：Shell 命令替换（无需临时文件）
+# macOS/Linux (bash/zsh)
+siyuan create "文档标题" "$(cat long-content.md)" --parent-id <id>
 siyuan update <docId> "$(cat long-content.md)"
+# Windows PowerShell（注意：需加 -Encoding UTF8 确保编码正确）
+siyuan create "文档标题" (Get-Content long-content.md -Raw -Encoding UTF8) --parent-id <id>
+siyuan update <docId> (Get-Content long-content.md -Raw -Encoding UTF8)
 ```
+
+> **推荐优先级**：`--file` > `Shell 命令替换`
+>
+> **Windows PowerShell 编码说明**：
+> - **推荐使用 `--file` 参数**，最简单可靠
+> - 命令替换方式：需使用 `Get-Content -Raw -Encoding UTF8`
 
 #### 注意事项
 
@@ -388,6 +399,7 @@ fi
 
 ## 相关文档
 
+- [书写指南](writing-guide.md) - 思源笔记内容书写格式规范
 - [命令详细文档](../commands/)
 - [环境变量配置](../config/environment.md)
 - [高级配置](../config/advanced.md)

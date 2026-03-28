@@ -14,6 +14,98 @@ if (process.platform === 'win32') {
 
 const { createSkill } = require('./index');
 const { version } = require('./package.json');
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * 从文件读取内容
+ * @param {string} filePath - 文件路径（绝对路径或相对路径）
+ * @returns {string} 文件内容
+ */
+function readFileContent(filePath) {
+  const absolutePath = path.isAbsolute(filePath) 
+    ? filePath 
+    : path.resolve(process.cwd(), filePath);
+  
+  if (!fs.existsSync(absolutePath)) {
+    console.error(`错误: 文件不存在: ${absolutePath}`);
+    process.exit(1);
+  }
+  
+  try {
+    return fs.readFileSync(absolutePath, 'utf-8');
+  } catch (error) {
+    console.error(`错误: 无法读取文件: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * 检测并获取内容来源（优先级：--file > 位置参数）
+ * @param {object} options - 解析后的选项
+ * @param {array} positional - 位置参数数组
+ * @param {number} contentIndex - 内容在位置参数中的索引
+ * @returns {object} { content: string, source: string }
+ */
+function resolveContent(options, positional, contentIndex) {
+  const file = options.file || '';
+  
+  if (file) {
+    return { content: readFileContent(file), source: `file:${file}` };
+  }
+  
+  if (positional.length > contentIndex) {
+    return { content: positional[contentIndex], source: 'argument' };
+  }
+  
+  return { content: '', source: 'none' };
+}
+
+/**
+ * 执行创建文档操作
+ * @param {string} title - 文档标题
+ * @param {string} content - 文档内容
+ * @param {string} parentId - 父文档ID
+ * @param {string} path - 文档路径
+ * @param {boolean} force - 是否强制创建
+ * @param {object} skill - SiyuanSkill 实例
+ */
+async function performCreate(title, content, parentId, path, force, skill) {
+  if (title && title.includes('/')) {
+    const originalTitle = title;
+    title = title.replace(/\//g, '／');
+    console.log(`⚠️ 标题包含斜杠，已自动转换: "${originalTitle}" → "${title}"`);
+  }
+  
+  if (!parentId && !path) {
+    parentId = skill.config.defaultNotebook;
+    if (!parentId) {
+      console.error('错误: 未设置默认笔记本 ID');
+      console.log('请设置环境变量 SIYUAN_DEFAULT_NOTEBOOK 或在 config.json 文件中配置 defaultNotebook，或使用 --parent-id 参数');
+      process.exit(1);
+    }
+  }
+  
+  console.log('创建文档...');
+  console.log('标题:', title);
+  console.log('内容:', content ? `(${content.length} 字符)` : '(空)');
+  if (parentId) {
+    console.log('父文档 ID:', parentId);
+  }
+  if (path) {
+    console.log('路径:', path);
+  }
+  console.log('强制创建:', force);
+  
+  const createResult = await skill.executeCommand('create-document', { 
+    parentId: parentId,
+    title: title,
+    content: content,
+    force: force,
+    path: path
+  });
+  console.log(JSON.stringify(createResult, null, 2));
+}
 
 /**
  * 显示版本信息
@@ -57,7 +149,7 @@ function parseCommandArgs(args, config) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     
-    if (arg.startsWith('--')) {
+    if (arg.startsWith('-')) {
       // 检测常见错误参数
       if (commonMistakes[arg]) {
         console.error(`\n❌ 未知参数: ${arg}`);
@@ -68,7 +160,7 @@ function parseCommandArgs(args, config) {
       // 检查是否是已知选项
       const optConfig = optionMap[arg];
       if (optConfig) {
-        const targetName = optConfig.targetName || arg.replace(/^--/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        const targetName = optConfig.targetName || arg.replace(/^-+/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
         
         if (optConfig.hasValue && i + 1 < args.length) {
           result.options[targetName] = args[++i];
@@ -130,7 +222,8 @@ const ALIAS_MAP = {
   'btr': 'block-transfer-ref',
   'st': 'tags',
   'check': 'exists',
-  'check-exists': 'exists'
+  'check-exists': 'exists',
+  'set-icon': 'icon'
 };
 
 /**
@@ -173,6 +266,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
   exists, check                    检查文档是否存在
   search, find                     搜索内容
   convert, path                    转换 ID 和路径
+  icon, set-icon                   设置/获取文档图标
   index, index-documents           索引文档到向量数据库
   nlp                              NLP 文本分析 [实验性]
   block-insert, bi                 插入新块
@@ -215,8 +309,8 @@ function showCommandHelp(command) {
     },
     'structure': {
       aliases: ['ls'],
-      description: '获取指定笔记本或文档的文档结构',
-      usage: 'siyuan structure (<notebookId|docId> | --path <path>) [--depth <depth>]',
+      description: '获取笔记本/文档结构（目录树）',
+      usage: 'siyuan structure [<notebookId|docId>] [--path <path>] [--depth <depth>]',
       notes: [
         '第一个位置参数默认为笔记本ID或文档ID',
         '--path 与位置参数二选一，不能同时使用',
@@ -225,8 +319,8 @@ function showCommandHelp(command) {
       ],
       options: [
         { name: '<notebookId|docId>', description: '笔记本ID或文档ID（位置参数，与 --path 二选一）' },
-        { name: '--path', description: '文档路径（与位置参数二选一）' },
-        { name: '--depth', description: '递归深度（默认1，-1表示无限）' }
+        { name: '--path, -P', description: '文档路径（与位置参数二选一）' },
+        { name: '--depth, -d', description: '递归深度（默认1，-1表示无限）' }
       ],
       examples: [
         'siyuan structure <notebook-id>',
@@ -247,10 +341,10 @@ function showCommandHelp(command) {
       ],
       options: [
         { name: '<docId>', description: '文档ID（位置参数，与 --path 二选一）' },
-        { name: '--doc-id', description: '文档ID（与 --path 二选一）' },
-        { name: '--path', description: '文档路径（与 --doc-id 二选一）' },
-        { name: '--format', description: '输出格式：kramdown、markdown、text、html（默认：kramdown）' },
-        { name: '--raw', description: '以纯文本格式返回（移除JSON外部结构）' }
+        { name: '--doc-id, -D', description: '文档ID（与 --path 二选一）' },
+        { name: '--path, -P', description: '文档路径（与 --doc-id 二选一）' },
+        { name: '--format, -F', description: '输出格式：kramdown、markdown、text、html（默认：kramdown）' },
+        { name: '--raw, -r', description: '以纯文本格式返回（移除JSON外部结构）' }
       ],
       examples: [
         'siyuan content <doc-id>',
@@ -270,7 +364,7 @@ function showCommandHelp(command) {
       options: [
         { name: '<docId>', description: '文档ID（必需，位置参数）' },
         { name: '--id', description: '文档ID（可选，等同于位置参数）' },
-        { name: '--format', description: '输出格式：summary（默认）、json' }
+        { name: '--format, -F', description: '输出格式：summary（默认）、json' }
       ],
       returns: [
         'id - 文档ID',
@@ -294,13 +388,14 @@ function showCommandHelp(command) {
       description: '搜索内容（支持向量搜索）',
       usage: 'siyuan search <query> [options]',
       options: [
-        { name: '--type', description: '按单个类型过滤 (d/p/h/l/i/tb/c/s/img)' },
+        { name: '--type, -T', description: '按单个类型过滤 (d/p/h/l/i/tb/c/s/img)' },
         { name: '--types', description: '按多个类型过滤 (逗号分隔，如 d,p,h)' },
-        { name: '--sort-by', description: '排序方式 (relevance/date)' },
-        { name: '--limit', description: '结果数量限制' },
-        { name: '--path', description: '搜索路径（仅搜索指定路径下的内容）' },
-        { name: '--sql', description: '自定义SQL查询条件' },
-        { name: '--mode', description: '搜索模式 (hybrid/semantic/keyword/legacy)' },
+        { name: '--sort-by, -s', description: '排序方式 (relevance/date)' },
+        { name: '--limit, -l', description: '结果数量限制' },
+        { name: '--path, -P', description: '搜索路径（仅搜索指定路径下的内容）' },
+        { name: '--where', description: '自定义WHERE条件（用于过滤搜索结果）' },
+        { name: '--mode, -m', description: '搜索模式 (hybrid/semantic/keyword/legacy)' },
+        { name: '--notebook, -n', description: '指定笔记本ID' },
         { name: '--dense-weight', description: '语义搜索权重（混合搜索时，默认 0.7）' },
         { name: '--sparse-weight', description: '关键词搜索权重（混合搜索时，默认 0.3）' },
         { name: '--threshold', description: '相似度阈值（0-1）' }
@@ -311,7 +406,7 @@ function showCommandHelp(command) {
         'siyuan search "关键词" --types d,p,h',
         'siyuan search "关键词" --sort-by date --limit 5',
         'siyuan search "关键词" --path /AI/openclaw',
-        'siyuan search "关键词" --sql "length(content) > 100"',
+        'siyuan search "关键词" --where "length(content) > 100"',
         'siyuan search "关键词" --mode hybrid',
         'siyuan search "关键词" --mode semantic',
         'siyuan search "关键词" --mode keyword',
@@ -323,7 +418,7 @@ function showCommandHelp(command) {
     'create': {
       aliases: ['new'],
       description: '创建文档（自动处理换行符）',
-      usage: 'siyuan create (<title> [content] | --path <path> [content]) [--title <title>] [--parent-id <parentId>] [--force]',
+      usage: 'siyuan create (<title> [content] | --path <path> [content]) [--title <title>] [--parent-id <parentId>] [--file <file>] [--force]',
       notes: [
         '【三种使用模式】',
         '',
@@ -343,6 +438,21 @@ function showCommandHelp(command) {
         '  在指定目录下创建新文档，位置参数1 = 标题，位置参数2 = 内容',
         '  siyuan create --path "笔记本/目录/" "新文档标题" "内容"',
         '',
+        '【内容输入方式】（优先级：--file > 位置参数）',
+        '',
+        '方式1：--file 从文件读取（推荐超长内容）',
+        '  siyuan create "标题" --file content.md --parent-id <id>',
+        '  siyuan create --path "笔记本/文档" --file content.md',
+        '',
+        '方式2：位置参数直接传递（适合短内容）',
+        '  siyuan create "标题" "内容"',
+        '',
+        '方式3：Shell 命令替换（适合超长内容，无需临时文件）',
+        '  macOS/Linux:',
+        '    siyuan create "标题" "$(cat content.md)" --parent-id <id>',
+        '  Windows PowerShell（需指定编码）:',
+        '    siyuan create "标题" (Get-Content content.md -Raw -Encoding UTF8) --parent-id <id>',
+        '',
         '【路径自动创建】',
         '  使用 --path 时，中间目录不存在会自动创建（空内容）',
         '  例如：--path "A/B/C/D" 会自动创建 A、B、C 目录',
@@ -356,9 +466,10 @@ function showCommandHelp(command) {
         '  标题中的 / 会自动转换为全角 ／'
       ],
       options: [
-        { name: '--parent-id, --parent', description: '父文档/笔记本ID（与 --path 二选一）' },
-        { name: '--path', description: '文档路径。末尾无/表示创建该文档；末尾有/表示在该目录下创建' },
+        { name: '--parent-id, --parent, -p', description: '父文档/笔记本ID（与 --path 二选一）' },
+        { name: '--path, -P', description: '文档路径。末尾无/表示创建该文档；末尾有/表示在该目录下创建' },
         { name: '--title, -t', description: '自定义标题（仅 --path 模式，覆盖路径中的标题）' },
+        { name: '--file, -f', description: '从文件读取内容（超长内容推荐）' },
         { name: '--force', description: '强制创建（忽略重名检测）' }
       ],
       examples: [
@@ -366,13 +477,21 @@ function showCommandHelp(command) {
         'siyuan create "我的文档" --parent-id <notebookId>',
         'siyuan create "我的文档" "文档内容" --parent-id <notebookId>',
         '',
+        '# 超长内容处理（推荐 --file）',
+        'siyuan create "超长文档" --file long-content.md --parent-id <notebookId>',
+        '# macOS/Linux 命令替换:',
+        'siyuan create "超长文档" "$(cat long-content.md)" --parent-id <notebookId>',
+        '# Windows PowerShell 命令替换:',
+        'siyuan create "超长文档" (Get-Content long-content.md -Raw -Encoding UTF8) --parent-id <notebookId>',
+        '',
         '# 模式2：路径指定文档',
         'siyuan create --path "AI/项目/需求文档" "这是文档内容"',
         'siyuan create --path "AI/项目/需求文档" --title "需求文档v2" "内容"',
-        'siyuan create --path "AI/项目/空目录/空文档"  # 创建多级空目录',
+        'siyuan create --path "AI/项目/超长文档" --file content.md',
         '',
         '# 模式3：在目录下创建',
         'siyuan create --path "AI/项目/" "新需求文档" "内容"',
+        'siyuan create --path "AI/项目/" "新文档" --file content.md',
         '',
         '# 重名处理',
         'siyuan create --path "AI/测试" "内容"      # 已存在时报错',
@@ -382,14 +501,38 @@ function showCommandHelp(command) {
     'update-document': {
       aliases: ['edit', 'update'],
       description: '更新文档内容（仅接受文档ID，支持Markdown格式）',
-      usage: 'siyuan update <docId> <content>',
+      usage: 'siyuan update <docId> [<content>] [--file <file>] [--data-type <type>]',
       notes: [
         '此命令仅用于更新文档内容，需要传入文档ID',
-        '如需更新块内容，请使用 block-update 命令'
+        '如需更新块内容，请使用 block-update 命令',
+        '',
+        '【内容输入方式】（优先级：--file > 位置参数）',
+        '',
+        '方式1：--file 从文件读取（推荐超长内容）',
+        '  siyuan update <docId> --file content.md',
+        '',
+        '方式2：位置参数直接传递（适合短内容）',
+        '  siyuan update <docId> "新内容"',
+        '',
+        '方式3：Shell 命令替换（适合超长内容，无需临时文件）',
+        '  macOS/Linux:',
+        '    siyuan update <docId> "$(cat content.md)"',
+        '  Windows PowerShell（需指定编码）:',
+        '    siyuan update <docId> (Get-Content content.md -Raw -Encoding UTF8)'
+      ],
+      options: [
+        { name: '<docId>', description: '文档ID（必需，位置参数）' },
+        { name: '<content>', description: '新内容（位置参数）' },
+        { name: '--file, -f', description: '从文件读取内容（超长内容推荐）' },
+        { name: '--data-type', description: '数据类型：markdown/dom（默认：markdown）' }
       ],
       examples: [
         'siyuan update <doc-id> "新的文档内容"',
-        'siyuan update <doc-id> "更新后的第一行\\n更新后的第二行"'
+        'siyuan update <doc-id> --file long-content.md',
+        '# macOS/Linux 命令替换:',
+        'siyuan update <doc-id> "$(cat long-content.md)"',
+        '# Windows PowerShell 命令替换:',
+        'siyuan update <doc-id> (Get-Content long-content.md -Raw -Encoding UTF8)'
       ]
     },
     'delete': {
@@ -518,7 +661,7 @@ function showCommandHelp(command) {
       usage: 'siyuan block-insert <content> --parent-id <parentId> [--data-type <type>]\n       siyuan block-insert <content> --previous-id <blockId>\n       siyuan block-insert <content> --next-id <blockId>',
       options: [
         { name: '<content>', description: '块内容（必需）' },
-        { name: '--parent-id', description: '父块ID（必需，三者选一）' },
+        { name: '--parent-id, -p', description: '父块ID（必需，三者选一）' },
         { name: '--previous-id', description: '前一个块ID，插入其后（必需，三者选一）' },
         { name: '--next-id', description: '后一个块ID，插入其前（必需，三者选一）' },
         { name: '--data-type', description: '数据类型：markdown/dom（默认：markdown）' }
@@ -526,7 +669,7 @@ function showCommandHelp(command) {
       examples: [
         'siyuan bi "新块内容" --parent-id 20260313203048-cjem96v',
         'siyuan block-insert "新段落" --previous-id 20260313203048-cjem96v',
-        'siyuan bi --data "新块" --next-id 20260313203048-cjem96v'
+        'siyuan bi -p 20260313203048-cjem96v "新块"'
       ]
     },
     'block-update': {
@@ -572,11 +715,11 @@ function showCommandHelp(command) {
       options: [
         { name: '<blockId>', description: '要移动的块ID（必需，位置参数）' },
         { name: '--id', description: '块ID（可选，等同于位置参数）' },
-        { name: '--parent-id', description: '目标父块ID' },
+        { name: '--parent-id, -p', description: '目标父块ID' },
         { name: '--previous-id', description: '目标前一个块ID' }
       ],
       examples: [
-        'siyuan bm <blockId> --parent-id <targetParentId>',
+        'siyuan bm <blockId> -p <targetParentId>',
         'siyuan block-move <blockId> --previous-id <targetPreviousId>',
         'siyuan bm --id <blockId> --previous-id <targetPreviousId>'
       ]
@@ -588,11 +731,11 @@ function showCommandHelp(command) {
       options: [
         { name: '<blockId>', description: '块ID（必需，位置参数）' },
         { name: '--id', description: '块ID（可选，等同于位置参数）' },
-        { name: '--mode', description: '查询模式：kramdown/children（默认：kramdown）' }
+        { name: '--mode, -m', description: '查询模式：kramdown/children（默认：kramdown）' }
       ],
       examples: [
         'siyuan bg <blockId>',
-        'siyuan block-get <blockId> --mode children',
+        'siyuan block-get <blockId> -m children',
         'siyuan bg --id <blockId>'
       ]
     },
@@ -603,13 +746,13 @@ function showCommandHelp(command) {
       options: [
         { name: '<blockId>', description: '块ID（必需，位置参数）' },
         { name: '--id', description: '块ID（可选，等同于位置参数）' },
-        { name: '--action', description: '操作类型：fold（折叠）或 unfold（展开），默认 fold' }
+        { name: '--action, -a', description: '操作类型：fold（折叠）或 unfold（展开），默认 fold' }
       ],
       examples: [
         'siyuan bf <blockId>              # 折叠块',
         'siyuan buu <blockId>            # 展开块',
-        'siyuan block-fold <blockId> --action unfold',
-        'siyuan bf --id <blockId> --action fold'
+        'siyuan block-fold <blockId> -a unfold',
+        'siyuan bf --id <blockId> -a fold'
       ]
     },
     'block-transfer-ref': {
@@ -633,17 +776,17 @@ function showCommandHelp(command) {
       usage: 'siyuan block-attrs <docId|blockId> (--set <attrs> | --get [key] | --remove <keys>) [--hide]',
       options: [
         { name: '<docId|blockId>', description: '块ID/文档ID（必传，位置参数）' },
-        { name: '--set', description: '设置属性（key=value格式，多个用逗号分隔）' },
-        { name: '--get', description: '获取属性（不带参数取所有，带参数取指定属性）' },
+        { name: '--set, -S', description: '设置属性（key=value格式，多个用逗号分隔）' },
+        { name: '--get, -g', description: '获取属性（不带参数取所有，带参数取指定属性）' },
         { name: '--remove', description: '移除属性（传入属性键名，多个用逗号分隔）' },
         { name: '--hide', description: '设置内部属性（不带 custom- 前缀，在界面不可见）' }
       ],
       examples: [
-        'siyuan attrs <docId> --set "status=draft,priority=high"',
-        'siyuan attrs <blockId> --set "internal=true" --hide',
-        'siyuan attrs <docId> --get',
-        'siyuan attrs <blockId> --get "status"',
-        'siyuan attrs <docId> --get "internal" --hide',
+        'siyuan attrs <docId> -S "status=draft,priority=high"',
+        'siyuan attrs <blockId> -S "internal=true" --hide',
+        'siyuan attrs <docId> -g',
+        'siyuan attrs <blockId> -g "status"',
+        'siyuan attrs <docId> -g "internal" --hide',
         'siyuan attrs <docId> --remove "status"',
         'siyuan attrs <blockId> --remove "status,priority"'
       ]
@@ -654,16 +797,16 @@ function showCommandHelp(command) {
       options: [
         { name: '<id>', description: '块ID/文档ID（必需，位置参数）' },
         { name: '--id', description: '块ID/文档ID（可选，等同于位置参数）' },
-        { name: '--tags', description: '标签内容（逗号分隔多个标签）' },
-        { name: '--add', description: '添加标签（追加模式）' },
+        { name: '--tags, -t', description: '标签内容（逗号分隔多个标签）' },
+        { name: '--add, -a', description: '添加标签（追加模式）' },
         { name: '--remove', description: '移除指定标签' },
-        { name: '--get', description: '获取当前标签' }
+        { name: '--get, -g', description: '获取当前标签' }
       ],
       examples: [
-        'siyuan tags <id> --tags "标签1,标签2"',
-        'siyuan tags <id> --tags "新标签" --add',
-        'siyuan tags <id> --tags "旧标签" --remove',
-        'siyuan tags <id> --get'
+        'siyuan tags <id> -t "标签1,标签2"',
+        'siyuan tags <id> -t "新标签" -a',
+        'siyuan tags <id> -t "旧标签" --remove',
+        'siyuan tags <id> -g'
       ]
     },
     'exists': {
@@ -681,6 +824,30 @@ function showCommandHelp(command) {
         'siyuan exists --title "子文档" --parent-id <父文档ID>',
         'siyuan exists --path "/测试目录/子文档A"',
         'siyuan check "文档标题"'
+      ]
+    },
+    'icon': {
+      aliases: ['set-icon'],
+      description: '设置或获取文档/块图标（emoji 编码）',
+      usage: 'siyuan icon <id> [--emoji <emoji>] [--get] [--remove]',
+      notes: [
+        '图标使用 emoji Unicode 编码（不带 U+ 前缀）',
+        '例如：1f4c4 = 📄, 1f4d4 = 📔, 1f5c2 = 📂',
+        '可使用在线工具将 emoji 转换为编码：https://unicode.org/emoji/charts/',
+        '多色 emoji 编码格式：1f5c2-fe0f'
+      ],
+      options: [
+        { name: '<id>', description: '文档ID或块ID（必需，位置参数）' },
+        { name: '--emoji, -e', description: 'emoji 编码（不带 U+ 前缀）或直接传入 emoji 字符' },
+        { name: '--get, -g', description: '获取当前图标' },
+        { name: '--remove, -r', description: '移除图标' }
+      ],
+      examples: [
+        'siyuan icon <doc-id> --emoji 1f4c4',
+        'siyuan icon <doc-id> --emoji 📄',
+        'siyuan icon <doc-id> --get',
+        'siyuan icon <doc-id> --remove',
+        'siyuan set-icon <doc-id> -e 1f4a1'
       ]
     }
   };
@@ -787,8 +954,8 @@ async function main(customArgs = null) {
         console.log('获取文档结构...');
         const structureParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--path': { hasValue: true },
-            '--depth': { hasValue: true }
+            '--path': { hasValue: true, aliases: ['-P'] },
+            '--depth': { hasValue: true, aliases: ['-d'] }
           },
           positionalCount: 1
         });
@@ -822,10 +989,10 @@ async function main(customArgs = null) {
         console.log('获取文档内容...');
         const contentParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--doc-id': { hasValue: true, aliases: ['--id'] },
-            '--path': { hasValue: true },
-            '--format': { hasValue: true },
-            '--raw': { isFlag: true }
+            '--doc-id': { hasValue: true, aliases: ['--id', '-D'] },
+            '--path': { hasValue: true, aliases: ['-P'] },
+            '--format': { hasValue: true, aliases: ['-F'] },
+            '--raw': { isFlag: true, aliases: ['-r'] }
           },
           positionalCount: 1
         });
@@ -860,7 +1027,7 @@ async function main(customArgs = null) {
         const infoParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--id': { hasValue: true },
-            '--format': { hasValue: true }
+            '--format': { hasValue: true, aliases: ['-F'] }
           },
           positionalCount: 1
         });
@@ -918,14 +1085,14 @@ async function main(customArgs = null) {
         console.log('搜索内容...');
         const searchParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--type': { hasValue: true },
+            '--type': { hasValue: true, aliases: ['-T'] },
             '--types': { hasValue: true },
-            '--sort-by': { hasValue: true },
-            '--limit': { hasValue: true },
-            '--path': { hasValue: true },
-            '--sql': { hasValue: true },
-            '--mode': { hasValue: true },
-            '--notebook': { hasValue: true },
+            '--sort-by': { hasValue: true, aliases: ['-s'] },
+            '--limit': { hasValue: true, aliases: ['-l'] },
+            '--path': { hasValue: true, aliases: ['-P'] },
+            '--where': { hasValue: true },
+            '--mode': { hasValue: true, aliases: ['-m'] },
+            '--notebook': { hasValue: true, aliases: ['-n'] },
             '--notebook-id': { hasValue: true, aliases: ['--notebook'] },
             '--sql-weight': { hasValue: true },
             '--dense-weight': { hasValue: true },
@@ -943,7 +1110,7 @@ async function main(customArgs = null) {
         if (searchParsed.options.sortBy) searchArgs.sortBy = searchParsed.options.sortBy;
         if (searchParsed.options.limit) searchArgs.limit = parseInt(searchParsed.options.limit, 10);
         if (searchParsed.options.path) searchArgs.path = searchParsed.options.path;
-        if (searchParsed.options.sql) searchArgs.sql = searchParsed.options.sql;
+        if (searchParsed.options.where) searchArgs.sql = searchParsed.options.where;
         if (searchParsed.options.mode) searchArgs.mode = searchParsed.options.mode;
         if (searchParsed.options.notebookId) searchArgs.notebookId = searchParsed.options.notebookId;
         if (searchParsed.options.sqlWeight) searchArgs.sqlWeight = parseFloat(searchParsed.options.sqlWeight);
@@ -969,22 +1136,23 @@ async function main(customArgs = null) {
         
         const createParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--parent-id': { hasValue: true, aliases: ['--parent'] },
-            '--path': { hasValue: true },
+            '--parent-id': { hasValue: true, aliases: ['--parent', '-p'] },
+            '--path': { hasValue: true, aliases: ['-P'] },
             '--title': { hasValue: true, aliases: ['-t'] },
-            '--force': { isFlag: true }
+            '--force': { isFlag: true },
+            '--file': { hasValue: true, aliases: ['-f'] }
           },
           positionalCount: 2,
           commonMistakes: {
             '--parent-path': '--path（用于指定完整路径）或 --parent-id（用于指定父文档ID）',
             '--notebook': '--parent-id（指定笔记本ID作为父ID）',
             '--folder': '--parent-id（指定父文档ID）或 --path（指定完整路径）',
-            '--dir': '--parent-id（指定父文档ID）或 --path（指定完整路径）'
+            '--dir': '--parent-id（指定父文档ID）或 --path（指定完整路径）',
+            '--from-file': '--file（从文件读取内容）'
           }
         });
         
         let createTitle = createParsed.options.title || '';
-        let createContent = '';
         let createParentId = createParsed.options.parentId || '';
         let createPath = createParsed.options.path || '';
         let createForce = createParsed.options.force || false;
@@ -999,70 +1167,59 @@ async function main(customArgs = null) {
             // 需要 title 参数，位置参数1=标题，位置参数2=内容
             if (!createTitle && createParsed.positional.length > 0) {
               createTitle = createParsed.positional[0];
-              createContent = createParsed.positional[1] || '';
-            } else {
-              createContent = createParsed.positional[0] || '';
             }
             
             if (!createTitle) {
               console.error('错误: 使用 --path "路径/" 在目录下创建时，需要提供标题');
               console.log('用法: siyuan create --path "笔记本/目录/" "标题" [内容]');
-              console.log('  或: siyuan create --path "笔记本/目录/" --title "标题" "内容"');
+              console.log('  或: siyuan create --path "笔记本/目录/" --title "标题" --file content.md');
               process.exit(1);
             }
+            
+            // 内容来源：--file > 位置参数1（因为位置参数0是标题）
+            const contentResult = resolveContent(createParsed.options, createParsed.positional, 1);
+            const createContent = contentResult.content;
+            if (contentResult.source !== 'none' && contentResult.source !== 'argument') {
+              console.log(`内容来源: ${contentResult.source}${createContent ? ` (${createContent.length} 字符)` : ''}`);
+            }
+            
+            // ... 继续创建逻辑
+            await performCreate(createTitle, createContent, createParentId, createPath, createForce, skill);
           } else {
             // 模式1/2：路径指向最终文档
             // 标题从路径最后一段提取，可用 --title 覆盖
             if (!createTitle) {
               createTitle = pathParts[pathParts.length - 1];
             }
-            createContent = createParsed.positional[0] || '';
+            
+            // 内容来源：--file > 位置参数0
+            const contentResult = resolveContent(createParsed.options, createParsed.positional, 0);
+            const createContent = contentResult.content;
+            if (contentResult.source !== 'none' && contentResult.source !== 'argument') {
+              console.log(`内容来源: ${contentResult.source}${createContent ? ` (${createContent.length} 字符)` : ''}`);
+            }
+            
+            await performCreate(createTitle, createContent, createParentId, createPath, createForce, skill);
           }
         } else {
           // 无 --path 模式：位置参数1=标题，位置参数2=内容
           if (createParsed.positional.length === 0) {
             console.error('错误: 请提供文档标题');
             console.log('用法: siyuan create <title> [content] [--parent-id <parentId>]');
+            console.log('  或: siyuan create <title> --file content.md [--parent-id <parentId>]');
             process.exit(1);
           }
           createTitle = createParsed.positional[0];
-          createContent = createParsed.positional[1] || '';
-        }
-        
-        if (createTitle && createTitle.includes('/')) {
-          const originalTitle = createTitle;
-          createTitle = createTitle.replace(/\//g, '／');
-          console.log(`⚠️ 标题包含斜杠，已自动转换: "${originalTitle}" → "${createTitle}"`);
-        }
-        
-        if (!createParentId && !createPath) {
-          createParentId = skill.config.defaultNotebook;
-          if (!createParentId) {
-            console.error('错误: 未设置默认笔记本 ID');
-            console.log('请设置环境变量 SIYUAN_DEFAULT_NOTEBOOK 或在 config.json 文件中配置 defaultNotebook，或使用 --parent-id 参数');
-            process.exit(1);
+          
+          // 内容来源：--file > 位置参数1
+          const contentResult = resolveContent(createParsed.options, createParsed.positional, 1);
+          const createContent = contentResult.content;
+          if (contentResult.source !== 'none' && contentResult.source !== 'argument') {
+            console.log(`内容来源: ${contentResult.source}${createContent ? ` (${createContent.length} 字符)` : ''}`);
           }
+          
+          await performCreate(createTitle, createContent, createParentId, createPath, createForce, skill);
         }
-        
-        console.log('创建文档...');
-        console.log('标题:', createTitle);
-        console.log('内容:', createContent || '(空)');
-        if (createParentId) {
-          console.log('父文档 ID:', createParentId);
-        }
-        if (createPath) {
-          console.log('路径:', createPath);
-        }
-        console.log('强制创建:', createForce);
-        
-        const createResult = await skill.executeCommand('create-document', { 
-          parentId: createParentId,
-          title: createTitle,
-          content: createContent,
-          force: createForce,
-          path: createPath
-        });
-        console.log(JSON.stringify(createResult, null, 2));
         break;
         
       case 'update-document':
@@ -1076,21 +1233,38 @@ async function main(customArgs = null) {
         // 使用通用参数解析器
         const updateParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--data-type': { hasValue: true }
+            '--data-type': { hasValue: true },
+            '--file': { hasValue: true, aliases: ['-f'] }
           },
           positionalCount: 2
         });
         
-        if (updateParsed.positional.length < 2) {
-          console.error('错误: 请提供文档ID和内容');
+        if (updateParsed.positional.length < 1) {
+          console.error('错误: 请提供文档ID');
           console.log('用法: siyuan update <docId> <content> [--data-type <type>]');
+          console.log('  或: siyuan update <docId> --file content.md');
           process.exit(1);
+        }
+        
+        // 内容来源：--file > 位置参数1
+        const updateContentResult = resolveContent(updateParsed.options, updateParsed.positional, 1);
+        
+        if (!updateContentResult.content && updateContentResult.source === 'none') {
+          console.error('错误: 请提供内容（或使用 --file）');
+          console.log('用法: siyuan update <docId> <content> [--data-type <type>]');
+          console.log('  或: siyuan update <docId> --file content.md');
+          process.exit(1);
+        }
+        
+        const updateContent = updateContentResult.content;
+        if (updateContentResult.source !== 'argument') {
+          console.log(`内容来源: ${updateContentResult.source}${updateContent ? ` (${updateContent.length} 字符)` : ''}`);
         }
         
         console.log('更新文档...');
         const updateDocArgs = {
           docId: updateParsed.positional[0],
-          content: updateParsed.positional[1],
+          content: updateContent,
           dataType: updateParsed.options.dataType
         };
         
@@ -1339,7 +1513,7 @@ async function main(customArgs = null) {
         const insertBlockParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--data-type': { hasValue: true },
-            '--parent-id': { hasValue: true },
+            '--parent-id': { hasValue: true, aliases: ['-p'] },
             '--previous-id': { hasValue: true },
             '--next-id': { hasValue: true }
           },
@@ -1423,7 +1597,7 @@ async function main(customArgs = null) {
         // 使用通用参数解析器
         const moveBlockParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--parent-id': { hasValue: true },
+            '--parent-id': { hasValue: true, aliases: ['-p'] },
             '--previous-id': { hasValue: true }
           },
           positionalCount: 1
@@ -1448,7 +1622,7 @@ async function main(customArgs = null) {
         // 使用通用参数解析器
         const getBlockParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--mode': { hasValue: true }
+            '--mode': { hasValue: true, aliases: ['-m'] }
           },
           positionalCount: 1
         });
@@ -1472,7 +1646,7 @@ async function main(customArgs = null) {
         // 使用通用参数解析器
         const foldBlockParsed = parseCommandArgs(args.slice(1), {
           options: {
-            '--action': { hasValue: true }
+            '--action': { hasValue: true, aliases: ['-a'] }
           },
           positionalCount: 1
         });
@@ -1565,9 +1739,9 @@ async function main(customArgs = null) {
           options: {
             '--id': { hasValue: true },
             '--attrs': { hasValue: true },
-            '--set': { hasValue: true, aliases: ['--attrs'] },
-            '--get': { isFlag: true },
-            '--key': { hasValue: true },
+            '--set': { hasValue: true, aliases: ['--attrs', '-S'] },
+            '--get': { isFlag: true, aliases: ['-g'] },
+            '--key': { hasValue: true, aliases: ['-k'] },
             '--remove': { hasValue: true },
             '--hide': { isFlag: true }
           },
@@ -1602,10 +1776,10 @@ async function main(customArgs = null) {
         const tagsParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--id': { hasValue: true },
-            '--tags': { hasValue: true },
-            '--add': { isFlag: true },
+            '--tags': { hasValue: true, aliases: ['-t'] },
+            '--add': { isFlag: true, aliases: ['-a'] },
             '--remove': { isFlag: true },
-            '--get': { isFlag: true }
+            '--get': { isFlag: true, aliases: ['-g'] }
           },
           positionalCount: 1
         });
@@ -1625,6 +1799,80 @@ async function main(customArgs = null) {
         }
         const tagsResult = await skill.executeCommand('tags', tagsArgs);
         console.log(JSON.stringify(tagsResult, null, 2));
+        break;
+        
+      case 'set-icon':
+      case 'icon':
+        if (args.includes('--help') || args.includes('-h')) {
+          showHelp('icon');
+          process.exit(0);
+        }
+        
+        const iconParsed = parseCommandArgs(args.slice(1), {
+          options: {
+            '--emoji': { hasValue: true, aliases: ['-e'] },
+            '--get': { isFlag: true, aliases: ['-g'] },
+            '--remove': { isFlag: true, aliases: ['-r'] }
+          },
+          positionalCount: 1
+        });
+        
+        if (iconParsed.positional.length < 1) {
+          console.error('错误：请提供文档ID或块ID');
+          console.log('用法：siyuan icon <id> [--emoji <emoji>] [--get] [--remove]');
+          process.exit(1);
+        }
+        
+        const iconId = iconParsed.positional[0];
+        const iconEmoji = iconParsed.options.emoji || '';
+        const iconGet = iconParsed.options.get || false;
+        const iconRemove = iconParsed.options.remove || false;
+        
+        if (iconGet) {
+          console.log('获取图标...');
+          const getIconResult = await skill.executeCommand('block-attrs', {
+            id: iconId,
+            get: true,
+            key: 'icon',
+            hide: true
+          });
+          console.log(JSON.stringify(getIconResult, null, 2));
+        } else if (iconRemove) {
+          console.log('移除图标...');
+          const removeIconResult = await skill.executeCommand('block-attrs', {
+            id: iconId,
+            remove: 'icon',
+            hide: true
+          });
+          console.log(JSON.stringify(removeIconResult, null, 2));
+        } else if (iconEmoji) {
+          let emojiCode = iconEmoji;
+          if (iconEmoji.length <= 4 || /^[\u{1F300}-\u{1F9FF}]+$/u.test(iconEmoji)) {
+            const codePoints = [];
+            for (const char of iconEmoji) {
+              codePoints.push(char.codePointAt(0).toString(16));
+            }
+            emojiCode = codePoints.join('-');
+            console.log(`转换 emoji 为编码: ${iconEmoji} -> ${emojiCode}`);
+          }
+          
+          console.log('设置图标...');
+          console.log('ID:', iconId);
+          console.log('图标编码:', emojiCode);
+          const setIconResult = await skill.executeCommand('block-attrs', {
+            id: iconId,
+            attrs: `icon=${emojiCode}`,
+            hide: true
+          });
+          console.log(JSON.stringify(setIconResult, null, 2));
+        } else {
+          console.error('错误：请指定操作');
+          console.log('用法：');
+          console.log('  siyuan icon <id> --emoji <emoji>  # 设置图标');
+          console.log('  siyuan icon <id> --get            # 获取图标');
+          console.log('  siyuan icon <id> --remove         # 移除图标');
+          process.exit(1);
+        }
         break;
         
       default:

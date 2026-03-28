@@ -14,14 +14,14 @@ siyuan search <query> [options]
 
 | 参数 | 类型 | 说明 | 示例 |
 |-----|------|------|------|
-| `--mode <mode>` | string | 搜索模式：hybrid（混合）、semantic（语义）、keyword（关键词）、legacy（SQL，默认） | `--mode hybrid` |
-| `--type <type>` | string | 按单个类型过滤 | `--type d` |
+| `--mode, -m <mode>` | string | 搜索模式：hybrid（混合）、semantic（语义）、keyword（关键词）、legacy（SQL，默认） | `-m hybrid` |
+| `--type, -T <type>` | string | 按单个类型过滤 | `-T d` |
 | `--types <types>` | string | 按多个类型过滤（逗号分隔） | `--types d,p,h` |
-| `--sort-by <sortBy>` | string | 排序方式（relevance/date） | `--sort-by date` |
-| `--limit <limit>` | number | 结果数量限制 | `--limit 5` |
-| `--path <path>` | string | 搜索路径（仅搜索指定路径下的内容） | `--path /AI/openclaw` |
-| `--notebook <notebookId>` | string | 指定笔记本ID | `--notebook 20260227231831-yq1lxq2` |
-| `--sql <sql>` | string | 自定义SQL查询条件 | `--sql "length(content) > 100 AND updated > '20260101000000'"` |
+| `--sort-by, -s <sortBy>` | string | 排序方式（relevance/date） | `-s date` |
+| `--limit, -l <limit>` | number | 结果数量限制 | `-l 5` |
+| `--path, -P <path>` | string | 搜索路径（仅搜索指定路径下的内容） | `-P /AI/openclaw` |
+| `--notebook, -n <notebookId>` | string | 指定笔记本ID | `-n 20260227231831-yq1lxq2` |
+| `--where <condition>` | string | 自定义WHERE条件（用于过滤搜索结果） | `--where "length(content) > 100 AND updated > '20260101000000'"` |
 | `--sql-weight <weight>` | number | SQL搜索权重（混合搜索时，默认 0） | `--sql-weight 0.3` |
 | `--dense-weight <weight>` | number | 语义搜索权重（混合搜索时，默认 0.7） | `--dense-weight 0.8` |
 | `--sparse-weight <weight>` | number | 关键词搜索权重（混合搜索时，默认 0.3） | `--sparse-weight 0.2` |
@@ -98,8 +98,8 @@ siyuan search "关键词" --path /AI/openclaw --type d
 
 ### 高级查询
 ```bash
-siyuan search "关键词" --sql "length(content) > 100 AND updated > '20260101000000'"
-siyuan search "关键词" --path /AI/openclaw --sql "type = 'd'"
+siyuan search "关键词" --where "length(content) > 100 AND updated > '20260101000000'"
+siyuan search "关键词" --path /AI/openclaw --where "type = 'd'"
 siyuan search "关键词" --min-length 20 --max-length 500
 siyuan search "关键词" --sort-by date --limit 5
 ```
@@ -121,7 +121,7 @@ siyuan search "关键词" --sort-by date --limit 5
 - **查询转义**：所有搜索查询都经过 `escapeSql` 方法转义
 - **ID 验证**：笔记本 ID 和父文档 ID 必须符合思源笔记格式（14-32位字母数字）
 - **类型白名单**：类型参数只接受预定义的合法值
-- **自定义 SQL 过滤**：自定义 SQL 条件会过滤注释和危险字符
+- **自定义 WHERE 条件过滤**：`--where` 参数会过滤注释和危险字符
 
 ### 参数验证
 | 参数 | 验证规则 |

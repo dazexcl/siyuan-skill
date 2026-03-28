@@ -104,6 +104,11 @@ const command = {
             
             if (createResult.id) {
               currentParentId = createResult.id;
+              try {
+                await skill.documentManager.setBlockAttrs(createResult.id, { icon: '1f5c2' });
+              } catch (iconError) {
+                console.warn(`为中间目录 "${component}" 设置图标失败:`, iconError.message);
+              }
             } else {
               return {
                 success: false,

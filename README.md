@@ -283,8 +283,8 @@ siyuan search "关键词" --mode keyword   # 关键词搜索（默认）
 siyuan search "概念描述" --mode semantic # 语义搜索（需向量服务）
 siyuan search "查询内容" --mode hybrid   # 混合搜索（需向量服务）
 
-# SQL 搜索
-siyuan search --sql "SELECT * FROM blocks WHERE content LIKE '%关键词%'"
+# WHERE 条件过滤
+siyuan search "关键词" --where "length(content) > 100"
 
 # 搜索选项
 siyuan search "关键词" --limit 10
@@ -805,7 +805,7 @@ siyuan search "人工智能应用" --mode hybrid
 | 模式  | 命令                  | 适用场景 | 依赖              |
 | --- | ------------------- | ---- | --------------- |
 | 关键词 | `--mode keyword`    | 精确匹配 | 无               |
-| SQL | `--sql "SELECT..."` | 复杂查询 | 无               |
+| WHERE过滤 | `--where "条件"` | 条件过滤 | 无               |
 | 语义  | `--mode semantic`   | 概念查找 | Qdrant + Ollama |
 | 混合  | `--mode hybrid`     | 综合搜索 | Qdrant + Ollama |
 
@@ -828,6 +828,8 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 ***
 
 ## 书写规范
+
+> 📋 完整书写规范见 [书写指南](references/advanced/writing-guide.md)
 
 ### 内部链接
 

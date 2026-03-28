@@ -73,6 +73,7 @@ siyuan --version       # 显示版本信息
 | 保护/取消保护 | `protect` | `--on` / `--off` | `siyuan protect <docId> --on` |
 | 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
 | 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
+| 设置文档图标 | `icon` / `set-icon` | `--emoji` / `--get` / `--remove` | `siyuan icon <docId> --emoji 1f4c4` |
 | 设置文档属性 | `block-attrs` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
 | 设置标签 | `tags` / `st` | `--tags` | `siyuan st <docId> --tags "A,B"` |
 | 搜索内容 | `search` / `find` | `--mode` / `--threshold` | `siyuan search "关键词" --mode semantic` |
@@ -201,6 +202,17 @@ siyuan ba <docId> --remove "status"
 siyuan st <docId> --tags "重要,待审核"
 ```
 
+## 图标设置
+
+```bash
+siyuan icon <docId> --emoji 📄       # 直接传入 emoji
+siyuan icon <docId> --emoji 1f4c4    # 或使用编码
+siyuan icon <docId> --get            # 获取图标
+siyuan icon <docId> --remove         # 移除图标
+```
+
+> 📋 完整 emoji 编码表见 [图标命令文档](references/commands/icon.md)
+
 ## 文档格式
 
 ```bash
@@ -225,24 +237,16 @@ siyuan create "标题" "第一段## 二级标题 内容"
 ### 内部链接
 
 ```markdown
-# ✅ 推荐：思源特有链接格式
 ((docId '标题'))
-
-# 示例
-((20260304051123-doaxgi4 '我的文档'))
-
-# ❌ 不推荐：标准 Markdown 链接
-[我的文档](20260304051123-doaxgi4)
 ```
 
 ### SQL 嵌入块
 
 ```markdown
-# 动态查询嵌入
 {{ SELECT * FROM blocks WHERE type = 'd' ORDER BY updated DESC LIMIT 5 }}
 ```
 
-> 📋 详细规范见 [最佳实践文档](references/advanced/best-practices.md)
+> 📋 完整规范见 [书写指南](references/advanced/writing-guide.md) 和 [最佳实践](references/advanced/best-practices.md)
 
 ---
 
@@ -330,7 +334,9 @@ siyuan nlp "文本" --tasks tokenize,keywords
 - [环境变量配置](references/config/environment.md)
 - [命令详细文档](references/commands/)
 - [高级功能](references/advanced/)
-- [使用指南（书写规范、故障排除）](references/advanced/usage-guide.md)
+- [书写指南（内容格式规范）](references/advanced/writing-guide.md)
+- [最佳实践](references/advanced/best-practices.md)
+- [使用指南（故障排除）](references/advanced/usage-guide.md)
 - [思源笔记 API](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
 
 ---

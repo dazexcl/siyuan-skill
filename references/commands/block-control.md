@@ -13,6 +13,7 @@
 | `block-get` | `bg` | 获取块信息 |
 | `block-attrs` | `ba`, `attrs` | 管理块属性 |
 | `tags` | `st` | 设置块/文档标签 |
+| `icon` | `set-icon` | 设置/获取文档图标 |
 | `block-fold` | `bf` | 折叠/展开块 |
 | `block-transfer-ref` | `btr` | 转移块引用 |
 
@@ -49,7 +50,7 @@ siyuan block-insert <content> --next-id <blockId>
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
 | `<content>` | string | ✅ | 块内容（位置参数） |
-| `--parent-id` | string | ⚡ | 父块ID（位置参数三选一） |
+| `--parent-id, -p` | string | ⚡ | 父块ID（位置参数三选一） |
 | `--previous-id` | string | ⚡ | 前一个块ID，插入到其后（位置参数三选一） |
 | `--next-id` | string | ⚡ | 后一个块ID，插入到其前（位置参数三选一） |
 | `--data-type` | string | ❌ | 数据类型：markdown/dom（默认：markdown） |
@@ -60,7 +61,7 @@ siyuan block-insert <content> --next-id <blockId>
 
 ```bash
 # 在文档末尾插入块（推荐方式）
-siyuan bi "新段落内容" --parent-id <docId>
+siyuan bi "新段落内容" -p <docId>
 
 # 在指定块后插入
 siyuan bi "新段落内容" --previous-id <blockId>
@@ -179,14 +180,14 @@ siyuan block-move <blockId> [--parent-id <parentId>] [--previous-id <previousId>
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
 | `<blockId>` | string | ✅ | 要移动的块ID（位置参数） |
-| `--parent-id` | string | ❌ | 目标父块ID |
+| `--parent-id, -p` | string | ❌ | 目标父块ID |
 | `--previous-id` | string | ❌ | 目标前一个块ID |
 
 ### 使用示例
 
 ```bash
 # 移动到新父块下
-siyuan bm <blockId> --parent-id <targetParentId>
+siyuan bm <blockId> -p <targetParentId>
 
 # 移动到指定块后
 siyuan bm <blockId> --previous-id <targetBlockId>
@@ -209,7 +210,7 @@ siyuan block-get <blockId> [--mode <mode>]
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
 | `<blockId>` | string | ✅ | 块ID（位置参数） |
-| `--mode` | string | ❌ | 查询模式：kramdown/children（默认：kramdown） |
+| `--mode, -m` | string | ❌ | 查询模式：kramdown/children（默认：kramdown） |
 
 ### 使用示例
 
@@ -218,7 +219,7 @@ siyuan block-get <blockId> [--mode <mode>]
 siyuan bg <blockId>
 
 # 获取文档的子块列表
-siyuan bg <docId> --mode children
+siyuan bg <docId> -m children
 ```
 
 ### 返回格式
@@ -271,8 +272,8 @@ siyuan block-attrs <docId|blockId> (--set <attrs> | --get [key] | --remove <keys
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
 | `<docId|blockId>` | string | ✅ | 块ID/文档ID（位置参数，必传） |
-| `--set` | string | ⚡ | 设置属性（key=value格式，多个用逗号分隔） |
-| `--get` | string | ⚡ | 获取属性（不带参数取所有，带参数取指定属性） |
+| `--set, -S` | string | ⚡ | 设置属性（key=value格式，多个用逗号分隔） |
+| `--get, -g` | string | ⚡ | 获取属性（不带参数取所有，带参数取指定属性） |
 | `--remove` | string | ⚡ | 移除属性（传入属性键名，多个用逗号分隔） |
 | `--hide` | boolean | ❌ | 操作内部属性（不带 custom- 前缀，在界面不可见） |
 
@@ -284,23 +285,23 @@ siyuan block-attrs <docId|blockId> (--set <attrs> | --get [key] | --remove <keys
 
 ```bash
 # 设置可见属性（自动添加 custom- 前缀，在界面可见）
-siyuan attrs <docId> --set "status=draft,priority=high"
+siyuan attrs <docId> -S "status=draft,priority=high"
 
 # 设置内部属性（不带 custom- 前缀，在界面不可见）
-siyuan attrs <blockId> --set "internal=true" --hide
+siyuan attrs <blockId> -S "internal=true" --hide
 ```
 
 #### 获取属性
 
 ```bash
 # 获取所有属性（自动移除 custom- 前缀显示）
-siyuan attrs <docId> --get
+siyuan attrs <docId> -g
 
 # 获取指定属性
-siyuan attrs <blockId> --get "status"
+siyuan attrs <blockId> -g "status"
 
 # 获取内部属性
-siyuan attrs <docId> --get "internal" --hide
+siyuan attrs <docId> -g "internal" --hide
 ```
 
 #### 移除属性
@@ -339,7 +340,7 @@ siyuan block-fold <blockId> [--action <fold|unfold>]
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
 | `<blockId>` | string | ✅ | 块ID（位置参数） |
-| `--action` | string | ❌ | 操作类型：fold（折叠）或 unfold（展开），默认 fold |
+| `--action, -a` | string | ❌ | 操作类型：fold（折叠）或 unfold（展开），默认 fold |
 
 ### 使用示例
 
@@ -350,8 +351,8 @@ siyuan bf <blockId>
 # 展开块
 siyuan buu <blockId>
 
-# 使用 --action 参数
-siyuan bf <blockId> --action unfold
+# 使用 -a 参数
+siyuan bf <blockId> -a unfold
 ```
 
 ---
@@ -520,5 +521,6 @@ siyuan bu <blockId3> "更新内容3"
 
 - [更新文档命令](update.md) - 全文档更新
 - [标签命令](tags.md) - 标签详细文档
+- [图标命令](icon.md) - 图标设置详细文档
 - [最佳实践](../advanced/best-practices.md) - 使用建议
 - [SKILL.md](../../SKILL.md#全文档更新-vs-块更新) - 全文档更新 vs 块更新详细对比

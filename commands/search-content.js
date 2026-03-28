@@ -28,7 +28,7 @@ const command = {
    * @param {string} args.type - 按单个类型过滤 (d/p/h/l/i/tb/c/s/img)
    * @param {Array|string} args.types - 按多个类型过滤
    * @param {boolean} args.hasTags - 是否有标签
-   * @param {string} args.sql - 自定义SQL查询条件（可选）
+   * @param {string} args.sql - 自定义WHERE条件（可选，通过 --where 参数传入）
    * @param {number} args.denseWeight - 语义搜索权重（混合搜索时）
    * @param {number} args.sparseWeight - 关键词搜索权重（混合搜索时）
    * @param {number} args.sqlWeight - SQL搜索权重（混合搜索时）
