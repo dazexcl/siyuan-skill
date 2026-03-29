@@ -43,10 +43,10 @@ node siyuan.js --version       # 显示版本信息
 | 删除文档 | `delete` / `rm` | 文档ID | `siyuan rm <docId>` |
 | 移动文档 | `move` / `mv` | `--new-title`（可选） | `siyuan mv <docId> <targetId>` |
 | 重命名文档 | `rename` | 新标题 | `siyuan rename <docId> "新标题"` |
-| 保护/取消保护 | `protect` | `--on` / `--off` | `siyuan protect <docId> --on` |
+| 保护/取消保护 | `protect` | `--remove` | `siyuan protect <docId>` / `siyuan protect <docId> --remove` |
 | 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
 | 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
-| 设置文档图标 | `icon` / `set-icon` | `--emoji` / `--get` / `--remove` | `siyuan icon <docId> --emoji 1f4c4` |
+| 设置文档图标 | `icon` | `--emoji` / `--get` / `--remove` | `siyuan icon <docId> --emoji 1f4c4` |
 | 设置文档属性 | `block-attrs` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
 | 设置标签 | `tags` / `st` | `--tags` | `siyuan st <docId> --tags "A,B"` |
 | 搜索内容 | `search` / `find` | `--mode` / `--threshold` | `siyuan search "关键词" --mode semantic` |
@@ -57,10 +57,10 @@ node siyuan.js --version       # 显示版本信息
 |----------|----------|----------|------|
 | 获取块信息 | `block-get` / `bg` | `--mode` | `siyuan bg <blockId> --mode kramdown` |
 | 修改单个块 | `block-update` / `bu` | 块ID（非文档ID） | `siyuan bu <blockId> "块内容"` |
-| 插入新块 | `block-insert` / `bi` | `--parent-id` / `--next-id` | `siyuan bi "内容" --parent-id xxx` |
+| 插入新块 | `block-insert` / `bi` | `--parent-id` / `--previous-id` / `--next-id` | `siyuan bi "内容" --parent-id xxx` |
 | 删除单个块 | `block-delete` / `bd` | 块ID | `siyuan bd <blockId>` |
-| 移动块 | `block-move` / `bm` | `--parent-id` / `--next-id` | `siyuan bm <blockId> --parent-id xxx` |
-| 折叠/展开块 | `block-fold` / `bf` | `--fold` / `--unfold` | `siyuan bf <blockId> --fold` |
+| 移动块 | `block-move` / `bm` | `--parent-id` / `--previous-id` | `siyuan bm <blockId> --parent-id xxx` |
+| 折叠/展开块 | `block-fold` / `bf` | `--action` | `siyuan bf <blockId>` / `siyuan bf <blockId> -a unfold` |
 | 转移块引用 | `block-transfer-ref` / `btr` | 源块ID、目标块ID | `siyuan btr <srcId> <tgtId>` |
 
 > **重要区分**：`update` 只接受文档ID，`block-update` 只接受块ID
@@ -141,7 +141,9 @@ siyuan exists --path "/目录/文档标题"
    
 2. 判断修改范围
    ├─ 全文替换 → siyuan update <docId> "完整新内容"
-   └─ 仅修改部分块 → 先 siyuan bg <docId> --mode kramdown
+   └─ 仅修改部分块
+       ├─ siyuan bg <blockId> --mode kramdown  # 获取特定块内容（注意是块ID）
+       └─ siyuan bu <blockId> "新内容"         # 更新单个块
 ```
 
 ## create 命令

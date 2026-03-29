@@ -203,7 +203,6 @@ const ALIAS_MAP = {
   'rm': 'delete',
   'mv': 'move',
   'path': 'convert',
-  'index-documents': 'index',
   'nlp-analyze': 'nlp',
   'bi': 'block-insert',
   'bu': 'block-update',
@@ -214,15 +213,10 @@ const ALIAS_MAP = {
   'attrs': 'block-attrs',
   'block-attributes': 'block-attrs',
   'bf': 'block-fold',
-  'buu': 'block-fold',
-  'block-unfold': 'block-fold',
-  'fold-block': 'block-fold',
-  'unfold-block': 'block-fold',
   'btr': 'block-transfer-ref',
   'st': 'tags',
   'check': 'exists',
-  'check-exists': 'exists',
-  'set-icon': 'icon'
+  'check-exists': 'exists'
 };
 
 /**
@@ -265,8 +259,8 @@ Siyuan Skill CLI - 思源笔记命令行工具
   exists, check                    检查文档是否存在
   search, find                     搜索内容
   convert, path                    转换 ID 和路径
-  icon, set-icon                   设置/获取文档图标
-  index, index-documents           索引文档到向量数据库
+  icon                              设置/获取文档图标
+  index                             索引文档到向量数据库
   nlp                              NLP 文本分析 [实验性]
   block-insert, bi                 插入新块
   block-update, bu                 更新块内容（仅接受块ID）
@@ -274,7 +268,7 @@ Siyuan Skill CLI - 思源笔记命令行工具
   block-move, bm                   移动块
   block-get, bg                    获取块信息
   block-attrs, ba, attrs           管理块/文档属性
-  block-fold, bf/buu               折叠/展开块
+  block-fold, bf                   折叠/展开块
   block-transfer-ref, btr          转移块引用
   tags, st                         设置块/文档标签
   help                             显示帮助信息
@@ -613,7 +607,6 @@ function showCommandHelp(command) {
       ]
     },
     'index': {
-      aliases: ['index-documents'],
       description: '索引文档到向量数据库（增量索引、自动分块、孤立索引清理）',
       usage: 'siyuan index [<id>] [--notebook <id>] [--doc-ids <ids>] [--force] [--remove]',
       options: [
@@ -739,7 +732,7 @@ function showCommandHelp(command) {
       ]
     },
     'block-fold': {
-      aliases: ['bf', 'block-unfold', 'buu'],
+      aliases: ['bf'],
       description: '折叠或展开块',
       usage: 'siyuan block-fold <blockId> [--action <fold|unfold>]',
       options: [
@@ -749,7 +742,7 @@ function showCommandHelp(command) {
       ],
       examples: [
         'siyuan bf <blockId>              # 折叠块',
-        'siyuan buu <blockId>            # 展开块',
+        'siyuan bf <blockId> -a unfold    # 展开块',
         'siyuan block-fold <blockId> -a unfold',
         'siyuan bf --id <blockId> -a fold'
       ]
@@ -826,7 +819,6 @@ function showCommandHelp(command) {
       ]
     },
     'icon': {
-      aliases: ['set-icon'],
       description: '设置或获取文档/块图标（emoji 编码）',
       usage: 'siyuan icon <id> [--emoji <emoji>] [--get] [--remove]',
       notes: [
@@ -845,8 +837,7 @@ function showCommandHelp(command) {
         'siyuan icon <doc-id> --emoji 1f4c4',
         'siyuan icon <doc-id> --emoji 📄',
         'siyuan icon <doc-id> --get',
-        'siyuan icon <doc-id> --remove',
-        'siyuan set-icon <doc-id> -e 1f4a1'
+        'siyuan icon <doc-id> --remove'
       ]
     }
   };
@@ -917,7 +908,7 @@ async function main(customArgs = null) {
       const modeIndex = args.indexOf('--mode');
       const mode = modeIndex !== -1 && modeIndex + 1 < args.length ? args[modeIndex + 1] : 'legacy';
       needsVectorSearch = ['semantic', 'hybrid'].includes(mode);
-    } else if (['index', 'index-documents'].includes(command)) {
+    } else if (command === 'index') {
       needsVectorSearch = true;
     }
     
@@ -1377,7 +1368,6 @@ async function main(customArgs = null) {
         console.log(JSON.stringify(moveResult, null, 2));
         break;
         
-      case 'index-documents':
       case 'index':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('index');
@@ -1635,8 +1625,6 @@ async function main(customArgs = null) {
         
       case 'block-fold':
       case 'bf':
-      case 'block-unfold':
-      case 'buu':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('block-fold');
           process.exit(0);
@@ -1650,8 +1638,7 @@ async function main(customArgs = null) {
           positionalCount: 1
         });
         
-        const defaultFoldAction = (command === 'block-unfold' || command === 'buu') ? 'unfold' : 'fold';
-        const foldAction = foldBlockParsed.options.action || defaultFoldAction;
+        const foldAction = foldBlockParsed.options.action || 'fold';
         
         console.log(`${foldAction === 'fold' ? '折叠' : '展开'}块...`);
         const foldBlockResult = await skill.executeCommand('block-fold', {
@@ -1800,7 +1787,6 @@ async function main(customArgs = null) {
         console.log(JSON.stringify(tagsResult, null, 2));
         break;
         
-      case 'set-icon':
       case 'icon':
         if (args.includes('--help') || args.includes('-h')) {
           showHelp('icon');

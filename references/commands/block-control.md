@@ -13,7 +13,7 @@
 | `block-get` | `bg` | 获取块信息 |
 | `block-attrs` | `ba`, `attrs` | 管理块属性 |
 | `tags` | `st` | 设置块/文档标签 |
-| `icon` | `set-icon` | 设置/获取文档图标 |
+| `icon` | | 设置/获取文档图标 |
 | `block-fold` | `bf` | 折叠/展开块 |
 | `block-transfer-ref` | `btr` | 转移块引用 |
 
@@ -332,8 +332,6 @@ siyuan block-fold <blockId> [--action <fold|unfold>]
 ### 别名
 
 - `bf` - 默认折叠
-- `buu` - 默认展开
-- `block-unfold` - 默认展开
 
 ### 参数说明
 
@@ -349,10 +347,8 @@ siyuan block-fold <blockId> [--action <fold|unfold>]
 siyuan bf <blockId>
 
 # 展开块
-siyuan buu <blockId>
-
-# 使用 -a 参数
 siyuan bf <blockId> -a unfold
+siyuan block-fold <blockId> -a unfold
 ```
 
 ---
