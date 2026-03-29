@@ -12,8 +12,7 @@ if (process.platform === 'win32') {
   // 移除之前的 ANSI 转义序列，避免终端响应
 }
 
-const { createSkill } = require('./index');
-const { version } = require('./package.json');
+const { createSkill, VERSION } = require('./index');
 const fs = require('fs');
 const path = require('path');
 
@@ -111,7 +110,7 @@ async function performCreate(title, content, parentId, path, force, skill) {
  * 显示版本信息
  */
 function showVersion() {
-  console.log(`siyuan-skill v${version}`);
+  console.log(`siyuan-skill v${VERSION}`);
 }
 
 /**

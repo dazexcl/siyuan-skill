@@ -5,6 +5,8 @@
  */
 
 const path = require('path');
+
+const VERSION = '1.7.8';
 const ConfigManager = require('./config');
 const SiyuanConnector = require('./connector');
 const commands = require('./commands');
@@ -172,7 +174,7 @@ class SiyuanNotesSkill {
   getInfo() {
     return {
       name: 'siyuan-skill',
-      version: '1.7.7',
+      version: VERSION,
       description: 'Siyuan Notes 连接器技能（支持向量搜索和 NLP）',
       commands: Object.keys(commands).map(cmd => ({
         name: cmd,
@@ -375,6 +377,7 @@ const nlpAnalyze = async (text, nlpOptions = {}, skillOptions = {}) => {
 };
 
 module.exports = {
+  VERSION,
   SiyuanNotesSkill,
   createSkill,
   executeSingleCommand,
