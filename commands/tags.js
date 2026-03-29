@@ -30,7 +30,7 @@ function splitTags(tagsStr) {
 const command = {
   name: 'tags',
   description: '设置 Siyuan Notes 中块/文档的标签',
-  usage: 'tags --id <blockId> --tags <tags> [--add] [--remove] [--get]',
+  usage: 'tags <id> [tags] [--add <tags>] [--remove <tags>] [--get]',
   
   /**
    * 执行指令
@@ -38,7 +38,7 @@ const command = {
    * @param {Object} args - 指令参数
    * @param {string} args.id - 块ID/文档ID
    * @param {string} args.tags - 标签（多个用逗号分隔）
-   * @param {boolean} args.add - 添加标签（不覆盖现有标签）
+   * @param {boolean} args.add - 添加标签
    * @param {boolean} args.remove - 移除标签
    * @param {boolean} args.get - 获取当前标签
    * @returns {Promise<Object>} 标签操作结果
@@ -58,7 +58,7 @@ const command = {
       return {
         success: false,
         error: '缺少必要参数',
-        message: '必须提供 --tags 参数或使用 --get 获取标签'
+        message: '必须提供标签内容或使用 --get 获取标签'
       };
     }
     

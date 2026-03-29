@@ -785,20 +785,20 @@ function showCommandHelp(command) {
     },
     'tags': {
       description: '设置块/文档标签',
-      usage: 'siyuan tags <id> --tags <tags> [--add] [--remove] [--get]',
+      usage: 'siyuan tags <id> [tags] [--add] [--remove] [--get]',
       options: [
         { name: '<id>', description: '块ID/文档ID（必需，位置参数）' },
+        { name: '<tags>', description: '标签内容（可选，位置参数，逗号分隔多个标签）' },
         { name: '--id', description: '块ID/文档ID（可选，等同于位置参数）' },
-        { name: '--tags, -t', description: '标签内容（逗号分隔多个标签）' },
-        { name: '--add, -a', description: '添加标签（追加模式）' },
-        { name: '--remove', description: '移除指定标签' },
+        { name: '--add, -a', description: '添加标签（需要提供标签内容）' },
+        { name: '--remove, -r', description: '移除标签（需要提供标签内容）' },
         { name: '--get, -g', description: '获取当前标签' }
       ],
       examples: [
-        'siyuan tags <id> -t "标签1,标签2"',
-        'siyuan tags <id> -t "新标签" -a',
-        'siyuan tags <id> -t "旧标签" --remove',
-        'siyuan tags <id> -g'
+        'siyuan tags <id> "标签1,标签2"',
+        'siyuan tags <id> --add "新标签"',
+        'siyuan tags <id> --remove "旧标签"',
+        'siyuan tags <id> --get'
       ]
     },
     'exists': {
@@ -1762,25 +1762,32 @@ async function main(customArgs = null) {
         const tagsParsed = parseCommandArgs(args.slice(1), {
           options: {
             '--id': { hasValue: true },
-            '--tags': { hasValue: true, aliases: ['-t'] },
-            '--add': { isFlag: true, aliases: ['-a'] },
-            '--remove': { isFlag: true },
+            '--add': { hasValue: true, aliases: ['-a'] },
+            '--remove': { hasValue: true, aliases: ['-r'] },
             '--get': { isFlag: true, aliases: ['-g'] }
           },
-          positionalCount: 1
+          positionalCount: 2
         });
         const tagsArgs = {};
         if (tagsParsed.positional.length > 0) {
           tagsArgs.id = tagsParsed.positional[0];
         }
+        if (tagsParsed.positional.length > 1) {
+          tagsArgs.tags = tagsParsed.positional[1];
+        }
         if (tagsParsed.options.id) tagsArgs.id = tagsParsed.options.id;
-        if (tagsParsed.options.tags) tagsArgs.tags = tagsParsed.options.tags;
-        if (tagsParsed.options.add) tagsArgs.add = true;
-        if (tagsParsed.options.remove) tagsArgs.remove = true;
+        if (tagsParsed.options.add) {
+          tagsArgs.tags = tagsParsed.options.add;
+          tagsArgs.add = true;
+        }
+        if (tagsParsed.options.remove) {
+          tagsArgs.tags = tagsParsed.options.remove;
+          tagsArgs.remove = true;
+        }
         if (tagsParsed.options.get) tagsArgs.get = true;
         if (!tagsArgs.id) {
           console.error('错误：请提供块/文档 ID');
-          console.log('用法：siyuan tags <id> --tags <tags> [--add] [--remove] [--get]');
+          console.log('用法：siyuan tags <id> [tags] [--add <tags>] [--remove <tags>] [--get]');
           process.exit(1);
         }
         const tagsResult = await skill.executeCommand('tags', tagsArgs);

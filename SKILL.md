@@ -48,7 +48,7 @@ node siyuan.js --version       # 显示版本信息
 | 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
 | 设置文档图标 | `icon` | `--emoji` / `--get` / `--remove` | `siyuan icon <docId> --emoji 1f4c4` |
 | 设置文档属性 | `block-attrs` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
-| 设置标签 | `tags` / `st` | `--tags` | `siyuan st <docId> --tags "A,B"` |
+| 设置标签 | `tags` / `st` | `--add` / `--remove` / `--get` | `siyuan st <docId> "A,B"` / `siyuan st <docId> --add "C"` |
 | 搜索内容 | `search` / `find` | `--mode` / `--threshold` | `siyuan search "关键词" --mode semantic` |
 
 ## 块操作
@@ -174,7 +174,7 @@ siyuan update <blockId> "内容"        # 错误：update 不接受块ID
 siyuan ba <docId> --set "status=published"
 siyuan ba <docId> --get
 siyuan ba <docId> --remove "status"
-siyuan st <docId> --tags "重要,待审核"
+siyuan st <docId> "重要,待审核"
 ```
 
 ## 图标设置

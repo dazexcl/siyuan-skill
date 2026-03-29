@@ -233,7 +233,7 @@ siyuan ba <docId> --set "priority=high" --set "due=2024-12-31"
 ### 使用命令设置标签（推荐）
 
 ```bash
-siyuan st <docId> --tags "重要,待审核,项目A"
+siyuan st <docId> "重要,待审核,项目A"
 ```
 
 > 标签支持中英文逗号分隔
