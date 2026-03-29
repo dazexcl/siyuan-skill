@@ -11,11 +11,11 @@
 | `block-delete` | `bd` | 删除块 |
 | `block-move` | `bm` | 移动块 |
 | `block-get` | `bg` | 获取块信息 |
-| `block-attrs` | `ba`, `attrs` | 管理块属性 |
-| `tags` | `st` | 设置块/文档标签 |
+| `block-attrs` | `ba`, `attrs`, `attr` | 管理块属性 |
+| `tags` | `tag` | 设置块/文档标签 |
 | `icon` | | 设置/获取文档图标 |
 | `block-fold` | `bf` | 折叠/展开块 |
-| `block-transfer-ref` | `btr` | 转移块引用 |
+| `block-transfer` | `bt` | 转移块引用 |
 
 ## 位置参数支持
 
@@ -353,14 +353,14 @@ siyuan block-fold <blockId> -a unfold
 
 ---
 
-## block-transfer-ref (btr)
+## block-transfer (bt)
 
 转移块引用，将一个块的引用转移到另一个块。
 
 ### 命令格式
 
 ```bash
-siyuan block-transfer-ref --from-id <fromId> --to-id <toId> [--ref-ids <refIds>]
+siyuan block-transfer --from-id <fromId> --to-id <toId> [--ref-ids <refIds>]
 ```
 
 ### 参数说明
@@ -375,10 +375,10 @@ siyuan block-transfer-ref --from-id <fromId> --to-id <toId> [--ref-ids <refIds>]
 
 ```bash
 # 转移所有引用
-siyuan btr --from-id <fromId> --to-id <toId>
+siyuan bt --from-id <fromId> --to-id <toId>
 
 # 转移指定引用
-siyuan btr --from-id <fromId> --to-id <toId> --ref-ids "ref1,ref2"
+siyuan bt --from-id <fromId> --to-id <toId> --ref-ids "ref1,ref2"
 ```
 
 ---

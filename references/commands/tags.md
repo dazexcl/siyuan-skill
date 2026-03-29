@@ -8,7 +8,7 @@
 siyuan tags <id> [tags] [--add <tags>] [--remove <tags>] [--get]
 ```
 
-**别名**：`st`
+**别名**：`tag`
 
 ## 参数说明
 
@@ -30,7 +30,7 @@ siyuan tags <id> [tags] [--add <tags>] [--remove <tags>] [--get]
 siyuan tags <docId> "标签1,标签2"
 
 # 使用别名
-siyuan st <docId> "标签1,标签2"
+siyuan tag <docId> "标签1,标签2"
 ```
 
 ### 添加标签（追加模式）
@@ -60,7 +60,7 @@ siyuan tags <docId> -r "标签1,标签2"
 siyuan tags <docId> --get
 
 # 使用别名
-siyuan st <docId> -g
+siyuan tag <docId> -g
 ```
 
 ## 返回格式

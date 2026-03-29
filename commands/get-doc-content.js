@@ -5,24 +5,75 @@
 
 const Permission = require('../utils/permission');
 const { pathToId } = require('./convert-path');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
  * 指令配置
  */
 const command = {
-  name: 'get-doc-content',
-  description: '获取指定文档的内容，支持 kramdown、markdown、text、html 格式',
-  usage: 'get-doc-content (--doc-id <docId> | --path <path>) [--format <format>] [--raw]',
+  name: 'content',
+  aliases: ['cat'],
+  description: '获取文档内容',
+  usage: 'siyuan content [<docId>] [--path <path>]',
+  sortOrder: 30,
+  
+  initOptions: {},
+  options: {
+    '--path': { hasValue: true, aliases: ['-P'], description: '文档路径' },
+    '--format': { hasValue: true, aliases: ['-F'], description: '输出格式：kramdown、markdown、text、html' },
+    '--raw': { isFlag: true, aliases: ['-r'], description: '纯文本格式返回' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    '位置参数为文档ID，或用 --path 指定路径'
+  ],
+  
+  examples: [
+    'siyuan content <id>',
+    'siyuan content --path "/目录/文档"',
+    'siyuan cat <id> --format text'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.docId = parsed.positional[0];
+    }
+    if (parsed.options.docId) args.docId = parsed.options.docId;
+    if (parsed.options.path) args.path = parsed.options.path;
+    if (parsed.options.format) args.format = parsed.options.format;
+    if (parsed.options.raw) args.raw = true;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.docId && !executeArgs.path) {
+      console.error('错误: 请提供 --doc-id 或 --path 参数');
+      console.log('用法: siyuan content (--doc-id <docId> | --path <path>) [--format <format>] [--raw]');
+      process.exit(1);
+    }
+    
+    console.log('获取文档内容...');
+    const result = await this.execute(skill, executeArgs);
+    
+    if (typeof result === 'string') {
+      console.log(result);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} [args.docId] - 文档ID（与 path 二选一）
-   * @param {string} [args.path] - 文档路径（与 docId 二选一）
-   * @param {string} args.format - 输出格式：kramdown、markdown、text、html（默认：kramdown）
-   * @param {boolean} args.raw - 是否以纯文本格式返回（移除JSON外部结构）
-   * @returns {Promise<Object|string>} 文档内容
    */
   execute: async (skill, args = {}) => {
     let { docId, path, format = 'kramdown', raw = false } = args;
@@ -174,8 +225,6 @@ const command = {
 
 /**
  * Markdown 转纯文本
- * @param {string} markdown - Markdown 文本
- * @returns {string} 纯文本
  */
 function markdownToText(markdown) {
   return markdown
@@ -192,8 +241,6 @@ function markdownToText(markdown) {
 
 /**
  * Markdown 转 HTML
- * @param {string} markdown - Markdown 文本
- * @returns {string} HTML 文本
  */
 function markdownToHtml(markdown) {
   return markdown

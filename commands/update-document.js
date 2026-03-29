@@ -8,11 +8,10 @@
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp, resolveContent } = require('../lib/cli-base');
 
 /**
- * 辅助函数：处理内容中的换行符
- * @param {string} content - 原始内容
- * @returns {string} 处理后的内容
+ * 处理内容中的换行符
  */
 function processContent(content) {
   return content ? content.replace(/\\n/g, '\n') : '';
@@ -20,9 +19,6 @@ function processContent(content) {
 
 /**
  * 验证ID是否为文档ID
- * @param {SiyuanNotesSkill} skill - 技能实例
- * @param {string} id - 要验证的ID
- * @returns {Promise<Object>} 验证结果 { isDoc: boolean, error?: string }
  */
 async function validateDocId(skill, id) {
   try {
@@ -53,18 +49,80 @@ async function validateDocId(skill, id) {
  * 命令配置
  */
 const command = {
-  name: 'update-document',
-  description: '在 Siyuan Notes 中更新文档内容（仅接受文档ID）',
-  usage: 'update --doc-id <docId> --content <content> [--data-type <dataType>]',
+  name: 'update',
+  aliases: ['edit'],
+  description: '更新文档内容（仅接受文档ID）',
+  usage: 'siyuan update <docId> <content> [--data-type <type>]',
+  sortOrder: 70,
+  
+  initOptions: {},
+  options: {
+    '--content': { hasValue: true, aliases: ['-c'], description: '新内容' },
+    '--file': { hasValue: true, aliases: ['-f'], description: '从文件读取内容' },
+    '--data-type': { hasValue: true, description: '数据类型：markdown（默认）/dom' }
+  },
+  positionalCount: 2,
+  
+  notes: [
+    '仅支持文档ID，块更新请用 block-update'
+  ],
+  
+  examples: [
+    'siyuan update <id> "新内容"',
+    'siyuan update <id> --file ./content.md'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.docId = parsed.positional[0];
+    }
+    if (parsed.positional.length > 1) {
+      args.content = parsed.positional[1];
+    }
+    if (parsed.options.docId) args.docId = parsed.options.docId;
+    if (parsed.options.content) args.content = parsed.options.content;
+    if (parsed.options.file) args.file = parsed.options.file;
+    if (parsed.options.dataType) args.dataType = parsed.options.dataType;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.docId) {
+      console.error('错误: 请提供文档ID');
+      console.log('用法: siyuan update <docId> --content <content>');
+      process.exit(1);
+    }
+    
+    const { content, source } = resolveContent(parsed.options, parsed.positional, 1);
+    if (source !== 'none' && !executeArgs.content) {
+      executeArgs.content = content;
+      if (source !== 'argument') {
+        console.log(`内容来源: ${source}${content ? ` (${content.length} 字符)` : ''}`);
+      }
+    }
+    
+    if (executeArgs.content === undefined) {
+      console.error('错误: 请提供内容');
+      console.log('用法: siyuan update <docId> --content <content> 或 --file <file>');
+      process.exit(1);
+    }
+    
+    console.log('更新文档...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行命令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 命令参数
-   * @param {string} args.docId - 文档ID（必需）
-   * @param {string} args.content - 新内容（必需）
-   * @param {string} args.dataType - 数据类型（markdown/dom，默认 markdown）
-   * @returns {Promise<Object>} 更新结果
    */
   execute: async (skill, args = {}) => {
     const docId = args.docId || args['doc-id'] || args.id;
@@ -117,7 +175,6 @@ const command = {
           const operation = result[0]?.doOperations?.[0];
           
           if (operation) {
-            
             return {
               success: true,
               data: {
@@ -133,7 +190,6 @@ const command = {
         }
         
         if (result === null || (result && result.code === 0)) {
-          
           return {
             success: true,
             data: {

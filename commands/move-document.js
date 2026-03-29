@@ -4,31 +4,26 @@
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
  * 根据人类可读路径获取文档 ID
- * @param {SiyuanNotesSkill} skill - 技能实例
- * @param {string} hPath - 人类可读路径，例如：/openclaw/更新记录
- * @returns {Promise<string|null>} 文档 ID，找不到则返回 null
  */
 async function getDocIdByHPath(skill, hPath) {
   try {
     console.log('通过路径查找文档 ID:', hPath);
     
-    // 解析路径，获取笔记本 ID 和相对路径
     const pathParts = hPath.split('/').filter(p => p.trim() !== '');
     if (pathParts.length === 0) {
       return null;
     }
     
-    // 获取所有笔记本列表
     const notebooksResult = await skill.connector.request('/api/notebook/lsNotebooks', {});
     if (!notebooksResult || !notebooksResult.notebooks) {
       console.error('获取笔记本列表失败');
       return null;
     }
     
-    // 查找第一个路径部分对应的笔记本 ID
     let notebookId = null;
     for (const nb of notebooksResult.notebooks) {
       if (nb.name === pathParts[0] || nb.id === pathParts[0]) {
@@ -42,15 +37,12 @@ async function getDocIdByHPath(skill, hPath) {
       return null;
     }
     
-    // 如果只有笔记本名称，返回笔记本 ID
     if (pathParts.length === 1) {
       return notebookId;
     }
     
-    // 构建完整的人类可读路径（不包含笔记本名称）
     const relativePath = '/' + pathParts.slice(1).join('/');
     
-    // 使用 getIDsByHPath API 获取文档 ID
     const result = await skill.connector.request('/api/filetree/getIDsByHPath', {
       notebook: notebookId,
       path: relativePath
@@ -71,8 +63,6 @@ async function getDocIdByHPath(skill, hPath) {
 
 /**
  * 判断是否为路径格式
- * @param {string} value - 待判断的值
- * @returns {boolean} 是否为路径格式
  */
 function isPathFormat(value) {
   return value && (value.startsWith('/') || value.includes('/'));
@@ -82,18 +72,69 @@ function isPathFormat(value) {
  * 指令配置
  */
 const command = {
-  name: 'move-document',
-  description: '将文档从一个目录迁移到另一个目录位置，支持使用文档 ID 或路径',
-  usage: 'move-document --doc-id <docId|path> --target-parent-id <targetParentId|path> [--new-title <newTitle>]',
+  name: 'move',
+  aliases: ['mv'],
+  description: '移动文档到另一个目录',
+  usage: 'siyuan move <docId> <targetParentId>',
+  sortOrder: 95,
+  
+  initOptions: {},
+  options: {
+    '--target': { hasValue: true, aliases: ['--to', '-T'], description: '目标父目录ID' },
+    '--new-title': { hasValue: true, aliases: ['-t'], description: '新标题（可选）' }
+  },
+  positionalCount: 2,
+  
+  notes: [
+    '目标位置可以是笔记本ID或文档ID'
+  ],
+  
+  examples: [
+    'siyuan move <id> <parentId>',
+    'siyuan move <id> <parentId> --new-title "新标题"'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.docId = parsed.positional[0];
+    }
+    if (parsed.positional.length > 1) {
+      args.targetParentId = parsed.positional[1];
+    }
+    if (parsed.options.target) args.targetParentId = parsed.options.target;
+    if (parsed.options.newTitle) args.newTitle = parsed.options.newTitle;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.docId) {
+      console.error('错误: 请提供文档ID');
+      console.log('用法: siyuan move <docId> <targetParentId>');
+      process.exit(1);
+    }
+    
+    if (!executeArgs.targetParentId) {
+      console.error('错误: 请提供目标位置');
+      console.log('用法: siyuan move <docId> <targetParentId>');
+      process.exit(1);
+    }
+    
+    console.log('移动文档...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.docId - 要移动的文档 ID 或路径
-   * @param {string} args.targetParentId - 目标父目录/笔记本 ID 或路径
-   * @param {string} args.newTitle - 新的文档标题（可选，不提供则保持原标题）
-   * @returns {Promise<Object>} 移动结果
    */
   async execute(skill, args = {}) {
     let { docId, targetParentId, newTitle } = args;
@@ -107,7 +148,6 @@ const command = {
     }
     
     try {
-      // 如果提供的是路径，转换为文档 ID
       let originalDocPath = null;
       let originalTargetPath = null;
       
@@ -135,7 +175,6 @@ const command = {
         }
       }
       
-      // 检查源文档权限
       const sourcePermission = await Permission.checkDocumentPermission(skill, docId);
       if (!sourcePermission.hasPermission) {
         const isNotFound = sourcePermission.reason === 'not_found' || 
@@ -148,7 +187,6 @@ const command = {
         };
       }
       
-      // 检查目标位置权限
       const targetPermission = await Permission.checkParentPermission(skill, targetParentId, skill.config.defaultNotebook);
       if (!targetPermission.hasPermission) {
         const isNotFound = targetPermission.reason === 'not_found' || 
@@ -161,7 +199,6 @@ const command = {
         };
       }
       
-      // 获取原文档标题（如果提供了新标题则使用新标题）
       let titleToUse = newTitle;
       if (!titleToUse) {
         try {
@@ -174,7 +211,6 @@ const command = {
         }
       }
       
-      // 重名检测：检查目标位置是否已存在同名文档（排除自身）
       const existingDoc = await skill.documentManager.checkDocumentExists(
         targetPermission.notebookId,
         targetParentId,
@@ -197,7 +233,6 @@ const command = {
         newTitle: titleToUse || '(保持原样)'
       });
       
-      // 使用 moveDocsByID API 移动文档
       console.log('调用 moveDocsByID API:', { fromIDs: [docId], toID: targetParentId });
       const moveResult = await skill.connector.request('/api/filetree/moveDocsByID', {
         fromIDs: [docId],
@@ -214,7 +249,6 @@ const command = {
         console.error('移动失败:', moveResult);
       }
       
-      // 如果提供了新标题，移动后重命名
       if (newTitle) {
         console.log('重命名文档为:', newTitle);
         try {
@@ -228,7 +262,6 @@ const command = {
         }
       }
       
-      // 获取移动后的路径信息
       let newPath = null;
       try {
         const newPathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: docId });

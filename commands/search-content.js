@@ -6,34 +6,90 @@
 
 const { pathToId } = require('./convert-path');
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
  * 指令配置
  */
 const command = {
-  name: 'search-content',
-  description: '在 Siyuan Notes 中搜索内容（支持向量搜索）',
-  usage: 'search-content --query <query> [--mode hybrid|semantic|keyword|legacy] [--notebook-id <notebookId>] [--limit <limit>]',
+  name: 'search',
+  aliases: ['find'],
+  description: '搜索内容（支持向量搜索）',
+  usage: 'siyuan search <query> [--mode <mode>]',
+  sortOrder: 50,
+  
+  initOptions: { initVectorSearch: false, initNLP: false },
+  options: {
+    '--type': { hasValue: true, aliases: ['-T'], description: '按类型过滤：d/p/h/l/i/tb/c' },
+    '--types': { hasValue: true, description: '按多个类型过滤（逗号分隔）' },
+    '--mode': { hasValue: true, aliases: ['-m'], description: '搜索模式：hybrid|semantic|keyword|legacy' },
+    '--limit': { hasValue: true, aliases: ['-l'], description: '结果数量限制（默认10）' },
+    '--path': { hasValue: true, aliases: ['-P'], description: '限定路径范围' },
+    '--notebook-id': { hasValue: true, aliases: ['-n', '--notebook'], description: '限定笔记本ID' },
+    '--sort-by': { hasValue: true, description: '排序字段' },
+    '--has-tags': { isFlag: true, description: '只返回有标签的结果' },
+    '--where': { hasValue: true, description: 'SQL WHERE 条件' },
+    '--threshold': { hasValue: true, description: '相似度阈值' },
+    '--dense-weight': { hasValue: true, description: '稠密向量权重' },
+    '--sparse-weight': { hasValue: true, description: '稀疏向量权重' },
+    '--sql-weight': { hasValue: true, description: 'SQL 权重' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    'mode: hybrid(混合)、semantic(语义)、keyword(关键词)、legacy(SQL)',
+    'type: d(文档)、p(段落)、h(标题)、l(列表)、i(图片)、tb(表格)、c(代码块)'
+  ],
+  
+  examples: [
+    'siyuan search "关键词"',
+    'siyuan search "查询" --mode semantic --limit 5',
+    'siyuan find "测试" --type d'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.query = parsed.positional[0];
+    }
+    if (parsed.options.type) args.type = parsed.options.type;
+    if (parsed.options.types) args.types = parsed.options.types;
+    if (parsed.options.mode) args.mode = parsed.options.mode;
+    if (parsed.options.limit) args.limit = parseInt(parsed.options.limit, 10);
+    if (parsed.options.path) args.path = parsed.options.path;
+    if (parsed.options.notebookId) args.notebookId = parsed.options.notebookId;
+    if (parsed.options.sortBy) args.sortBy = parsed.options.sortBy;
+    if (parsed.options.hasTags) args.hasTags = true;
+    if (parsed.options.where) args.sql = parsed.options.where;
+    if (parsed.options.threshold) args.threshold = parseFloat(parsed.options.threshold);
+    if (parsed.options.denseWeight) args.denseWeight = parseFloat(parsed.options.denseWeight);
+    if (parsed.options.sparseWeight) args.sparseWeight = parseFloat(parsed.options.sparseWeight);
+    if (parsed.options.sqlWeight) args.sqlWeight = parseFloat(parsed.options.sqlWeight);
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.query) {
+      console.error('错误: 请提供搜索查询');
+      console.log('用法: siyuan search <query> [options]');
+      process.exit(1);
+    }
+    
+    console.log('搜索内容...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.query - 搜索查询
-   * @param {string} args.mode - 搜索模式：hybrid(混合)、semantic(语义)、keyword(关键词)、legacy(SQL)
-   * @param {string} args.notebookId - 笔记本ID（可选）
-   * @param {string} args.path - 搜索路径（可选）
-   * @param {number} args.limit - 结果数量限制
-   * @param {string} args.sortBy - 排序方式：relevance、date
-   * @param {string} args.type - 按单个类型过滤 (d/p/h/l/i/tb/c/s/img)
-   * @param {Array|string} args.types - 按多个类型过滤
-   * @param {boolean} args.hasTags - 是否有标签
-   * @param {string} args.sql - 自定义WHERE条件（可选，通过 --where 参数传入）
-   * @param {number} args.denseWeight - 语义搜索权重（混合搜索时）
-   * @param {number} args.sparseWeight - 关键词搜索权重（混合搜索时）
-   * @param {number} args.sqlWeight - SQL搜索权重（混合搜索时）
-   * @param {number} args.threshold - 相似度阈值
-   * @returns {Promise<Object>} 搜索结果
    */
   async execute(skill, args = {}) {
     const { 

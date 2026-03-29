@@ -1,26 +1,15 @@
 /**
  * 属性管理指令
  * 管理 Siyuan Notes 中块/文档的属性（设置/获取/移除）
- * 
- * API 说明：
- * - /api/attr/setBlockAttrs - 设置块属性
- * - /api/attr/getBlockAttrs - 获取块属性
- * 
- * 注意：
- * - 文档本身也是一种特殊的块，因此设置文档属性也使用相同的 API
- * - 默认情况下，属性会自动添加 custom- 前缀（在思源笔记界面可见）
- * - 使用 --hide 标记可以操作内部属性（不带 custom- 前缀，在界面不可见）
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 const CUSTOM_PREFIX = 'custom-';
 
 /**
  * 解析属性参数
- * @param {string} attrsStr - 属性字符串（key=value 格式，多个用逗号分隔）
- * @param {boolean} hide - 是否隐藏属性（不带 custom- 前缀）
- * @returns {Object} 解析后的属性对象
  */
 function parseAttributes(attrsStr, hide = false) {
   const attrs = {};
@@ -31,7 +20,13 @@ function parseAttributes(attrsStr, hide = false) {
     const eqIndex = pair.indexOf('=');
     if (eqIndex > 0) {
       let key = pair.substring(0, eqIndex).trim();
-      const value = pair.substring(eqIndex + 1).trim();
+      let value = pair.substring(eqIndex + 1).trim();
+      
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      
       if (key) {
         if (!hide && !key.startsWith(CUSTOM_PREFIX)) {
           key = CUSTOM_PREFIX + key;
@@ -45,23 +40,7 @@ function parseAttributes(attrsStr, hide = false) {
 }
 
 /**
- * 获取属性键名（根据 hide 参数决定是否添加前缀）
- * @param {string} key - 原始属性键名
- * @param {boolean} hide - 是否隐藏属性
- * @returns {string} 处理后的属性键名
- */
-function getAttrKey(key, hide = false) {
-  if (!hide && !key.startsWith(CUSTOM_PREFIX)) {
-    return CUSTOM_PREFIX + key;
-  }
-  return key;
-}
-
-/**
- * 从返回结果中移除 custom- 前缀（用于显示）
- * @param {Object} result - API 返回的属性对象
- * @param {boolean} hide - 是否隐藏属性模式
- * @returns {Object} 处理后的属性对象
+ * 从返回结果中移除 custom- 前缀
  */
 function formatResultForDisplay(result, hide = false) {
   if (!result || hide) return result;
@@ -79,9 +58,6 @@ function formatResultForDisplay(result, hide = false) {
 
 /**
  * 解析要移除的属性键名列表
- * @param {string} removeStr - 属性键名字符串（多个用逗号分隔）
- * @param {boolean} hide - 是否隐藏属性模式
- * @returns {string[]} 属性键名数组
  */
 function parseRemoveKeys(removeStr, hide = false) {
   if (!removeStr) return [];
@@ -100,132 +76,179 @@ function parseRemoveKeys(removeStr, hide = false) {
  */
 const command = {
   name: 'block-attrs',
-  description: '管理 Siyuan Notes 中块/文档的属性（设置/获取/移除）',
-  usage: 'block-attrs <docId|blockId> (--set <attrs> | --get [key] | --remove <keys>) [--hide]',
+  aliases: ['attrs', 'attr', 'ba'],
+  description: '管理块/文档属性（设置/获取/移除）',
+  usage: 'siyuan attrs <id> [--set <k=v>] [--get <key>] [--remove <key>]',
+  sortOrder: 200,
+  
+  initOptions: {},
+  positionalCount: 1,
+  
+  options: {
+    '--set': { 
+      hasValue: true, 
+      aliases: ['-s', '-S'], 
+      description: '设置属性（key=value 格式，多个用逗号分隔）' 
+    },
+    '--get': { 
+      hasValue: true, 
+      aliases: ['-g'], 
+      description: '获取指定属性值' 
+    },
+    '--remove': { 
+      hasValue: true, 
+      aliases: ['-r', '--rm'], 
+      description: '移除属性（多个用逗号分隔）' 
+    },
+    '--hide': { 
+      isFlag: true, 
+      description: '操作内部属性（不带 custom- 前缀）' 
+    }
+  },
+  
+  notes: [
+    '无参数时获取所有属性',
+    '默认属性会添加 custom- 前缀',
+    '使用 --hide 操作内部属性'
+  ],
+  
+  examples: [
+    'siyuan attrs <id>              # 获取所有属性',
+    'siyuan attrs <id> --set status=done',
+    'siyuan attrs <id> --get status',
+    'siyuan attrs <id> --remove status'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.id = parsed.positional[0];
+    }
+    if (parsed.options.set) args.set = parsed.options.set;
+    if (parsed.options.get) args.get = parsed.options.get;
+    if (parsed.options.remove) args.remove = parsed.options.remove;
+    if (parsed.options.hide) args.hide = true;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.id) {
+      console.error('错误: 请提供块/文档ID');
+      console.log('用法: siyuan attrs <id> [--set|--get|--remove|--all]');
+      process.exit(1);
+    }
+    
+    console.log('管理属性...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.id - 块ID/文档ID（必传，位置参数）
-   * @param {string} args.attrs - 要设置的属性（key=value格式，多个用逗号分隔）
-   * @param {boolean} args.get - 是否获取属性
-   * @param {string} args.key - 获取指定属性键（可选）
-   * @param {string} args.remove - 要移除的属性键名（多个用逗号分隔）
-   * @param {boolean} args.hide - 是否设置隐藏属性（不带 custom- 前缀）
-   * @returns {Promise<Object>} 属性操作结果
    */
   execute: Permission.createPermissionWrapper(async (skill, args, notebookId) => {
-    const { id, attrs, get, key, remove, hide } = args;
+    const { id, set, get, remove, hide = false } = args;
     
     if (!id) {
       return {
         success: false,
         error: '缺少必要参数',
-        message: '必须提供 docId/blockId 作为第一个参数'
-      };
-    }
-    
-    if (!attrs && !get && !remove) {
-      return {
-        success: false,
-        error: '缺少必要参数',
-        message: '必须提供 --set 设置属性、--get 获取属性 或 --remove 移除属性'
+        message: '必须提供 id 参数'
       };
     }
     
     try {
-      let result;
-      let operation = 'set';
-      
-      if (remove) {
-        const removeKeys = parseRemoveKeys(remove, hide);
-        if (removeKeys.length === 0) {
+      if (set) {
+        const attrs = parseAttributes(set, hide);
+        if (Object.keys(attrs).length === 0) {
           return {
             success: false,
             error: '参数格式错误',
-            message: '必须提供要移除的属性键名'
+            message: '--set 参数格式应为 key=value（多个用逗号分隔）'
           };
         }
         
-        const attrObj = {};
-        for (const k of removeKeys) {
-          attrObj[k] = '';
-        }
-        
-        console.log('移除属性参数:', { id, keys: removeKeys, hide });
-        
-        result = await skill.connector.request('/api/attr/setBlockAttrs', {
-          id,
-          attrs: attrObj
-        });
-        operation = 'remove';
-        
-        console.log('API 响应:', JSON.stringify(result, null, 2));
+        console.log('设置属性:', attrs);
+        await skill.connector.request('/api/attr/setBlockAttrs', { id, attrs });
         
         return {
           success: true,
-          data: {
-            id,
-            operation,
-            removedKeys: removeKeys,
-            timestamp: Date.now(),
-            notebookId
-          },
-          message: `成功移除属性: ${removeKeys.join(', ')}`
+          data: { id, attrs: formatResultForDisplay(attrs, hide) },
+          message: '属性设置成功'
         };
-      } else if (attrs) {
-        const attrObj = parseAttributes(attrs, hide);
-        console.log('设置属性参数:', { id, attrs: attrObj, hide });
-        
-        result = await skill.connector.request('/api/attr/setBlockAttrs', {
-          id,
-          attrs: attrObj
-        });
-        operation = 'set';
-      } else {
-        const actualKey = key ? getAttrKey(key, hide) : undefined;
-        console.log('获取属性参数:', { id, key: actualKey, hide });
-        
-        result = await skill.connector.request('/api/attr/getBlockAttrs', {
-          id
-        });
-        operation = 'get';
-        
-        if (actualKey && result) {
-          if (result[actualKey] !== undefined) {
-            result = { [key]: result[actualKey] };
-          } else {
-            result = {};
-          }
-        } else if (result && !hide) {
-          result = formatResultForDisplay(result, hide);
-        }
       }
       
-      console.log('API 响应:', JSON.stringify(result, null, 2));
+      if (remove) {
+        const keys = parseRemoveKeys(remove, hide);
+        if (keys.length === 0) {
+          return {
+            success: false,
+            error: '参数格式错误',
+            message: '--remove 参数应为属性键名（多个用逗号分隔）'
+          };
+        }
+        
+        const attrs = {};
+        keys.forEach(key => { attrs[key] = ''; });
+        
+        console.log('移除属性:', keys);
+        await skill.connector.request('/api/attr/setBlockAttrs', { id, attrs });
+        
+        return {
+          success: true,
+          data: { id, removed: keys },
+          message: '属性移除成功'
+        };
+      }
+      
+      console.log('获取属性:', id);
+      const result = await skill.connector.request('/api/attr/getBlockAttrs', { id });
+      
+      if (!result) {
+        return {
+          success: false,
+          error: '获取属性失败',
+          message: '无法获取块属性'
+        };
+      }
+      
+      if (get && typeof get === 'string' && get.trim()) {
+        let key = get.trim();
+        if (!hide && !key.startsWith(CUSTOM_PREFIX)) {
+          key = CUSTOM_PREFIX + key;
+        }
+        const value = result[key] || null;
+        
+        return {
+          success: true,
+          data: { id, key: get, value },
+          message: value ? '获取属性成功' : '属性不存在'
+        };
+      }
       
       return {
         success: true,
-        data: {
-          id,
-          operation,
-          result: result,
-          timestamp: Date.now(),
-          notebookId
-        },
-        message: operation === 'set' ? '属性设置成功' : '属性获取成功'
+        data: { id, attrs: formatResultForDisplay(result, hide) },
+        message: '获取属性成功'
       };
     } catch (error) {
-      console.error('操作属性失败:', error);
+      console.error('属性操作失败:', error);
       return {
         success: false,
         error: error.message,
-        message: '操作属性失败'
+        message: '属性操作失败'
       };
     }
   }, {
-    type: 'document',
+    type: 'block',
     idParam: 'id'
   })
 };

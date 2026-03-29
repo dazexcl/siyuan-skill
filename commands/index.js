@@ -1,6 +1,7 @@
 /**
  * 命令索引文件
- * 导出所有可用的单指令脚本
+ * 导出所有可用的命令模块
+ * 每个命令模块包含：name, aliases, description, usage, options, help, runCLI, execute
  */
 
 const getNotebooks = require('./get-notebooks');
@@ -27,35 +28,76 @@ const transferBlockRef = require('./transfer-block-ref');
 const blockAttrs = require('./block-attrs');
 const tags = require('./tags');
 const checkExists = require('./check-exists');
+const setIcon = require('./icon');
 
-const commands = {
-  'get-notebooks': getNotebooks,
-  'get-doc-structure': getDocStructure,
-  'get-doc-content': getDocContent,
-  'get-doc-info': getDocInfo,
-  'search-content': searchContent,
-  'create-document': createDocument,
-  'update-document': updateDocument,
-  'delete-document': deleteDocument,
-  'protect-document': protectDocument,
-  'move-document': moveDocument,
-  'rename-document': renameDocument,
-  'convert-path': convertPath,
-  'index-documents': indexDocuments,
-  'nlp-analyze': nlpAnalyze,
-  'block-insert': insertBlock,
-  'block-update': updateBlock,
-  'block-delete': deleteBlock,
-  'block-move': moveBlock,
-  'block-get': getBlock,
-  'block-attributes': blockAttrs,
-  'block-attrs': blockAttrs,
-  'block-fold': blockFold,
-  'fold-block': blockFold,
-  'unfold-block': blockFold,
-  'transfer-block-ref': transferBlockRef,
-  'tags': tags,
-  'check-exists': checkExists
-};
+const commandModules = [
+  getNotebooks,
+  getDocStructure,
+  getDocContent,
+  getDocInfo,
+  searchContent,
+  createDocument,
+  updateDocument,
+  deleteDocument,
+  protectDocument,
+  moveDocument,
+  renameDocument,
+  convertPath,
+  indexDocuments,
+  nlpAnalyze,
+  insertBlock,
+  updateBlock,
+  deleteBlock,
+  moveBlock,
+  getBlock,
+  blockFold,
+  transferBlockRef,
+  blockAttrs,
+  tags,
+  checkExists,
+  setIcon
+];
+
+const commands = {};
+const commandList = [];
+
+for (const cmd of commandModules) {
+  if (!cmd || !cmd.name) continue;
+  
+  commands[cmd.name] = cmd;
+  
+  if (cmd.aliases && Array.isArray(cmd.aliases)) {
+    for (const alias of cmd.aliases) {
+      commands[alias] = cmd;
+    }
+  }
+  
+  commandList.push({
+    name: cmd.name,
+    aliases: cmd.aliases || [],
+    description: cmd.description || '',
+    usage: cmd.usage || '',
+    sortOrder: cmd.sortOrder || 999
+  });
+}
+
+commandList.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999));
+
+function getCommand(name) {
+  return commands[name] || null;
+}
+
+function getAllCommands() {
+  return commandList;
+}
+
+function getCommandNames() {
+  return commandList.map(cmd => cmd.name);
+}
 
 module.exports = commands;
+module.exports.commands = commands;
+module.exports.commandList = commandList;
+module.exports.getCommand = getCommand;
+module.exports.getAllCommands = getAllCommands;
+module.exports.getCommandNames = getCommandNames;

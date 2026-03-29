@@ -1,71 +1,122 @@
 /**
- * 块插入命令
+ * 插入块指令
  * 在 Siyuan Notes 中插入新块
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp, resolveContent } = require('../lib/cli-base');
 
 /**
- * 辅助函数：处理内容中的换行符
- * @param {string} content - 原始内容
- * @returns {string} 处理后的内容
+ * 处理内容中的换行符
  */
 function processContent(content) {
-  // 处理content中的换行符，将字面量\n转换为实际换行
   return content ? content.replace(/\\n/g, '\n') : '';
 }
 
 /**
- * 命令配置
+ * 指令配置
  */
 const command = {
-  name: 'insert-block',
-  description: '在 Siyuan Notes 中插入新块',
-  usage: 'insert-block --data <content> [--parent-id <parentId>] [--previous-id <previousId>] [--next-id <nextId>] [--data-type <dataType>]',
+  name: 'block-insert',
+  aliases: ['bi'],
+  description: '插入新块',
+  usage: 'siyuan insert <content> --parent-id <parentId>',
+  sortOrder: 210,
+  
+  initOptions: {},
+  options: {
+    '--data': { hasValue: true, aliases: ['--content', '-c'], description: '块内容' },
+    '--file': { hasValue: true, aliases: ['-f'], description: '从文件读取内容' },
+    '--parent-id': { hasValue: true, aliases: ['-p'], description: '父块ID' },
+    '--previous-id': { hasValue: true, description: '插入到此块之后' },
+    '--next-id': { hasValue: true, description: '插入到此块之前' },
+    '--data-type': { hasValue: true, description: '数据类型：markdown（默认）/dom' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    '必须提供 parent-id、previous-id 或 next-id 之一'
+  ],
+  
+  examples: [
+    'siyuan insert "内容" --parent-id <id>',
+    'siyuan insert --file ./content.md -p <id>'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.data = parsed.positional[0];
+    }
+    if (parsed.options.data) args.data = parsed.options.data;
+    if (parsed.options.file) args.file = parsed.options.file;
+    if (parsed.options.parentId) args.parentId = parsed.options.parentId;
+    if (parsed.options.previousId) args.previousId = parsed.options.previousId;
+    if (parsed.options.nextId) args.nextId = parsed.options.nextId;
+    if (parsed.options.dataType) args.dataType = parsed.options.dataType;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    const { content, source } = resolveContent(parsed.options, parsed.positional, 0);
+    if (source !== 'none' && !executeArgs.data) {
+      executeArgs.data = content;
+    }
+    
+    if (!executeArgs.data) {
+      console.error('错误: 请提供块内容');
+      console.log('用法: siyuan insert <content> --parent-id <parentId>');
+      process.exit(1);
+    }
+    
+    if (!executeArgs.parentId && !executeArgs.previousId && !executeArgs.nextId) {
+      console.error('错误: 请提供至少一个位置参数');
+      console.log('用法: siyuan insert <content> --parent-id <parentId>');
+      process.exit(1);
+    }
+    
+    console.log('插入块...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行命令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 命令参数
-   * @param {string} args.data - 块内容
-   * @param {string} args.dataType - 数据类型（markdown/dom）
-   * @param {string} args.parentId - 父块ID
-   * @param {string} args.previousId - 前一个块ID
-   * @param {string} args.nextId - 后一个块ID
-   * @returns {Promise<Object>} 插入结果
    */
   execute: async (skill, args = {}) => {
     const { data, dataType = 'markdown', parentId, previousId, nextId } = args;
     
-    // 参数验证
     if (!data) {
       return {
         success: false,
         error: '缺少必要参数',
-        message: '必须提供 content 参数\n用法: siyuan block-insert <content> --parent-id <parentId>\n示例: siyuan bi "新块内容" --parent-id 20260313203048-cjem96v'
+        message: '必须提供 content 参数'
       };
     }
     
-    // 位置参数验证（至少提供一个）
     if (!parentId && !previousId && !nextId) {
       return {
         success: false,
         error: '缺少位置参数',
-        message: '必须提供至少一个位置参数:\n  --parent-id <父块ID>    作为子块插入\n  --previous-id <块ID>    插入到此块之后\n  --next-id <块ID>        插入到此块之前\n示例: siyuan bi "内容" --parent-id 20260313203048-cjem96v'
+        message: '必须提供至少一个位置参数: --parent-id, --previous-id, --next-id'
       };
     }
     
-    // 确定用于权限检查的 ID（优先 parentId，其次 previousId，最后 nextId）
     const idForPermission = parentId || previousId || nextId;
     const permissionType = parentId ? 'parent' : 'block';
     
-    // 使用权限包装器
     const permissionHandler = Permission.createPermissionWrapper(async (skill, args, notebookId) => {
       try {
-        // 处理内容中的换行符
         const processedData = processContent(data);
         
-        // 构建请求参数
         const requestData = {
           dataType,
           data: processedData,
@@ -74,20 +125,16 @@ const command = {
           nextID: nextId || ''
         };
         
-        // 调用 API
         console.log('请求参数:', JSON.stringify(requestData, null, 2));
         const result = await skill.connector.request('/api/block/insertBlock', requestData);
         console.log('API 响应:', JSON.stringify(result, null, 2));
         
-        // 尝试从响应中提取块 ID
         let blockId = null;
         if (result && Array.isArray(result) && result.length > 0) {
           const operation = result[0]?.doOperations?.[0];
           blockId = operation?.id;
         }
         
-        // 思源 API 返回 null 或空响应也可能表示成功
-        // 如果没有错误抛出，认为操作成功
         return {
           success: true,
           data: {

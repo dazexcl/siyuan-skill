@@ -325,7 +325,7 @@ siyuan bf <blockId>                # 折叠块
 siyuan bf <blockId> -a unfold      # 展开块
 
 # 转移块引用
-siyuan btr --from-id <fromId> --to-id <toId>
+siyuan bt --from-id <fromId> --to-id <toId>
 ```
 
 ### 属性与标签
@@ -335,6 +335,7 @@ siyuan btr --from-id <fromId> --to-id <toId>
 siyuan block-attrs <blockId> --set "key=value"
 siyuan ba <blockId> --set "status=published"   # 别名
 siyuan attrs <blockId> --set "key=value"       # 别名
+siyuan attr <blockId> --set "key=value"       # 别名
 
 # 获取属性
 siyuan ba <blockId> --get                  # 获取所有属性
@@ -348,13 +349,13 @@ siyuan ba <blockId> --set "internal=value" --hide
 
 # 设置标签
 siyuan tags <blockId> "标签1,标签2"
-siyuan st <blockId> "新标签"            # 别名
+siyuan tag <blockId> "新标签"            # 别名
 
 # 添加标签（追加模式）
-siyuan st <blockId> --add "新标签"
+siyuan tag <blockId> --add "新标签"
 
 # 移除标签
-siyuan st <blockId> --remove "旧标签"
+siyuan tag <blockId> --remove "旧标签"
 
 # 获取标签
 siyuan tags <blockId> --get
@@ -899,7 +900,7 @@ siyuan update <docId> "$(cat content.md)"
 ```bash
 # ✅ 推荐：使用命令
 siyuan ba <docId> --set "status=published"
-siyuan st <docId> "重要,待审核"
+siyuan tag <docId> "重要,待审核"
 
 # ❌ 不推荐：在内容中添加 Front Matter
 ```

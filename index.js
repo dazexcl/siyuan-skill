@@ -79,8 +79,8 @@ class SiyuanNotesSkill {
         throw new Error('无法连接到 Siyuan Notes');
       }
 
-      const initVectorSearch = options.initVectorSearch !== false && this.vectorSearchEnabled;
-      const initNLP = options.initNLP !== false && this.nlpEnabled;
+      const initVectorSearch = options.initVectorSearch === true && this.vectorSearchEnabled;
+      const initNLP = options.initNLP === true && this.nlpEnabled;
 
       if (initVectorSearch) {
         await this.initVectorSearch();

@@ -11,7 +11,7 @@ siyuan delete <docId> [--confirm-title <title>]
 siyuan delete --doc-id <docId> [--confirm-title <title>]
 ```
 
-**别名**：`rm`
+**别名**：`del`, `rm`
 
 ## 参数说明
 

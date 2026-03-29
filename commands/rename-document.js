@@ -1,29 +1,80 @@
 /**
  * 重命名文档指令
  * 重命名 Siyuan Notes 中的文档标题
- * 
- * API 说明：
- * - /api/filetree/renameDocByID - 通过文档ID重命名
- * - /api/filetree/renameDoc - 通过笔记本ID和路径重命名
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
  * 指令配置
  */
 const command = {
-  name: 'rename-document',
-  description: '重命名 Siyuan Notes 中的文档标题',
-  usage: 'rename-document --doc-id <docId> --title <title>',
+  name: 'rename',
+  aliases: ['rn'],
+  description: '重命名文档标题',
+  usage: 'siyuan rename <docId> <title> [--force]',
+  sortOrder: 90,
+  
+  initOptions: {},
+  options: {
+    '--title': { hasValue: true, aliases: ['-t'], description: '新标题（与位置参数2二选一）' },
+    '--force': { isFlag: true, description: '强制重命名（跳过重名检测）' }
+  },
+  positionalCount: 2,
+  
+  notes: [
+    '重名检测默认开启，使用 --force 跳过',
+    '第二个位置参数作为新标题'
+  ],
+  examples: [
+    'siyuan rename <doc-id> "新标题"',
+    'siyuan rename <doc-id> --title "新标题"',
+    'siyuan rename <doc-id> -t "新标题" --force',
+    'siyuan rn <doc-id> "新标题"'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.docId = parsed.positional[0];
+    }
+    if (parsed.positional.length > 1) {
+      args.title = parsed.positional[1];
+    }
+    if (parsed.options.title) args.title = parsed.options.title;
+    if (parsed.options.force) args.force = true;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.docId) {
+      console.error('错误: 请提供文档ID');
+      console.log('用法: siyuan rename <docId> --title <title>');
+      process.exit(1);
+    }
+    
+    if (!executeArgs.title) {
+      console.error('错误: 请提供新标题');
+      console.log('用法: siyuan rename <docId> --title <title>');
+      process.exit(1);
+    }
+    
+    console.log('重命名文档...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.docId - 文档ID
-   * @param {string} args.title - 新标题
-   * @returns {Promise<Object>} 重命名结果
    */
   execute: Permission.createPermissionWrapper(async (skill, args, notebookId) => {
     const { docId, title, force } = args;
@@ -44,21 +95,17 @@ const command = {
       };
     }
     
-    // 重名检测：检查同一目录下是否已存在同名文档（除非使用 --force）
     if (!force) {
       try {
-        // 获取文档的 hPath（人类可读路径）
         const hPath = await skill.connector.request('/api/filetree/getHPathByID', { id: docId });
         let parentId = notebookId;
         
         if (hPath && hPath !== '/') {
-          // 从 hPath 提取父文档路径
           const pathParts = hPath.split('/');
-          pathParts.pop(); // 移除当前文档名
+          pathParts.pop();
           const parentHPath = pathParts.join('/');
           
           if (parentHPath) {
-            // 通过 hPath 获取父文档 ID
             const parentIds = await skill.connector.request('/api/filetree/getIDsByHPath', {
               path: parentHPath,
               notebook: notebookId
@@ -69,7 +116,6 @@ const command = {
           }
         }
         
-        // 检查同名文档（排除自身）
         const existingDoc = await skill.documentManager.checkDocumentExists(
           notebookId,
           parentId,

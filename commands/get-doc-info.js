@@ -4,22 +4,64 @@
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
  * 命令配置
  */
 const command = {
-  name: 'get-doc-info',
-  description: '获取文档基础信息（ID、标题、路径、属性等）',
-  usage: 'get-doc-info --id <docId> [--format <format>]',
+  name: 'info',
+  description: '获取文档基础信息（ID、标题、路径、属性）',
+  usage: 'siyuan info <docId>',
+  sortOrder: 40,
+  
+  initOptions: {},
+  options: {
+    '--format': { hasValue: true, aliases: ['-F'], description: '输出格式：summary（默认）、json' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    '仅支持文档ID，不支持笔记本ID'
+  ],
+  
+  examples: [
+    'siyuan info <id>',
+    'siyuan info <id> --format json'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.id = parsed.positional[0];
+    }
+    if (parsed.options.id) args.id = parsed.options.id;
+    if (parsed.options.format) args.format = parsed.options.format;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.id) {
+      console.error('错误: 请提供文档ID');
+      console.log('用法: siyuan info <docId> [--format <format>]');
+      process.exit(1);
+    }
+    
+    console.log('获取文档信息...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行命令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 命令参数
-   * @param {string} args.id - 文档ID
-   * @param {string} args.format - 输出格式 (json/summary)，默认 summary
-   * @returns {Promise<Object>} 查询结果
    */
   execute: async (skill, args = {}) => {
     const { id, format = 'summary' } = args;

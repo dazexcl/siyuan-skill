@@ -40,16 +40,18 @@ node siyuan.js --version       # 显示版本信息
 | 获取文档信息 | `info` | 文档ID | `siyuan info <docId>` |
 | 创建新文档 | `create` / `new` | `--parent-id` 或 `--path` | `siyuan create "标题" --parent-id xxx` |
 | 修改整个文档 | `update` / `edit` | 文档ID | `siyuan update <docId> "完整内容"` |
-| 删除文档 | `delete` / `rm` | 文档ID | `siyuan rm <docId>` |
+| 删除文档 | `delete` / `del` / `rm` | 文档ID | `siyuan rm <docId>` |
 | 移动文档 | `move` / `mv` | `--new-title`（可选） | `siyuan mv <docId> <targetId>` |
-| 重命名文档 | `rename` | 新标题 | `siyuan rename <docId> "新标题"` |
+| 重命名文档 | `rename` / `rn` | 新标题 | `siyuan rename <docId> "新标题"` |
 | 保护/取消保护 | `protect` | `--remove` | `siyuan protect <docId>` / `siyuan protect <docId> --remove` |
 | 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
 | 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
 | 设置文档图标 | `icon` | `--emoji` / `--get` / `--remove` | `siyuan icon <docId> --emoji 1f4c4` |
-| 设置文档属性 | `block-attrs` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
-| 设置标签 | `tags` / `st` | `--add` / `--remove` / `--get` | `siyuan st <docId> "A,B"` / `siyuan st <docId> --add "C"` |
+| 设置文档属性 | `block-attrs` / `attrs` / `attr` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
+| 设置标签 | `tags` / `tag` | `--add` / `--remove` / `--get` | `siyuan tag <docId> "A,B"` / `siyuan tag <docId> --add "C"` |
 | 搜索内容 | `search` / `find` | `--mode` / `--threshold` | `siyuan search "关键词" --mode semantic` |
+| 索引文档 | `index` | `--notebook` / `--force` | `siyuan index` / `siyuan index --force` |
+| NLP分析 | `nlp` | `--tasks` | `siyuan nlp "文本" --tasks tokenize,keywords` |
 
 ## 块操作
 
@@ -61,7 +63,7 @@ node siyuan.js --version       # 显示版本信息
 | 删除单个块 | `block-delete` / `bd` | 块ID | `siyuan bd <blockId>` |
 | 移动块 | `block-move` / `bm` | `--parent-id` / `--previous-id` | `siyuan bm <blockId> --parent-id xxx` |
 | 折叠/展开块 | `block-fold` / `bf` | `--action` | `siyuan bf <blockId>` / `siyuan bf <blockId> -a unfold` |
-| 转移块引用 | `block-transfer-ref` / `btr` | 源块ID、目标块ID | `siyuan btr <srcId> <tgtId>` |
+| 转移块引用 | `block-transfer` / `bt` | 源块ID、目标块ID | `siyuan bt <srcId> <tgtId>` |
 
 > **重要区分**：`update` 只接受文档ID，`block-update` 只接受块ID
 
@@ -174,7 +176,7 @@ siyuan update <blockId> "内容"        # 错误：update 不接受块ID
 siyuan ba <docId> --set "status=published"
 siyuan ba <docId> --get
 siyuan ba <docId> --remove "status"
-siyuan st <docId> "重要,待审核"
+siyuan tag <docId> "重要,待审核"
 ```
 
 ## 图标设置

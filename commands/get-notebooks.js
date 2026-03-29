@@ -3,26 +3,42 @@
  * 从 Siyuan Notes 获取所有笔记本信息
  */
 
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
+
 /**
  * 指令配置
  */
 const command = {
-  name: 'get-notebooks',
-  description: '获取 Siyuan Notes 中的所有笔记本列表',
-  usage: 'get-notebooks',
+  name: 'notebooks',
+  aliases: ['nb'],
+  description: '获取所有笔记本列表',
+  usage: 'siyuan notebooks',
+  sortOrder: 10,
+  
+  initOptions: {},
+  options: {},
+  positionalCount: 0,
+  
+  examples: [
+    'siyuan notebooks',
+    'siyuan nb'
+  ],
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    console.log('获取笔记本列表...');
+    const result = await this.execute(skill, {});
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @returns {Promise<Object>} 笔记本列表
    */
   async execute(skill, args = {}) {
     try {
-      // 从 API 获取数据
       const response = await skill.connector.request('/api/notebook/lsNotebooks');
-      
-      // 提取笔记本列表
       const notebooks = response?.notebooks || [];
       
       return {

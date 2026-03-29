@@ -4,9 +4,69 @@
  */
 
 const command = {
-  name: 'index-documents',
-  description: '将文档索引到向量数据库',
-  usage: 'index-documents [--notebook <id>] [--doc-ids <ids>] [--force] [--remove]',
+  name: 'index',
+  description: '索引文档到向量数据库',
+  usage: 'siyuan index [<id>] [--notebook <id>] [--force] [--remove]',
+  options: {
+    '--notebook': { hasValue: true, aliases: ['-n'], description: '索引指定笔记本' },
+    '--doc-ids': { hasValue: true, description: '索引指定文档ID（逗号分隔）' },
+    '--force': { isFlag: true, description: '强制重建索引' },
+    '--remove': { isFlag: true, description: '只移除索引' },
+    '--batch-size': { hasValue: true, description: '批量大小（默认5）' }
+  },
+  positionalCount: 1,
+  initOptions: { initVectorSearch: true, initNLP: false },
+  
+  notes: [
+    '无参数时增量索引所有笔记本',
+    '--force 会删除现有索引再重建'
+  ],
+  
+  examples: [
+    'siyuan index                    # 增量索引',
+    'siyuan index <notebook-id>      # 索引指定笔记本',
+    'siyuan index <doc-id> --force   # 强制重建'
+  ],
+
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.id = parsed.positional[0];
+    }
+    if (parsed.options.notebook) args.notebookId = parsed.options.notebook;
+    if (parsed.options.docIds) args.docIds = parsed.options.docIds.split(',').map(id => id.trim());
+    if (parsed.options.force) args.force = true;
+    if (parsed.options.remove) args.remove = true;
+    if (parsed.options.batchSize) args.batchSize = parseInt(parsed.options.batchSize, 10);
+    return args;
+  },
+  
+  async runCLI(skill, parsed, rawArgs) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (executeArgs.id && !executeArgs.notebookId && !executeArgs.docIds) {
+      try {
+        const notebooksResponse = await skill.connector.request('/api/notebook/lsNotebooks');
+        const notebooks = notebooksResponse?.notebooks || notebooksResponse || [];
+        const notebookIds = new Set(notebooks.map(n => n.id));
+        
+        if (notebookIds.has(executeArgs.id)) {
+          executeArgs.notebookId = executeArgs.id;
+        } else {
+          executeArgs.docIds = [executeArgs.id];
+        }
+        delete executeArgs.id;
+      } catch (error) {
+        console.warn('无法识别位置参数类型，假设为文档ID');
+        executeArgs.docIds = [executeArgs.id];
+        delete executeArgs.id;
+      }
+    }
+    
+    console.log('索引文档...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
 
   /**
    * 执行指令

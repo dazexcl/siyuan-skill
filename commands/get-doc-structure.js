@@ -5,23 +5,73 @@
 
 const Permission = require('../utils/permission');
 const { pathToId } = require('./convert-path');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
  * 指令配置
  */
 const command = {
-  name: 'get-doc-structure',
-  description: '获取指定笔记本的文档和文件夹结构，支持笔记本ID、文档ID和路径',
-  usage: 'get-doc-structure (<notebookId|docId> | --path <path>)',
+  name: 'structure',
+  aliases: ['ls'],
+  description: '获取笔记本/文档结构（目录树）',
+  usage: 'siyuan structure [<id>] [--path <path>] [--depth <n>]',
+  sortOrder: 20,
+  
+  initOptions: {},
+  options: {
+    '--path': { hasValue: true, aliases: ['-P'], description: '文档路径' },
+    '--depth': { hasValue: true, aliases: ['-d'], description: '递归深度（默认1，-1无限）' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    '位置参数为笔记本ID或文档ID',
+    'path 与位置参数二选一'
+  ],
+  
+  examples: [
+    'siyuan structure <notebook-id>',
+    'siyuan ls --path "/笔记本名"',
+    'siyuan ls --depth 2 <id>'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.notebookId = parsed.positional[0];
+    }
+    if (parsed.options.path) args.path = parsed.options.path;
+    if (parsed.options.depth) args.depth = parseInt(parsed.options.depth, 10);
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.notebookId && !executeArgs.path) {
+      console.error('错误: 请提供笔记本ID/文档ID 或 --path 参数');
+      console.log('用法: siyuan structure [<notebookId|docId>] [--path <path>]');
+      process.exit(1);
+    }
+    if (executeArgs.notebookId && executeArgs.path) {
+      console.error('错误: 位置参数和 --path 不能同时使用');
+      console.log('用法: siyuan structure [<notebookId|docId>] 或 siyuan structure --path <path>');
+      process.exit(1);
+    }
+    
+    console.log('获取文档结构...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.notebookId - 笔记本ID或文档ID
-   * @param {string} args.path - 文档路径（与 notebookId 二选一）
-   * @param {number} args.depth - 递归深度（默认1，-1表示无限）
-   * @returns {Promise<Object>} 文档结构
    */
   async execute(skill, args = {}) {
     const { notebookId, path, depth = 1 } = args;
@@ -158,13 +208,7 @@ const command = {
   },
   
   /**
-   * 构建文档结构（使用正确的 listDocsByPath API）
-   * @param {Object} skill - 技能实例
-   * @param {string} notebookId - 笔记本ID
-   * @param {string} startPath - 起始路径（系统路径）
-   * @param {number} depth - 递归深度
-   * @param {string} parentHPath - 父级可读路径
-   * @returns {Promise<Object>} 文档结构
+   * 构建文档结构
    */
   async buildDocStructure(skill, notebookId, startPath = '/', depth = 1, parentHPath = '') {
     const structure = {
@@ -243,8 +287,6 @@ const command = {
   
   /**
    * 统计文档数量
-   * @param {Object} structure - 文档结构
-   * @returns {number} 文档数量
    */
   countDocuments(structure) {
     let count = structure.documents ? structure.documents.length : 0;
@@ -258,8 +300,6 @@ const command = {
   
   /**
    * 统计文件夹数量
-   * @param {Object} structure - 文档结构
-   * @returns {number} 文件夹数量
    */
   countFolders(structure) {
     let count = structure.folders ? structure.folders.length : 0;
@@ -273,10 +313,6 @@ const command = {
   
   /**
    * 获取文档的子文档结构（兼容旧接口）
-   * @param {Object} skill - 技能实例
-   * @param {string} documentId - 文档ID
-   * @param {string} notebookId - 笔记本ID
-   * @returns {Promise<Object>} 文档结构
    */
   async getDocumentStructure(skill, documentId, notebookId) {
     let docPath = '/';
@@ -314,9 +350,6 @@ const command = {
   
   /**
    * 获取笔记本的文档结构（兼容旧接口）
-   * @param {Object} skill - 技能实例
-   * @param {string} notebookId - 笔记本ID
-   * @returns {Promise<Object>} 文档结构
    */
   async getNotebookStructure(skill, notebookId) {
     const structure = await this.buildDocStructure(skill, notebookId, '/', 2);

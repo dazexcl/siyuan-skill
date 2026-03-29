@@ -1,27 +1,71 @@
 /**
- * 文档保护指令
+ * 文档保护命令
  * 管理文档的保护标记，防止被误删除
  */
 
 const Permission = require('../utils/permission');
 const DeleteProtection = require('../utils/delete-protection');
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
 
 /**
- * 指令配置
+ * 命令配置
  */
 const command = {
-  name: 'protect-document',
+  name: 'protect',
+  aliases: [],
   description: '设置或移除文档保护标记，防止文档被删除',
-  usage: 'protect-document --doc-id <docId> [--remove] [--permanent]',
+  usage: 'siyuan protect <docId> [--remove] [--permanent]',
+  sortOrder: 270,
+  
+  initOptions: {},
+  options: {
+    '--remove': { isFlag: true, aliases: ['-r'], description: '移除保护标记' },
+    '--permanent': { isFlag: true, aliases: ['-p'], description: '设置为永久保护' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    '永久保护的文档无法通过命令移除保护',
+    '需要手动在思源笔记中修改属性'
+  ],
+  examples: [
+    'siyuan protect <doc-id>',
+    'siyuan protect <doc-id> --permanent',
+    'siyuan protect <doc-id> --remove'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.docId = parsed.positional[0];
+    }
+    if (parsed.options.remove) args.remove = true;
+    if (parsed.options.permanent) args.permanent = true;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.docId) {
+      console.error('错误: 请提供文档ID');
+      console.log('用法: siyuan protect <docId> [--remove] [--permanent]');
+      process.exit(1);
+    }
+    
+    console.log('设置文档保护...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.docId - 文档ID
-   * @param {boolean} [args.remove] - 移除保护标记
-   * @param {boolean} [args.permanent] - 设置为永久保护
-   * @returns {Promise<Object>} 操作结果
    */
   execute: Permission.createPermissionWrapper(async (skill, args, notebookId) => {
     const { docId, remove, permanent } = args;
@@ -52,12 +96,15 @@ const command = {
       const result = await DeleteProtection.setDocumentProtection(skill, docId, protectedStatus);
       
       if (result.success) {
+        const verifyAttrs = await skill.connector.request('/api/attr/getBlockAttrs', { id: docId });
+        const actualProtected = verifyAttrs ? verifyAttrs['custom-protected'] : null;
+        
         return {
           success: true,
           data: {
             id: docId,
-            protected: protectedStatus ? true : false,
-            protectionType: protectedStatus || null,
+            protected: actualProtected ? true : false,
+            protectionType: actualProtected || null,
             notebookId
           },
           message: result.message,

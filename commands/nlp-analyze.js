@@ -1,21 +1,69 @@
 /**
  * NLP 分析命令
- * 对文本进行 NLP 分析
- * 指令配置
+ * 对文本进行 NLP 分析（分词、实体识别、关键词提取）
+ */
+
+const { parseCommandArgs, showHelp } = require('../lib/cli-base');
+
+/**
+ * 命令配置
  */
 const command = {
-  name: 'nlp-analyze',
-  description: '对文本进行 NLP 分析（分词、实体识别、关键词提取）',
-  usage: 'nlp-analyze --text <text> [--tasks <tasks>] [--top-n <topN>]',
+  name: 'nlp',
+  description: '对文本进行 NLP 分析',
+  usage: 'siyuan nlp <text> [--tasks <tasks>]',
+  sortOrder: 310,
+  
+  initOptions: { initNLP: true },
+  options: {
+    '--text': { hasValue: true, aliases: ['-t'], description: '要分析的文本' },
+    '--tasks': { hasValue: true, description: '分析任务：tokenize,entities,keywords,all' },
+    '--top-n': { hasValue: true, aliases: ['-n'], description: '返回前N个关键词（默认10）' }
+  },
+  positionalCount: 1,
+  
+  notes: [
+    'tasks: tokenize(分词), entities(实体), keywords(关键词), all(全部)'
+  ],
+  
+  examples: [
+    'siyuan nlp "要分析的文本"',
+    'siyuan nlp "文本" --tasks tokenize,keywords'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.text = parsed.positional[0];
+    }
+    if (parsed.options.text) args.text = parsed.options.text;
+    if (parsed.options.tasks) args.tasks = parsed.options.tasks;
+    if (parsed.options.topN) args.topN = parseInt(parsed.options.topN, 10);
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    if (!executeArgs.text) {
+      console.error('错误: 请提供要分析的文本');
+      console.log('用法: siyuan nlp --text <text>');
+      process.exit(1);
+    }
+    
+    console.log('NLP 分析...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.text - 要分析的文本
-   * @param {string} args.tasks - 分析任务列表（逗号分隔）
-   * @param {number} args.topN - 返回前 N 个关键词
-   * @returns {Promise<Object>} 执行结果
    */
   execute: async (skill, args = {}) => {
     const {

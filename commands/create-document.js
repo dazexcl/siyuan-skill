@@ -4,14 +4,12 @@
  */
 
 const Permission = require('../utils/permission');
+const { parseCommandArgs, showHelp, resolveContent } = require('../lib/cli-base');
 
 /**
- * 辅助函数：处理内容中的换行符
- * @param {string} content - 原始内容
- * @returns {string} 处理后的内容
+ * 处理内容中的换行符
  */
 function processContent(content) {
-  // 处理content中的换行符，将字面量\n转换为实际换行
   return content ? content.replace(/\\n/g, '\n') : '';
 }
 
@@ -19,20 +17,84 @@ function processContent(content) {
  * 指令配置
  */
 const command = {
-  name: 'create-document',
-  description: '在 Siyuan Notes 中创建新文档',
-  usage: 'create-document --title <title> [--content <content>] [--force] (--parent-id <parentId> | --path <path>)',
+  name: 'create',
+  aliases: ['new'],
+  description: '创建新文档',
+  usage: 'siyuan create <title> [--parent-id <id> | --path <path>]',
+  sortOrder: 60,
+  
+  initOptions: {},
+  options: {
+    '--title': { hasValue: true, aliases: ['-t'], description: '文档标题' },
+    '--content': { hasValue: true, aliases: ['-c'], description: '文档内容' },
+    '--file': { hasValue: true, aliases: ['-f'], description: '从文件读取内容' },
+    '--parent-id': { hasValue: true, aliases: ['-p'], description: '父文档/笔记本ID' },
+    '--path': { hasValue: true, aliases: ['-P'], description: '文档路径' },
+    '--force': { isFlag: true, description: '强制创建（忽略重名检测）' }
+  },
+  positionalCount: 2,
+  
+  notes: [
+    '第一个位置参数为标题，第二个为内容（可选）',
+    'parent-id 和 path 二选一',
+    'path 末尾带 / 表示在目录下创建标题文档'
+  ],
+  
+  examples: [
+    'siyuan create "标题" --parent-id <id>',
+    'siyuan create "标题" --path "/笔记本/目录/"',
+    'siyuan create "标题" "内容" -p <id>'
+  ],
+  
+  /**
+   * 参数转换
+   */
+  toExecuteArgs(parsed) {
+    const args = {};
+    if (parsed.positional.length > 0) {
+      args.title = parsed.positional[0];
+    }
+    if (parsed.positional.length > 1) {
+      args.content = parsed.positional[1];
+    }
+    if (parsed.options.title) args.title = parsed.options.title;
+    if (parsed.options.content) args.content = parsed.options.content;
+    if (parsed.options.file) args.file = parsed.options.file;
+    if (parsed.options.parentId) args.parentId = parsed.options.parentId;
+    if (parsed.options.path) args.path = parsed.options.path;
+    if (parsed.options.force) args.force = true;
+    return args;
+  },
+  
+  /**
+   * CLI 执行入口
+   */
+  async runCLI(skill, parsed, args) {
+    const executeArgs = this.toExecuteArgs(parsed);
+    
+    const { content, source } = resolveContent(parsed.options, parsed.positional, 1);
+    if (source !== 'none' && !executeArgs.content) {
+      executeArgs.content = content;
+    }
+    
+    if (!executeArgs.title) {
+      console.error('错误: 请提供文档标题');
+      console.log('用法: siyuan create <title> [options]');
+      process.exit(1);
+    }
+    
+    if (executeArgs.parentId && executeArgs.path) {
+      console.error('错误: --parent-id 和 --path 不能同时使用');
+      process.exit(1);
+    }
+    
+    console.log('创建文档...');
+    const result = await this.execute(skill, executeArgs);
+    console.log(JSON.stringify(result, null, 2));
+  },
   
   /**
    * 执行指令
-   * @param {SiyuanNotesSkill} skill - 技能实例
-   * @param {Object} args - 指令参数
-   * @param {string} args.parentId - 父文档/笔记本ID（与 path 二选一）
-   * @param {string} args.title - 文档标题
-   * @param {string} args.content - 文档内容（可选）
-   * @param {boolean} args.force - 是否强制创建（忽略重名检测）
-   * @param {string} args.path - 文档路径（可选，与 parentId 二选一）
-   * @returns {Promise<Object>} 创建结果
    */
   execute: async (skill, args = {}) => {
     const { parentId, title, content = '', force = false, path = '' } = args;
@@ -53,7 +115,6 @@ const command = {
       };
     }
     
-    // 处理路径参数
     let effectiveParentId = parentId;
     
     if (path) {
@@ -65,9 +126,7 @@ const command = {
       let createdDocPath = null;
       let actualParentId = null;
       
-      // 如果路径末尾有 /，需要创建中间目录，然后在其下创建标题文档
       const componentsToProcess = pathEndsWithSlash ? pathComponents.length : pathComponents.length - 1;
-      // 标题优先级：1. 显式指定的 title 参数 2. 路径最后一段
       const finalTitle = title || (pathEndsWithSlash ? null : pathComponents[pathComponents.length - 1]);
       
       if (!finalTitle) {
@@ -78,12 +137,11 @@ const command = {
         };
       }
       
-      // 处理所有中间组件（创建目录结构）
       for (let i = 0; i < componentsToProcess; i++) {
         const component = pathComponents[i];
         
         try {
-          const findResult = await skill.executeCommand('convert-path', {
+          const findResult = await skill.executeCommand('convert', {
             path: `/${pathComponents.slice(0, i + 1).join('/')}`,
             force: true
           });
@@ -124,10 +182,9 @@ const command = {
         }
       }
       
-      // 创建最终文档前检查重名
       if (!force) {
         const fullPath = pathEndsWithSlash ? `${path}${finalTitle}` : path;
-        const existCheck = await skill.executeCommand('convert-path', {
+        const existCheck = await skill.executeCommand('convert', {
           path: fullPath,
           force: true
         });
@@ -142,7 +199,6 @@ const command = {
         }
       }
       
-      // 创建最终文档
       actualParentId = currentParentId;
       const processedContent = processContent(content);
       const createResult = await skill.documentManager.createDocument(
@@ -186,7 +242,6 @@ const command = {
       effectiveParentId = currentParentId;
     }
     
-    // 如果未提供 parentId，使用默认笔记本 ID
     if (!effectiveParentId) {
       effectiveParentId = skill.config.defaultNotebook;
     }
@@ -199,14 +254,11 @@ const command = {
       };
     }
     
-    // 使用权限包装器处理权限检查（提升到方法开头，确保所有操作都在权限检查后执行）
-    // 将 effectiveParentId 保存到闭包中供权限包装器使用
     const savedParentId = effectiveParentId;
     
     const permissionHandler = Permission.createPermissionWrapper(async (skill, args, notebookId) => {
       const { title, content = '', force = false, targetParentId } = args;
       
-      // 重名检测（权限检查通过后执行）
       if (!force) {
         const existingDoc = await skill.documentManager.checkDocumentExists(
           notebookId, 
@@ -243,10 +295,8 @@ const command = {
           fullPath = parentHPath ? `${parentHPath}/${title}` : `/${title}`;
         }
         
-        // 处理内容中的换行符
         const formattedContent = processContent(content);
         
-        // 使用createDocWithMd API创建文档
         const createResult = await skill.connector.request('/api/filetree/createDocWithMd', {
           notebook: notebookId,
           path: fullPath,
@@ -269,13 +319,10 @@ const command = {
           };
         }
         
-        // API返回null，检查是否真的创建成功
         console.warn('API返回null，检查文档是否真的创建成功');
         
-        // 等待一小段时间，确保文档创建完成
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // 使用搜索 API 查找包含标题的文档
         const searchParams = {
           keyword: title,
           limit: 5
@@ -300,13 +347,11 @@ const command = {
           };
         }
         
-        // 获取笔记本的文档结构，查找最近创建的文档
         const docStructure = await skill.connector.request('/api/filetree/getDocStructure', {
           notebook: notebookId
         });
         
         if (docStructure && docStructure.documents && docStructure.documents.length > 0) {
-          // 按更新时间排序，返回最新的文档
           const sortedDocs = docStructure.documents.sort((a, b) => {
             return new Date(b.updated || 0) - new Date(a.updated || 0);
           });
@@ -329,7 +374,6 @@ const command = {
           }
         }
         
-        // 如果所有搜索都失败，返回错误
         const errorMessage = `文档创建失败：API返回null，且无法通过搜索找到创建的文档。\n` +
           `请检查：\n` +
           `1. API令牌是否正确\n` +
