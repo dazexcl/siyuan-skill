@@ -5,7 +5,7 @@
 ## 语法
 
 ```bash
-siyuan icon <id> [--emoji <emoji>] [--get] [--remove]
+siyuan icon <id> [emoji] [--remove]
 ```
 
 ## 参数说明
@@ -13,21 +13,20 @@ siyuan icon <id> [--emoji <emoji>] [--get] [--remove]
 | 参数 | 说明 |
 |------|------|
 | `<id>` | 文档ID或块ID（必需） |
-| `--emoji` | 设置图标，支持编码或直接传入 emoji |
-| `--get` | 获取当前图标 |
-| `--remove` | 移除图标 |
+| `[emoji]` | 位置参数：设置图标，支持直接传入 emoji 字符或 Unicode 编码。省略则获取当前图标 |
+| `--remove` / `-r` | 移除图标 |
 
 ## 使用示例
 
 ```bash
-# 使用编码设置图标
-siyuan icon <docId> --emoji 1f4c4
+# 使用 Unicode 编码设置图标
+siyuan icon <docId> 1f4c4
 
 # 直接传入 emoji 字符
-siyuan icon <docId> --emoji 📁
+siyuan icon <docId> 📁
 
-# 获取当前图标
-siyuan icon <docId> --get
+# 获取当前图标（省略 emoji 参数）
+siyuan icon <docId>
 
 # 移除图标
 siyuan icon <docId> --remove

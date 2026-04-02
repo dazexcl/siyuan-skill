@@ -238,8 +238,6 @@ const command = {
           timestamp: Date.now()
         };
       }
-      
-      effectiveParentId = currentParentId;
     }
     
     if (!effectiveParentId) {
@@ -284,15 +282,52 @@ const command = {
           fullPath = `/${title}`;
         } else {
           let parentHPath = '';
+          let pathResolved = false;
+          
           try {
-            const hPathInfo = await skill.connector.request('/api/filetree/getHPathByID', { id: effectiveParentId });
-            if (hPathInfo) {
-              parentHPath = hPathInfo;
+            const pathInfo = await skill.connector.request('/api/filetree/getPathByID', { id: effectiveParentId });
+            if (pathInfo && (pathInfo.notebook || pathInfo.box)) {
+              if (pathInfo.path !== '/' && pathInfo.path) {
+                const hPathInfo = await skill.connector.request('/api/filetree/getHPathByID', { id: effectiveParentId });
+                if (hPathInfo) {
+                  parentHPath = hPathInfo;
+                  pathResolved = true;
+                }
+              } else {
+                pathResolved = true;
+              }
             }
-          } catch (error) {
-            console.warn('获取父文档hPath失败:', error.message);
+          } catch (pathError) {
+            console.warn('getPathByID 失败，尝试 getBlockInfo:', pathError.message);
           }
-          fullPath = parentHPath ? `${parentHPath}/${title}` : `/${title}`;
+          
+          if (!pathResolved) {
+            try {
+              const blockInfo = await skill.connector.request('/api/block/getBlockInfo', { id: effectiveParentId });
+              if (blockInfo && blockInfo.box) {
+                const rootId = blockInfo.rootID || effectiveParentId;
+                const hPathInfo = await skill.connector.request('/api/filetree/getHPathByID', { id: rootId });
+                if (hPathInfo) {
+                  parentHPath = hPathInfo;
+                  pathResolved = true;
+                }
+              }
+            } catch (blockError) {
+              console.warn('getBlockInfo 失败:', blockError.message);
+            }
+          }
+          
+          if (pathResolved && parentHPath) {
+            fullPath = parentHPath !== '/' ? `${parentHPath}/${title}` : `/${title}`;
+          } else if (pathResolved) {
+            fullPath = `/${title}`;
+          } else {
+            return {
+              success: false,
+              error: '无法获取父文档路径',
+              message: `无法确定父文档 "${effectiveParentId}" 的路径，请确认父文档ID是否正确`
+            };
+          }
         }
         
         const formattedContent = processContent(content);

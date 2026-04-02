@@ -19,7 +19,7 @@ function splitTags(tagsStr) {
  */
 const command = {
   name: 'tags',
-  aliases: ['tag'],
+  aliases: ['tag', 'st'],
   description: '管理块/文档的标签',
   usage: 'siyuan tags <id> [tags] [--add <tags>] [--remove <tags>] [--get]',
   sortOrder: 280,

@@ -51,7 +51,9 @@ siyuan search <query> [options]
 - `i` - 列表项
 - `tb` - 表格
 - `c` - 代码块
-- `s` - 分隔线
+- `s` - 超级块
+- `m` - 数学公式
+- `t` - 嵌入块
 - `img` - 图片
 
 ## 使用示例
@@ -100,7 +102,6 @@ siyuan search "关键词" --path /AI/openclaw --type d
 ```bash
 siyuan search "关键词" --where "length(content) > 100 AND updated > '20260101000000'"
 siyuan search "关键词" --path /AI/openclaw --where "type = 'd'"
-siyuan search "关键词" --min-length 20 --max-length 500
 siyuan search "关键词" --sort-by date --limit 5
 ```
 

@@ -45,8 +45,8 @@ node siyuan.js --version       # 显示版本信息
 | 重命名文档 | `rename` / `rn` | 新标题 | `siyuan rename <docId> "新标题"` |
 | 保护/取消保护 | `protect` | `--remove` | `siyuan protect <docId>` / `siyuan protect <docId> --remove` |
 | 检查文档存在 | `exists` / `check` | `--title` 或 `--path` | `siyuan exists --title "标题"` |
-| 转换ID和路径 | `convert` / `path` | `--to-id` 或 `--to-path` | `siyuan path "/笔记本/文档" --to-id` |
-| 设置文档图标 | `icon` | `--emoji` / `--get` / `--remove` | `siyuan icon <docId> --emoji 1f4c4` |
+| 转换ID和路径 | `convert` / `path` | `--id` 或 `--path` | `siyuan path "/笔记本/文档"` |
+| 设置文档图标 | `icon` | 位置参数 `[emoji]` / `--remove` | `siyuan icon <docId> 📄` |
 | 设置文档属性 | `block-attrs` / `attrs` / `attr` / `ba` | `--set` / `--get` / `--remove` | `siyuan ba <docId> --set "status=done"` |
 | 设置标签 | `tags` / `tag` | `--add` / `--remove` / `--get` | `siyuan tag <docId> "A,B"` / `siyuan tag <docId> --add "C"` |
 | 搜索内容 | `search` / `find` | `--mode` / `--threshold` | `siyuan search "关键词" --mode semantic` |
@@ -182,10 +182,10 @@ siyuan tag <docId> "重要,待审核"
 ## 图标设置
 
 ```bash
-siyuan icon <docId> --emoji 📄       # 直接传入 emoji
-siyuan icon <docId> --emoji 1f4c4    # 或使用编码
-siyuan icon <docId> --get            # 获取图标
-siyuan icon <docId> --remove         # 移除图标
+siyuan icon <docId> 📄             # 直接传入 emoji 设置图标
+siyuan icon <docId> 1f4c4          # 或使用 Unicode 编码
+siyuan icon <docId>                # 获取当前图标（省略 emoji 参数）
+siyuan icon <docId> --remove       # 移除图标
 ```
 
 > 📋 完整 emoji 编码表见 [图标命令文档](references/commands/icon.md)

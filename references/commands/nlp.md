@@ -75,27 +75,27 @@ siyuan nlp "文本内容" --tasks keywords --top-n 5
 ```json
 {
   "success": true,
-  "data": {
-    "language": "zh",
-    "tokens": ["这是", "一段", "需要", "分析", "的", "文本", "内容"],
-    "entities": [
-      {
-        "type": "email",
-        "value": "example@example.com",
-        "start": 10,
-        "end": 30
-      }
-    ],
-    "keywords": [
-      {
-        "word": "文本",
-        "score": 0.8,
-        "count": 2
-      }
-    ],
-    "summary": "这是一段需要分析的文本内容"
-  },
-  "message": "NLP 分析完成",
+  "text": "这是一段需要分析的文本内容",
+  "tokens": ["这是", "一段", "需要", "分析", "的", "文本", "内容"],
+  "tokenCount": 7,
+  "entities": [
+    {
+      "type": "email",
+      "value": "example@example.com",
+      "start": 10,
+      "end": 30
+    }
+  ],
+  "entityCount": 1,
+  "keywords": [
+    {
+      "word": "文本",
+      "score": 0.8,
+      "count": 2
+    }
+  ],
+  "keywordCount": 1,
+  "summary": "这是一段需要分析的文本内容",
   "timestamp": 1646389200000
 }
 ```

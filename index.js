@@ -6,7 +6,7 @@
 
 const path = require('path');
 
-const VERSION = '1.7.8';
+const VERSION = '1.8.0';
 const ConfigManager = require('./config');
 const SiyuanConnector = require('./connector');
 const commands = require('./commands');
