@@ -134,16 +134,36 @@ class SiyuanConnector {
         
         res.on('end', () => {
           try {
-            // 处理空响应
-            if (!responseData) {
-              // 对于某些API，空响应表示成功
-              if (statusCode >= 200 && statusCode < 300) {
-                resolve(null);
-              } else {
-                reject(new Error(`HTTP ${statusCode}: 空响应`));
+            // 检查 HTTP 状态码
+            if (statusCode < 200 || statusCode >= 300) {
+              // 非 2xx 状态码，尝试提取错误信息
+              let errorMessage = `HTTP ${statusCode}`;
+              if (responseData) {
+                // 尝试从 JSON 响应中提取错误信息
+                try {
+                  const errorData = JSON.parse(responseData);
+                  if (errorData.msg) {
+                    errorMessage = errorData.msg;
+                  } else if (errorData.message) {
+                    errorMessage = errorData.message;
+                  } else {
+                    errorMessage = `${statusCode}: ${responseData.substring(0, 200)}`;
+                  }
+                } catch {
+                  // 不是 JSON，使用原始响应文本
+                  errorMessage = `${statusCode}: ${responseData.substring(0, 200)}`;
+                }
               }
+              reject(new Error(errorMessage));
               return;
             }
+            
+            // 处理空响应
+            if (!responseData) {
+              resolve(null);
+              return;
+            }
+            
             const parsedData = JSON.parse(responseData);
             
             // 检查响应格式

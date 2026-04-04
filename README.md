@@ -94,7 +94,7 @@ cd siyuan-skill
 **验证安装**
 
 ```bash
-node siyuan.js help
+node scripts/notebooks.js
 ```
 
 ### 2. 获取凭证
@@ -108,7 +108,7 @@ node siyuan.js help
 **获取笔记本 ID**
 
 ```bash
-node siyuan.js notebooks
+node scripts/notebooks.js
 
 # 输出示例：
 # {
@@ -146,10 +146,10 @@ cp config.example.json config.json
 
 ```bash
 # 测试连接
-node siyuan.js notebooks
+node scripts/notebooks.js
 
 # 查看帮助
-node siyuan.js help
+node scripts/notebooks.js
 ```
 
 ***
@@ -160,7 +160,7 @@ node siyuan.js help
 
 ```bash
 cd skills/siyuan-skill
-node siyuan.js <command>
+node scripts/<command>
 ```
 
 ### 方式 2：使用 npm link 全局安装（推荐）
@@ -174,7 +174,7 @@ siyuan <command>
 ### 方式 3：直接指定路径运行
 
 ```bash
-node <skills-directory>/siyuan-skill/siyuan.js <command>
+node <<skills-directory>/siyuan-skill/scripts/ <command>
 ```
 
 ***
@@ -944,7 +944,7 @@ siyuan create "标题" "第一段## 二级标题 内容"
 
 ```bash
 # 测试 API 连接
-node siyuan.js notebooks
+node scripts/notebooks.js
 ```
 
 ***
@@ -953,7 +953,7 @@ node siyuan.js notebooks
 
 本工具完全开源，欢迎审计：
 
-- **主要源码**：`connector.js`, `config.js`, `index.js`, `siyuan.js`
+- **主要源码**：`connector.js`, `config.js`, `scripts/`
 - **TLS 证书验证**：默认启用
 - **日志脱敏**：Token/密码自动隐藏
 

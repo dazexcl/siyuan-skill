@@ -123,7 +123,7 @@
 node -e "console.log(JSON.parse(require('fs').readFileSync('config.json', 'utf8')))"
 
 # 测试连接
-node siyuan.js notebooks
+node scripts/notebooks.js
 ```
 
 ## 常见错误

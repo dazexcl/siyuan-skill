@@ -11,12 +11,12 @@
 ```
 ┌─────────────────┐
 │  1. 全局安全模式  │  ← 最高优先级
-├────────┬────────┘
+├────────┬────────┤
          │
          ▼
 ┌─────────────────┐
 │  2. 文档保护标记  │
-├────────┬────────┘
+├────────┬────────┤
          │
          ▼
 ┌─────────────────┐
@@ -70,16 +70,16 @@
 **设置方式**：
 ```bash
 # 设置普通保护
-siyuan protect <docId>
+node scripts/protect.js <docId>
 
 # 设置永久保护
-siyuan protect <docId> --permanent
+node scripts/protect.js <docId> --permanent
 ```
 
 **移除方式**：
 ```bash
 # 移除普通保护
-siyuan protect <docId> --remove
+node scripts/protect.js <docId> --remove
 ```
 
 **错误信息**：
@@ -110,17 +110,7 @@ siyuan protect <docId> --remove
 **使用方式**：
 ```bash
 # 必须提供正确的文档标题
-siyuan delete <docId> --confirm-title "文档标题"
-```
-
-**错误信息**：
-```json
-{
-  "success": false,
-  "error": "删除保护",
-  "message": "删除确认机制已启用，必须提供 --confirm-title 参数以确认删除操作。",
-  "protectionLevel": "confirmation_failed"
-}
+node scripts/delete.js <docId> --confirm-title "文档标题"
 ```
 
 ## 配置说明
@@ -164,10 +154,10 @@ siyuan delete <docId> --confirm-title "文档标题"
 
 ```bash
 # 设置普通保护（可移除）
-siyuan protect <important-doc-id>
+node scripts/protect.js <important-doc-id>
 
 # 设置永久保护（不可通过命令移除）
-siyuan protect <critical-doc-id> --permanent
+node scripts/protect.js <critical-doc-id> --permanent
 ```
 
 ### Agent 操作建议
@@ -175,9 +165,3 @@ siyuan protect <critical-doc-id> --permanent
 1. **启用确认机制**：确保 Agent 删除时需要明确确认
 2. **保护重要文档**：对关键文档设置保护标记
 3. **定期检查**：定期检查保护配置是否正确
-
-## 相关文档
-
-- [删除文档命令](../commands/delete.md)
-- [文档保护命令](../commands/protect.md)
-- [配置说明](../config/environment.md)
