@@ -10,19 +10,19 @@
 | 查看文档结构 | `structure.js` | `node scripts/structure.js <notebookId>` |
 | 读取文档内容 | `content.js` | `node scripts/content.js <docId>` |
 | 获取文档信息 | `info.js` | `node scripts/info.js <docId>` |
-| 创建文档 | `create.js` | `node scripts/create.js "标题" --parent-id <parentId>` |
+| 创建文档 | `create.js` | `node scripts/create.js "标题" --parent-id <id>` 或 `--path <path>` |
 | 修改文档全文 | `update.js` | `node scripts/update.js <docId> --content "新内容"` |
 | 删除文档 | `delete.js` | `node scripts/delete.js <docId>` |
 | 移动文档 | `move.js` | `node scripts/move.js <docId> --target <targetId>` |
 | 重命名文档 | `rename.js` | `node scripts/rename.js <docId> "新标题"` |
 | 保护/取消保护 | `protect.js` | `node scripts/protect.js <docId>` |
 | 检查文档存在 | `exists.js` | `node scripts/exists.js --title "标题"` |
-| ID↔路径转换 | `convert.js` | `node scripts/convert.js --path "/笔记本/文档"` |
+| ID↔路径转换 | `convert.js` | `node scripts/convert.js --id <id>` 或 `--path <path>` |
 | 设置图标 | `icon.js` | `node scripts/icon.js <docId> 1f4cb` |
 | 设置属性 | `block-attrs.js` | `node scripts/block-attrs.js <id> --set "key=value"` |
 | 管理标签 | `tags.js` | `node scripts/tags.js <id> --add "标签1,标签2"` |
 | 搜索内容 | `search.js` | `node scripts/search.js "关键词"` |
-| 向量索引 | `index-docs.js` | `node scripts/index-docs.js --notebook <id>` |
+| 向量索引 | `index.js` | `node scripts/index.js --notebook <id>` |
 | NLP 分析 | `nlp.js` | `node scripts/nlp.js "文本"` |
 | 获取块信息 | `block-get.js` | `node scripts/block-get.js <blockId>` |
 | 更新块内容 | `block-update.js` | `node scripts/block-update.js <blockId> --content "新内容"` |
@@ -55,7 +55,7 @@
 
 ### 创建文档
 ```
-exists.js --title "标题" → 不存在 → create.js "标题" --parent-id <id>
+exists.js --title "标题" → 不存在 → create.js "标题" --parent-id <id> 或 --path <path>
                          → 已存在 → 询问用户 → update.js <docId> --content "新内容" 或 create.js --force
 ```
 

@@ -2,8 +2,8 @@
 /**
  * icon.js - 设置或获取文档/块的图标
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: icon <id> [emoji] [选项]
 
@@ -108,12 +108,10 @@ async function main() {
     });
 
     if (params.remove) {
-      // 移除图标
-      const newAttrs = { ...currentAttrs };
-      delete newAttrs.icon;
+      // 移除图标：显式设置为空字符串
       const result = await connector.request('/api/attr/setBlockAttrs', {
         id: params.id,
-        attrs: newAttrs
+        attrs: { icon: '' }
       });
       console.log(JSON.stringify({
         success: true,
@@ -142,8 +140,13 @@ async function main() {
       // 获取图标
       const icon = currentAttrs.icon || null;
       console.log(JSON.stringify({
-        id: params.id,
-        icon: icon
+        success: true,
+        data: {
+          id: params.id,
+          hasIcon: icon !== null,
+          icon: icon
+        },
+        message: icon ? '图标获取成功' : '未设置图标'
       }, null, 2));
     }
     process.exit(0);

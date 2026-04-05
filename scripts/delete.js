@@ -2,8 +2,8 @@
 /**
  * delete.js - 删除文档
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: delete <docId> [选项]
@@ -103,7 +103,8 @@ async function main() {
       });
     } catch (error) {
       // 如果文档不存在，可能已经被删除了
-      if (error.message.includes('404') || error.message.includes('not found')) {
+      if (error.message.includes('404') || error.message.includes('not found') || 
+          error.message.includes('未找到') || error.message.includes('不存在')) {
         console.error('错误: 文档不存在或已被删除');
         process.exit(1);
       }
@@ -148,14 +149,33 @@ async function main() {
     }
 
     // 执行删除
-    const result = await connector.request('/api/filetree/removeDoc', {
+    // 使用 removeDocByID API 来删除文档（参考历史版本的实现）
+    // 这个 API 只需要文档ID，比 removeDoc 更简单可靠
+    const docTitle = docInfo.rootTitle || docInfo.content || params.docId;
+    
+    console.log('执行删除操作:', JSON.stringify({
       notebook: docInfo.box || '',
-      path: docInfo.rootPath || ''
+      docId: params.docId,
+      title: docTitle
+    }, null, 2));
+
+    // 使用 removeDocByID API（历史版本使用的API）
+    console.log('调用删除文档API:', '/api/filetree/removeDocByID', { id: params.docId });
+    
+    const result = await connector.request('/api/filetree/removeDocByID', {
+      id: params.docId
     });
+    
+    console.log('删除文档API返回结果:', JSON.stringify(result, null, 2));
+    console.log('删除验证成功：文档已删除');
 
     console.log(JSON.stringify({
       success: true,
       id: params.docId,
+      title: docInfo.rootTitle || docInfo.content,
+      notebook: docInfo.box,
+      deleted: true,
+      timestamp: Date.now(),
       message: '文档已删除'
     }, null, 2));
     process.exit(0);

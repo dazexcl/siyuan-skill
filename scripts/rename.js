@@ -2,8 +2,8 @@
 /**
  * rename.js - 重命名文档标题
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: rename <docId> [title] [选项]
@@ -124,14 +124,20 @@ async function main() {
     // 检查重名（如果不强制）
     if (!params.force && docInfo.parentID) {
       try {
-        const parentPath = docInfo.rootPath.substring(0, docInfo.rootPath.lastIndexOf('/'));
-        const newPath = parentPath + '/' + params.title;
-        const existing = await connector.request('/api/filetree/getIDsByHPath', {
-          path: newPath
+        const hPathInfo = await connector.request('/api/filetree/getHPathByID', {
+          id: docInfo.parentID
         });
-        if (existing && existing.length > 0 && !existing.includes(params.docId)) {
-          console.error(`错误: 已存在同名文档 "${params.title}"，使用 --force 强制重命名`);
-          process.exit(1);
+        
+        if (hPathInfo) {
+          const newPath = hPathInfo + '/' + params.title;
+          const existing = await connector.request('/api/filetree/getIDsByHPath', {
+            notebook: docInfo.box,
+            path: newPath
+          });
+          if (existing && existing.length > 0 && !existing.includes(params.docId)) {
+            console.error(`错误: 已存在同名文档 "${params.title}"，使用 --force 强制重命名`);
+            process.exit(1);
+          }
         }
       } catch (checkError) {
         // 检查失败时继续

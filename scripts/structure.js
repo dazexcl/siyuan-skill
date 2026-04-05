@@ -12,8 +12,8 @@
  * - 使用 listDocsByPath API 递归获取文档结构
  * - 统计文档和文件夹数量
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission, checkPermissionResult } = require('./lib/permission');
 
 /**
@@ -203,6 +203,53 @@ async function buildDocStructure(connector, notebookId, startPath = '/', depth =
 }
 
 /**
+ * 在文档结构中查找指定ID的文档
+ * @param {Object} structure - 文档结构
+ * @param {string} docId - 文档ID
+ * @returns {Object|null} 找到的文档对象或null
+ */
+function findDocInStructure(structure, docId) {
+  const docs = structure.documents || [];
+  const folders = structure.folders || [];
+  
+  for (const doc of docs) {
+    if (doc.id === docId) return doc;
+  }
+  
+  for (const folder of folders) {
+    if (folder.id === docId) return folder;
+    if (folder.documents) {
+      for (const doc of folder.documents) {
+        if (doc.id === docId) return doc;
+      }
+    }
+    if (folder.folders) {
+      const found = findDocInStructure({ folders: folder.folders, documents: [] }, docId);
+      if (found) return found;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * 验证文档A是否是文档B的子文档
+ * @param {Object} structure - 文档结构
+ * @param {string} parentId - 父文档ID
+ * @param {string} childId - 子文档ID
+ * @returns {boolean} 是否为父子关系
+ */
+function isChildOf(structure, parentId, childId) {
+  const parentDoc = findDocInStructure(structure, parentId);
+  if (!parentDoc) return false;
+  
+  const childInDocuments = parentDoc.documents && parentDoc.documents.some(d => d.id === childId);
+  const childInFolders = parentDoc.folders && parentDoc.folders.some(f => f.id === childId);
+  
+  return childInDocuments || childInFolders;
+}
+
+/**
  * 获取笔记本列表
  * @param {SiyuanConnector} connector - 连接器实例
  * @returns {Promise<Array>} 笔记本列表
@@ -222,7 +269,14 @@ async function getNotebooks(connector) {
  */
 async function pathToId(connector, hPath, force = false, defaultNotebook = null) {
   try {
-    // 解析路径
+    if (!hPath || typeof hPath !== 'string') {
+      return {
+        success: false,
+        error: '无效路径',
+        message: '路径不能为空且必须是字符串'
+      };
+    }
+
     const pathParts = hPath.split('/').filter(p => p.trim() !== '');
     if (pathParts.length === 0) {
       return {
@@ -232,7 +286,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
       };
     }
 
-    // 获取所有笔记本列表
     const notebooks = await getNotebooks(connector);
     if (!notebooks || notebooks.length === 0) {
       return {
@@ -242,12 +295,10 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
       };
     }
 
-    // 查找第一个路径部分对应的笔记本
     let notebookId = null;
     let notebookName = null;
     let foundNotebook = false;
 
-    // 首先检查是否为已知的笔记本ID格式 (14位数字 + 短横线 + 7位字母数字)
     if (/^\d{14}-[a-zA-Z0-9]{7}$/.test(pathParts[0])) {
       const nbById = notebooks.find(nb => nb.id === pathParts[0]);
       if (nbById) {
@@ -256,7 +307,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
         foundNotebook = true;
       }
     } else {
-      // 尝试查找匹配的笔记本名称
       for (const nb of notebooks) {
         if (nb.name === pathParts[0]) {
           notebookId = nb.id;
@@ -267,14 +317,12 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
       }
     }
 
-    // 如果未找到匹配的笔记本，检查是否有默认笔记本配置
     if (!foundNotebook) {
       if (defaultNotebook) {
         notebookId = defaultNotebook;
         const defaultNbInfo = notebooks.find(nb => nb.id === defaultNotebook);
         notebookName = defaultNbInfo?.name || '默认笔记本';
       } else {
-        // 回退：使用第一个可用笔记本
         if (notebooks.length > 0) {
           notebookId = notebooks[0].id;
           notebookName = notebooks[0].name || '未命名笔记本';
@@ -289,7 +337,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
       }
     }
 
-    // 如果只有笔记本名称，返回笔记本 ID
     if (pathParts.length === 1 && foundNotebook) {
       return {
         success: true,
@@ -303,19 +350,15 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
       };
     }
 
-    // 根据是否找到匹配的笔记本决定路径处理方式
     if (foundNotebook) {
-      // 构建相对路径（不包含笔记本名称）
       const relativePath = '/' + pathParts.slice(1).join('/');
 
-      // 使用 getIDsByHPath API 获取文档 ID
       const result = await connector.request('/api/filetree/getIDsByHPath', {
         notebook: notebookId,
         path: relativePath
       });
 
       if (result && Array.isArray(result) && result.length > 0) {
-        // 检查是否有多个匹配结果
         if (result.length > 1 && !force) {
           return {
             success: false,
@@ -324,7 +367,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
           };
         }
 
-        // 获取文档属性以获取标题
         let docTitle = null;
         try {
           const attrs = await connector.request('/api/attr/getBlockAttrs', { id: result[0] });
@@ -332,7 +374,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
             docTitle = attrs.title;
           }
         } catch (error) {
-          // 忽略错误
         }
 
         return {
@@ -357,7 +398,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
         message: `未找到路径对应的文档：${hPath}`
       };
     } else {
-      // 未找到匹配的笔记本，整个路径都被视为文档路径
       const relativePath = '/' + pathParts.join('/');
       const result = await connector.request('/api/filetree/getIDsByHPath', {
         notebook: notebookId,
@@ -365,7 +405,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
       });
 
       if (result && Array.isArray(result) && result.length > 0) {
-        // 检查是否有多个匹配结果
         if (result.length > 1 && !force) {
           return {
             success: false,
@@ -374,7 +413,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
           };
         }
 
-        // 获取文档属性以获取标题
         let docTitle = null;
         try {
           const attrs = await connector.request('/api/attr/getBlockAttrs', { id: result[0] });
@@ -382,7 +420,6 @@ async function pathToId(connector, hPath, force = false, defaultNotebook = null)
             docTitle = attrs.title;
           }
         } catch (error) {
-          // 忽略错误
         }
 
         return {
@@ -565,7 +602,13 @@ async function main() {
       timestamp: Date.now(),
       documentCount: countDocuments(structure),
       folderCount: countFolders(structure),
-      type: isDocumentId ? 'doc' : 'notebook'
+      type: isDocumentId ? 'doc' : 'notebook',
+      query: {
+        notebookId: notebookId,
+        documentId: documentId || null,
+        startPath: startPath,
+        depth: depth
+      }
     };
 
     console.log(JSON.stringify(result, null, 2));
@@ -574,7 +617,13 @@ async function main() {
     const errorResult = {
       success: false,
       error: error.name || '执行失败',
-      message: error.message
+      message: error.message,
+      details: {
+        notebookId: notebookId,
+        documentId: documentId || null,
+        startPath: startPath,
+        depth: depth
+      }
     };
     console.log(JSON.stringify(errorResult, null, 2));
     process.exit(1);

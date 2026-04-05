@@ -97,6 +97,6 @@ node scripts/search.js "人工智能应用" --mode semantic
 node scripts/search.js "人工智能应用" --mode hybrid
 
 # 索引文档到向量库
-node scripts/index-docs.js --notebook <notebookId>
-node scripts/index-docs.js --doc-ids <docId1>,<docId2>
+node scripts/index.js --notebook <notebookId>
+node scripts/index.js --doc-ids <docId1>,<docId2>
 ```

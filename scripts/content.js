@@ -6,8 +6,8 @@
  * 支持 docId 或 path 参数
  * 支持 raw 模式直接输出
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: content [<docId>] [选项]
@@ -168,11 +168,18 @@ async function pathToDocId(connector, path, defaultNotebook) {
       notebook: notebookId
     });
 
+    let docId = null;
     if (result && result.rootID) {
+      docId = result.rootID;
+    } else if (Array.isArray(result) && result.length > 0) {
+      docId = result[0];
+    }
+
+    if (docId) {
       return {
         success: true,
         data: {
-          id: result.rootID,
+          id: docId,
           notebookId: notebookId,
           path: docPath
         }
@@ -262,7 +269,7 @@ async function main() {
       const kramdownResult = await connector.request('/api/block/getBlockKramdown', { id: docId });
 
       if (!kramdownResult || !kramdownResult.kramdown) {
-        console.error('错误: 未找到文档 kramdown 内容');
+        console.error(`错误: 未找到文档 ${docId} 的 kramdown 内容`);
         process.exit(1);
       }
 
@@ -291,7 +298,7 @@ async function main() {
       const result = await connector.request('/api/export/exportMdContent', { id: docId });
 
       if (!result || !result.content) {
-        console.error('错误: 未找到文档内容');
+        console.error(`错误: 未找到文档 ${docId} 的内容`);
         process.exit(1);
       }
 

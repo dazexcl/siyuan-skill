@@ -7,10 +7,11 @@
  * - semantic: 使用向量嵌入进行语义搜索
  * - hybrid: 结合 Siyuan 原生搜索和向量搜索的混合模式
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const EmbeddingManager = require('./lib/embedding-manager');
 const VectorManager = require('./lib/vector-manager');
+const SearchManager = require('./lib/search-manager');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: search <query> [选项]
@@ -21,20 +22,28 @@ const HELP_TEXT = `用法: search <query> [选项]
   query                 搜索关键词
 
 选项:
-  -m, --mode <mode>       搜索模式: legacy/keyword/semantic/hybrid
-  -T, --type <type>       搜索类型: 0=文档,1=文档(标题+摘要),2=全文
-  -l, --limit <num>       返回结果数量限制
-  -P, --path <path>       限定搜索路径
-  -n, --notebook-id <id>  限定笔记本ID
-  --threshold <num>       语义搜索阈值 (0-1)
-  -h, --help              显示帮助信息
+  -m, --mode <mode>           搜索模式: legacy/keyword/semantic/hybrid
+  -T, --type <type>           搜索类型: d=文档, p=段落, h=标题, l=列表, i=项目, tb=代码块, c=代码块, s=数学公式, img=图片
+  -l, --limit <num>           返回结果数量限制
+  -P, --path <path>           限定搜索路径
+  -n, --notebook-id <id>      限定笔记本ID
+  --sort <type>               排序方式: relevance=相关性, date=日期
+  --types <types>             多个类型过滤 (逗号分隔)
+  --tags <tags>               标签过滤 (逗号分隔的标签列表)
+  --where <condition>         自定义SQL WHERE条件
+  --dense-weight <num>        语义搜索权重 (混合搜索, 默认0.7)
+  --sparse-weight <num>       关键词搜索权重 (混合搜索, 默认0.3)
+  --sql-weight <num>          SQL搜索权重 (混合搜索, 默认0)
+  --threshold <num>           语义搜索阈值 (0-1)
+  -h, --help                  显示帮助信息
 
 示例:
   search "关键词"
   search "项目" --mode keyword --limit 10
   search "笔记" --notebook-id <id>
   search "类似概念" --mode semantic
-  search "综合查询" --mode hybrid --threshold 0.5`;
+  search "综合查询" --mode hybrid --threshold 0.5
+  search "标签" --tags "技术,笔记" --sort date`;
 
 /**
  * 将连字符命名转换为驼峰命名
@@ -53,7 +62,10 @@ function camelCase(str) {
 function parseArgs(argv) {
   const positional = [];
   const options = {};
-  const hasValueOpts = new Set(['mode', 'type', 'limit', 'path', 'notebookId', 'threshold']);
+  const hasValueOpts = new Set([
+    'mode', 'type', 'types', 'limit', 'path', 'notebookId', 'notebook', 'threshold',
+    'sort', 'tags', 'where', 'denseWeight', 'sparseWeight', 'sqlWeight'
+  ]);
   const SHORT_OPTS = { m: 'mode', T: 'type', l: 'limit', P: 'path', n: 'notebookId' };
 
   for (let i = 0; i < argv.length; i++) {
@@ -92,43 +104,6 @@ function parseArgs(argv) {
  * @param {Object} params - 额外参数
  * @returns {Promise<Array>} 搜索结果数组
  */
-async function executeSiyuanSearch(connector, query, mode, type, limit, params) {
-  const methodMap = { legacy: 0, keyword: 1, semantic: 2, hybrid: 3 };
-  const requestData = {
-    query,
-    method: methodMap[mode] || 0,
-    types: [type],
-    limit
-  };
-
-  if (params.path) requestData.path = params.path;
-  if (params.notebookId) requestData.box = params.notebookId;
-
-  const result = await connector.request('/api/search/fullTextSearchBlock', requestData);
-  return result && result.data ? result.data.blocks || [] : [];
-}
-
-/**
- * 执行向量语义搜索
- * @param {EmbeddingManager} embeddingManager - 嵌入管理器实例
- * @param {VectorManager} vectorManager - 向量管理器实例
- * @param {string} query - 搜索查询
- * @param {number} limit - 结果数量限制
- * @param {number} threshold - 相似度阈值
- * @returns {Promise<Array>} 向量搜索结果数组
- */
-async function executeVectorSearch(embeddingManager, vectorManager, query, limit, threshold) {
-  // 生成查询向量
-  const queryVector = await embeddingManager.generateEmbedding(query);
-  if (!queryVector) {
-    throw new Error('无法生成查询向量');
-  }
-
-  // 执行向量搜索
-  const results = await vectorManager.searchSimilar(queryVector, limit, threshold);
-  return results;
-}
-
 /**
  * 主函数 - 执行搜索
  */
@@ -141,13 +116,34 @@ async function main() {
 
   const params = parseArgs(args);
   if (params.positional.length === 0) {
-    console.error('错误: 请提供搜索关键词');
+    process.stdout.write('错误: 请提供搜索关键词\n');
     process.exit(1);
   }
 
   const query = params.positional[0];
+  if (!query || query.trim() === '') {
+    process.stdout.write('错误: 搜索关键词不能为空\n');
+    process.exit(1);
+  }
+
+  if (params.notebook && !params.notebookId) {
+    params.notebookId = params.notebook;
+  }
+
+  const validModes = ['legacy', 'keyword', 'semantic', 'hybrid'];
   const mode = params.mode || 'legacy';
-  const type = parseInt(params.type) || 0;
+  if (params.mode && !validModes.includes(params.mode)) {
+    process.stdout.write('错误: 无效的搜索模式，支持的模式: legacy, keyword, semantic, hybrid\n');
+    process.exit(1);
+  }
+  const type = params.type;
+  const types = params.types ? (typeof params.types === 'string' ? params.types.split(',').map(t => t.trim()) : params.types) : null;
+  const tags = params.tags ? (typeof params.tags === 'string' ? params.tags.split(',').map(t => t.trim()) : params.tags) : null;
+  const where = params.where || null;
+  const sort = params.sort || 'relevance';
+  const denseWeight = parseFloat(params.denseWeight) || 0.7;
+  const sparseWeight = parseFloat(params.sparseWeight) || 0.3;
+  const sqlWeight = parseFloat(params.sqlWeight) || 0;
   const limit = parseInt(params.limit) || 32;
   const threshold = parseFloat(params.threshold) || 0;
 
@@ -161,167 +157,78 @@ async function main() {
       tls: config.tls
     });
 
-    // 权限检查：如果指定了 notebookId，需要验证
-    if (params.notebookId) {
-      checkPermission(config, params.notebookId);
+    // 仅在配置了向量搜索相关参数时初始化
+    let vectorManager = null;
+    let embeddingManager = null;
+
+    if (config.qdrant && config.qdrant.url && config.embedding && config.embedding.baseUrl) {
+      try {
+        embeddingManager = new EmbeddingManager(config.embedding);
+        vectorManager = new VectorManager(config, embeddingManager);
+        await vectorManager.initialize();
+      } catch (error) {
+        console.warn('向量搜索初始化失败，将使用传统搜索:', error.message);
+        vectorManager = null;
+      }
     }
 
-    // 根据搜索模式执行不同逻辑
-    if (mode === 'semantic') {
-      // 语义搜索模式
-      await executeSemanticSearch(config, query, limit, threshold);
-    } else if (mode === 'hybrid') {
-      // 混合搜索模式
-      await executeHybridSearch(config, connector, query, type, limit, threshold, params);
-    } else {
-      // legacy 或 keyword 模式 - 使用 Siyuan 原生搜索
-      const blocks = await executeSiyuanSearch(connector, query, mode, type, limit, params);
-      console.log(JSON.stringify({
-        success: true,
-        data: { blocks },
-        query: { keyword: query, mode, type, limit }
-      }, null, 2));
-    }
+    const searchManager = new SearchManager(connector, vectorManager);
+
+    const searchOptions = {
+      notebookId: params.notebookId,
+      path: params.path,
+      type: type,
+      types: types,
+      tags: tags,
+      where: where,
+      sort: sort,
+      denseWeight: denseWeight,
+      sparseWeight: sparseWeight,
+      sqlWeight: sqlWeight,
+      limit: limit,
+      threshold: threshold,
+      checkPermissionFn: (notebookId) => {
+        try {
+          checkPermission(config, notebookId);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+    };
+
+    const result = await searchManager.search(query, {
+      mode: mode,
+      ...searchOptions
+    });
+
+    const blocks = result.results.map(r => ({
+      id: r.id,
+      score: r.relevanceScore || 0,
+      content: r.content || r.excerpt || '',
+      title: r.title || '',
+      notebookId: r.box || r.notebookId || '',
+      path: r.path || '',
+      type: r.type || 'd'
+    }));
+
+    console.log(JSON.stringify({
+      success: true,
+      data: {
+        blocks
+      },
+      query: {
+        keyword: query,
+        mode: mode,
+        limit: limit,
+        threshold: threshold
+      }
+    }, null, 2));
 
     process.exit(0);
   } catch (error) {
     console.error('执行失败:', error.message);
     process.exit(1);
-  }
-}
-
-/**
- * 执行语义搜索
- * @param {Object} config - 配置对象
- * @param {string} query - 搜索查询
- * @param {number} limit - 结果数量限制
- * @param {number} threshold - 相似度阈值
- */
-async function executeSemanticSearch(config, query, limit, threshold) {
-  // 检查向量搜索是否启用
-  if (!config.vectorSearch || !config.vectorSearch.enabled) {
-    console.log(JSON.stringify({
-      success: false,
-      message: '向量搜索未启用。请在 config.json 中配置 vectorSearch.enabled = true'
-    }, null, 2));
-    process.exit(1);
-  }
-
-  const embeddingManager = new EmbeddingManager(config);
-  const vectorManager = new VectorManager(config);
-
-  try {
-    const results = await executeVectorSearch(embeddingManager, vectorManager, query, limit, threshold);
-
-    console.log(JSON.stringify({
-      success: true,
-      data: {
-        blocks: results.map(r => ({
-          id: r.id,
-          score: r.score,
-          content: r.payload?.content || '',
-          title: r.payload?.title || '',
-          notebookId: r.payload?.notebookId || '',
-          path: r.payload?.path || ''
-        }))
-      },
-      query: { keyword: query, mode: 'semantic', limit, threshold }
-    }, null, 2));
-  } catch (error) {
-    // 向量搜索失败，输出错误
-    console.log(JSON.stringify({
-      success: false,
-      message: `向量搜索失败: ${error.message}`,
-      fallback: true
-    }, null, 2));
-    process.exit(1);
-  }
-}
-
-/**
- * 执行混合搜索
- * @param {Object} config - 配置对象
- * @param {SiyuanConnector} connector - Siyuan 连接器实例
- * @param {string} query - 搜索查询
- * @param {number} type - 搜索类型
- * @param {number} limit - 结果数量限制
- * @param {number} threshold - 相似度阈值
- * @param {Object} params - 额外参数
- */
-async function executeHybridSearch(config, connector, query, type, limit, threshold, params) {
-  // 检查向量搜索是否启用
-  if (!config.vectorSearch || !config.vectorSearch.enabled) {
-    // 向量搜索未启用，fallback 到 Siyuan 原生搜索
-    console.error('警告: 向量搜索未启用，使用 Siyuan 原生搜索');
-    const blocks = await executeSiyuanSearch(connector, query, 'hybrid', type, limit, params);
-    console.log(JSON.stringify({
-      success: true,
-      data: { blocks },
-      query: { keyword: query, mode: 'hybrid', type, limit },
-      warning: '向量搜索未启用，使用原生搜索'
-    }, null, 2));
-    return;
-  }
-
-  const embeddingManager = new EmbeddingManager(config);
-  const vectorManager = new VectorManager(config);
-
-  try {
-    // 并行执行 Siyuan 原生搜索和向量搜索
-    const [siyuanResults, queryVector] = await Promise.all([
-      executeSiyuanSearch(connector, query, 'hybrid', type, limit, params),
-      embeddingManager.generateEmbedding(query)
-    ]);
-
-    if (!queryVector) {
-      // 向量生成失败，仅使用 Siyuan 结果
-      console.error('警告: 无法生成查询向量，仅使用 Siyuan 原生搜索结果');
-      console.log(JSON.stringify({
-        success: true,
-        data: { blocks: siyuanResults },
-        query: { keyword: query, mode: 'hybrid', type, limit },
-        warning: '向量生成失败，仅使用原生搜索'
-      }, null, 2));
-      return;
-    }
-
-    // 执行混合搜索
-    const hybridResults = await vectorManager.hybridSearch(
-      queryVector,
-      siyuanResults.map(b => ({
-        id: b.id,
-        score: b.score || 0.5,
-        content: b.content || ''
-      })),
-      limit
-    );
-
-    console.log(JSON.stringify({
-      success: true,
-      data: {
-        blocks: hybridResults.map(r => ({
-          id: r.id,
-          score: r.score,
-          vectorScore: r.vectorScore,
-          keywordScore: r.keywordScore,
-          content: r.payload?.content || '',
-          title: r.payload?.title || '',
-          notebookId: r.payload?.notebookId || '',
-          path: r.payload?.path || ''
-        }))
-      },
-      query: { keyword: query, mode: 'hybrid', type, limit, threshold }
-    }, null, 2));
-  } catch (error) {
-    // 混合搜索失败，fallback 到 Siyuan 原生搜索
-    console.error(`警告: 混合搜索失败 (${error.message})，使用 Siyuan 原生搜索`);
-    const blocks = await executeSiyuanSearch(connector, query, 'hybrid', type, limit, params);
-    console.log(JSON.stringify({
-      success: true,
-      data: { blocks },
-      query: { keyword: query, mode: 'hybrid', type, limit },
-      warning: `混合搜索失败: ${error.message}`
-    }, null, 2));
   }
 }
 

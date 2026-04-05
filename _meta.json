@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "name": "siyuan-skill",
-  "description": "思源笔记API转CLI工具，支持笔记本管理、文档操作、内容搜索、块控制",
+  "description": "思源笔记工具，支持笔记本管理、文档操作、内容搜索、块控制",
   "skillType": "cli",
   "runtime": "node",
   "runtimeVersion": ">=14.0.0",
@@ -37,7 +37,7 @@
     "scripts/block-transfer.js",
     "scripts/tags.js",
     "scripts/search.js",
-    "scripts/index-docs.js",
+    "scripts/index.js",
     "scripts/nlp.js"
   ]
 }

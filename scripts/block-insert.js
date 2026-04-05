@@ -2,8 +2,8 @@
 /**
  * block-insert.js - 插入新块到 Siyuan Notes
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission, isNotebookAllowed } = require('./lib/permission');
 
 const HELP_TEXT = `用法: block-insert <content> [选项]
@@ -122,9 +122,24 @@ async function main() {
     if (params.nextId) requestData.nextID = params.nextId;
 
     const result = await connector.request('/api/block/insertBlock', requestData);
+    
+    // 提取块ID：result 是一个数组，第一个元素的 doOperations[0].id 就是块ID
+    let blockId = null;
+    if (Array.isArray(result) && result.length > 0 && result[0].doOperations && result[0].doOperations.length > 0 && result[0].doOperations[0].id) {
+      blockId = result[0].doOperations[0].id;
+    } else if (typeof result === 'string') {
+      blockId = result;
+    }
+    
+    if (!blockId) {
+      console.error('错误: 未能获取插入块的ID');
+      console.error('返回结果:', JSON.stringify(result));
+      process.exit(1);
+    }
+    
     console.log(JSON.stringify({
       success: true,
-      data: result,
+      id: blockId,
       message: '块插入成功'
     }, null, 2));
     process.exit(0);

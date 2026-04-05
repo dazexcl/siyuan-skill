@@ -2,8 +2,8 @@
 /**
  * block-get.js - 获取块信息
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: block-get <block-id> [选项]
 

@@ -2,8 +2,8 @@
 /**
  * block-move.js - 移动块
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: block-move <blockId> [选项]
@@ -66,14 +66,20 @@ async function main() {
 
   const params = parseArgs(args);
   const blockId = params.positional[0];
+  let parentId = params.parentId;
+
+  // 支持位置参数：第二个位置参数作为 parentId
+  if (!parentId && params.positional[1]) {
+    parentId = params.positional[1];
+  }
 
   if (!blockId) {
     console.error('错误: 请提供块ID');
     process.exit(1);
   }
 
-  if (!params.parentId) {
-    console.error('错误: 请提供 --parent-id');
+  if (!parentId) {
+    console.error('错误: 请提供目标父块ID（--parent-id 或第二个位置参数）');
     process.exit(1);
   }
 
@@ -95,7 +101,7 @@ async function main() {
 
     const requestData = {
       id: blockId,
-      parentID: params.parentId
+      parentID: parentId
     };
     if (params.previousId) {
       requestData.previousID = params.previousId;
@@ -104,7 +110,7 @@ async function main() {
     await connector.request('/api/block/moveBlock', requestData);
     console.log(JSON.stringify({
       success: true,
-      data: { id: blockId, parentId: params.parentId },
+      data: { id: blockId, parentId: parentId },
       message: '块移动成功'
     }, null, 2));
     process.exit(0);

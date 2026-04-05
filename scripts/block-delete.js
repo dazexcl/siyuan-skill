@@ -2,8 +2,8 @@
 /**
  * block-delete.js - 删除块
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: block-delete <blockId>

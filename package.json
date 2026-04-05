@@ -1,7 +1,7 @@
 {
   "name": "siyuan-skill",
   "version": "2.0.0",
-  "description": "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能",
+  "description": "思源笔记工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能",
   "main": "scripts/notebooks.js",
   "bin": {},
   "keywords": [

@@ -4,8 +4,8 @@
  * 
  * 获取文档的ID、标题、路径、属性等信息
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: info <docId> [选项]
@@ -33,6 +33,11 @@ function camelCase(str) {
 }
 
 /**
+ * 短选项到长选项的映射
+ */
+const SHORT_OPTS = { f: 'format', h: 'help' };
+
+/**
  * 解析命令行参数
  * @param {string[]} argv - 命令行参数数组
  * @returns {Object} 解析后的参数对象
@@ -57,7 +62,14 @@ function parseArgs(argv) {
         }
       }
     } else if (arg.startsWith('-') && arg.length === 2 && arg !== '-') {
-      // 短选项暂不定义
+      const shortKey = SHORT_OPTS[arg[1]];
+      if (shortKey) {
+        if (hasValueOpts.has(shortKey) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
+          options[shortKey] = argv[++i];
+        } else {
+          options[shortKey] = true;
+        }
+      }
     } else {
       positional.push(arg);
     }
@@ -99,25 +111,21 @@ async function main() {
     // 获取路径信息
     let pathInfo;
     try {
-      pathInfo = await connector.request('/api/filetree/getPathByID', { id: docId });
+        pathInfo = await connector.request('/api/filetree/getPathByID', { id: docId });
     } catch (pathError) {
-      // 检查是否是笔记本ID
-      const notebooksResult = await connector.request('/api/notebook/lsNotebooks');
-      if (notebooksResult && notebooksResult.notebooks) {
-        const notebook = notebooksResult.notebooks.find(nb => nb.id === docId);
-        if (notebook) {
-          console.error(`错误: "${docId}" 是笔记本ID，不是文档ID。info 命令仅支持文档ID。`);
-          console.error(`笔记本名称: ${notebook.name}`);
-          process.exit(1);
+        // 检查是否是笔记本ID
+        const notebooksResult = await connector.request('/api/notebook/lsNotebooks');
+        if (notebooksResult && notebooksResult.notebooks) {
+            const notebook = notebooksResult.notebooks.find(nb => nb.id === docId);
+            if (notebook) {
+                throw new Error(`"${docId}" 是笔记本ID，不是文档ID`);
+            }
         }
-      }
-      console.error(`错误: 未找到 ID 对应的文档：${docId}`);
-      process.exit(1);
+        throw new Error(`未找到 ID 对应的文档：${docId}`);
     }
 
     if (!pathInfo || !pathInfo.notebook) {
-      console.error(`错误: 未找到 ID 对应的文档：${docId}`);
-      process.exit(1);
+        throw new Error(`未找到 ID 对应的文档：${docId}`);
     }
 
     // 权限检查
@@ -130,12 +138,12 @@ async function main() {
     const notebooksResult = await connector.request('/api/notebook/lsNotebooks');
     let notebookName = null;
     if (notebooksResult && notebooksResult.notebooks) {
-      for (const nb of notebooksResult.notebooks) {
-        if (nb.id === pathInfo.notebook) {
-          notebookName = nb.name;
-          break;
+        for (const nb of notebooksResult.notebooks) {
+            if (nb.id === pathInfo.notebook) {
+                notebookName = nb.name;
+                break;
+            }
         }
-      }
     }
 
     // 获取块属性
@@ -146,39 +154,39 @@ async function main() {
     const tags = [];
     const rawAttrs = {};
     if (attrs) {
-      for (const [key, value] of Object.entries(attrs)) {
-        rawAttrs[key] = value;
-        if (key.startsWith('custom-')) {
-          customAttrs[key.replace('custom-', '')] = value;
+        for (const [key, value] of Object.entries(attrs)) {
+            rawAttrs[key] = value;
+            if (key.startsWith('custom-')) {
+                customAttrs[key.replace('custom-', '')] = value;
+            }
         }
-      }
-      if (attrs.tags) {
-        const tagValue = attrs.tags;
-        if (typeof tagValue === 'string' && tagValue) {
-          tags.push(...tagValue.split(',').map(t => t.trim()).filter(Boolean));
+        // 同时支持内置的 tags 字段和自定义的 tags 属性
+        const tagValue = attrs.tags || attrs['custom-tags'];
+        if (tagValue && typeof tagValue === 'string') {
+            tags.push(...tagValue.split(',').map(t => t.trim()).filter(Boolean));
         }
-      }
     }
 
     // 构建文档信息
     const docInfo = {
-      id: docId,
-      title: attrs?.title || null,
-      type: attrs?.type || 'doc',
-      notebook: {
-        id: pathInfo.notebook,
-        name: notebookName
-      },
-      path: {
-        humanReadable: notebookName ? `/${notebookName}${hPath}` : hPath,
-        storage: pathInfo.path,
-        hpath: hPath
-      },
-      attributes: customAttrs,
-      tags: tags,
-      rawAttributes: rawAttrs,
-      updated: attrs?.updated || null,
-      created: docId.substring(0, docId.indexOf('-'))
+        id: docId,
+        title: attrs?.title || null,
+        type: attrs?.type || 'doc',
+        notebook: {
+            id: pathInfo.notebook,
+            name: notebookName
+        },
+        path: {
+            humanReadable: notebookName ? `/${notebookName}${hPath}` : hPath,
+            storage: pathInfo.path,
+            hpath: hPath
+        },
+        attributes: customAttrs,
+        tags: tags,
+        rawAttributes: rawAttrs,
+        icon: attrs?.icon || null,
+        updated: attrs?.updated || null,
+        created: docId.substring(0, docId.indexOf('-'))
     };
 
     if (format === 'json') {
@@ -188,7 +196,7 @@ async function main() {
         message: '文档信息获取成功'
       }, null, 2));
     } else {
-      // summary 格式
+      // summary 格式（默认）
       console.log(JSON.stringify({
         id: docInfo.id,
         title: docInfo.title,
@@ -196,7 +204,9 @@ async function main() {
         notebook: docInfo.notebook,
         path: docInfo.path.humanReadable,
         tags: docInfo.tags,
-        updated: docInfo.updated
+        icon: docInfo.icon,
+        updated: docInfo.updated,
+        created: docInfo.created
       }, null, 2));
     }
 

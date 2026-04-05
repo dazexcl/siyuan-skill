@@ -1,6 +1,6 @@
 ---
 name: "siyuan-skill"
-description: "思源笔记API转CLI工具，支持笔记本管理、文档操作、内容搜索、块控制。当用户操作思源笔记、管理笔记本、创建/更新/删除文档、搜索内容、管理块时调用。"
+description: "思源笔记工具，支持笔记本管理、文档操作、内容搜索、块控制。当用户操作思源笔记、管理笔记本、创建/更新/删除文档、搜索内容、管理块时调用。"
 skillType: "cli"
 homepage: "https://github.com/dazexcl/siyuan-skill"
 metadata: {"openclaw":{"emoji":"📝","requires":{"bins":["node"],"env":["SIYUAN_BASE_URL","SIYUAN_TOKEN"],"optionalEnv":["SIYUAN_TIMEOUT","SIYUAN_PERMISSION_MODE","SIYUAN_NOTEBOOK_LIST","QDRANT_URL","QDRANT_API_KEY","QDRANT_COLLECTION_NAME","OLLAMA_BASE_URL","EMBEDDING_MODEL","EMBEDDING_DIMENSION","SIYUAN_DELETE_SAFE_MODE","SIYUAN_DELETE_REQUIRE_CONFIRMATION","SIYUAN_TLS_ALLOW_SELF_SIGNED"]},"primaryEnv":"SIYUAN_TOKEN"}}
@@ -12,9 +12,8 @@ metadata: {"openclaw":{"emoji":"📝","requires":{"bins":["node"],"env":["SIYUAN
 ## 快速开始
 
 ```bash
-cd skills/siyuan-skill
-node scripts/<command>.js [options]
-node scripts/<command>.js --help  # 查看命令帮助
+node {baseDir}/scripts/<command>.js [options]
+node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 ```
 
 ## 命令列表
@@ -23,41 +22,41 @@ node scripts/<command>.js --help  # 查看命令帮助
 
 | 脚本 | 说明 | 示例 |
 |------|------|------|
-| `notebooks` | 列出笔记本 | `node scripts/notebooks.js` |
-| `structure` | 查看文档结构 | `node scripts/structure.js <docId>` |
-| `content` | 获取文档内容 | `node scripts/content.js <docId>` |
-| `info` | 获取文档信息 | `node scripts/info.js <docId>` |
-| `create` | 创建文档 | `node scripts/create.js <title> --notebook <id>` |
-| `update` | 更新文档 | `node scripts/update.js <docId> --content <md>` |
-| `delete` | 删除文档 | `node scripts/delete.js <docId>` |
-| `move` | 移动文档 | `node scripts/move.js <docId> --target <notebookId>` |
-| `rename` | 重命名文档 | `node scripts/rename.js <docId> <title>` |
-| `protect` | 保护/取消保护 | `node scripts/protect.js <docId>` |
-| `exists` | 检查文档存在 | `node scripts/exists.js --title <title>` |
-| `convert` | ID与路径转换 | `node scripts/convert.js --id <id>` |
-| `icon` | 设置文档图标 | `node scripts/icon.js <docId> [emoji]` |
+| `notebooks` | 列出笔记本 | `node {baseDir}/scripts/notebooks.js` |
+| `structure` | 查看文档结构 | `node {baseDir}/scripts/structure.js <docId>` |
+| `content` | 获取文档内容 | `node {baseDir}/scripts/content.js <docId>` |
+| `info` | 获取文档信息 | `node {baseDir}/scripts/info.js <docId>` |
+| `create` | 创建文档 | `node {baseDir}/scripts/create.js <title> --parent-id <id>` 或 `--path <path>` |
+| `update` | 更新文档 | `node {baseDir}/scripts/update.js <docId> --content <md>` |
+| `delete` | 删除文档 | `node {baseDir}/scripts/delete.js <docId>` |
+| `move` | 移动文档 | `node {baseDir}/scripts/move.js <docId> --target <notebookId>` |
+| `rename` | 重命名文档 | `node {baseDir}/scripts/rename.js <docId> <title>` |
+| `protect` | 保护/取消保护 | `node {baseDir}/scripts/protect.js <docId>` |
+| `exists` | 检查文档存在 | `node {baseDir}/scripts/exists.js --title <title>` |
+| `convert` | ID与路径转换 | `node {baseDir}/scripts/convert.js --id <id>` |
+| `icon` | 设置/获取图标 | `node {baseDir}/scripts/icon.js <id> [emoji]` 或 `--remove` |
 
 ### 块操作
 
 | 脚本 | 说明 | 示例 |
 |------|------|------|
-| `block-get` | 获取块信息 | `node scripts/block-get.js <blockId>` |
-| `block-insert` | 插入块 | `node scripts/block-insert.js <content> --parent-id <id>` |
-| `block-update` | 更新块 | `node scripts/block-update.js <blockId> --content <md>` |
-| `block-delete` | 删除块 | `node scripts/block-delete.js <blockId>` |
-| `block-move` | 移动块 | `node scripts/block-move.js <blockId> --parent-id <id>` |
-| `block-fold` | 折叠/展开 | `node scripts/block-fold.js <blockId> --action fold` |
-| `block-transfer` | 转移引用 | `node scripts/block-transfer.js <srcId> <tgtId>` |
-| `block-attrs` | 块属性 | `node scripts/block-attrs.js <blockId> --set key=value` |
+| `block-get` | 获取块信息 | `node {baseDir}/scripts/block-get.js <blockId>` |
+| `block-insert` | 插入块 | `node {baseDir}/scripts/block-insert.js <content> --parent-id <id>` |
+| `block-update` | 更新块 | `node {baseDir}/scripts/block-update.js <blockId> --content <md>` |
+| `block-delete` | 删除块 | `node {baseDir}/scripts/block-delete.js <blockId>` |
+| `block-move` | 移动块 | `node {baseDir}/scripts/block-move.js <blockId> --parent-id <id>` |
+| `block-fold` | 折叠/展开 | `node {baseDir}/scripts/block-fold.js <blockId> --action fold` |
+| `block-transfer` | 转移引用 | `node {baseDir}/scripts/block-transfer.js <srcId> <tgtId>` |
+| `block-attrs` | 块属性 | `node {baseDir}/scripts/block-attrs.js <blockId> --set key=value` |
 
 ### 搜索/索引
 
 | 脚本 | 说明 | 示例 |
 |------|------|------|
-| `search` | 搜索内容 | `node scripts/search.js <query> --mode keyword` |
-| `tags` | 标签管理 | `node scripts/tags.js <blockId> --add tag1,tag2` |
-| `index-docs` | 索引到向量库 | `node scripts/index-docs.js --notebook <id>` |
-| `nlp` | NLP分析 | `node scripts/nlp.js <text>` |
+| `search` | 搜索内容 | `node {baseDir}/scripts/search.js <query> --mode keyword` |
+| `tags` | 标签管理 | `node {baseDir}/scripts/tags.js <blockId> --add tag1,tag2` |
+| `index` | 索引到向量库 | `node {baseDir}/scripts/index.js --notebook <id>` |
+| `nlp` | NLP分析 | `node {baseDir}/scripts/nlp.js <text>` |
 
 ---
 

@@ -4,8 +4,8 @@
  * 
  * 支持完整的路径解析和ID转换功能
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: convert [选项]
 
@@ -279,7 +279,18 @@ async function main() {
     process.exit(0);
   }
 
-  const params = parseArgs(args);
+  const { positional, ...params } = parseArgs(args);
+
+  // 支持简写模式：如果没有--id和--path，检查位置参数
+  if (!params.id && !params.path && positional.length > 0) {
+    const firstArg = positional[0];
+    // 判断是ID还是路径：如果是ID格式（14位数字-6位字符），则识别为ID
+    if (/^\d{14}-\w{7}$/.test(firstArg)) {
+      params.id = firstArg;
+    } else {
+      params.path = firstArg;
+    }
+  }
 
   if (!params.id && !params.path) {
     console.error('错误: 需要提供 --id 或 --path 参数');

@@ -2,8 +2,8 @@
 /**
  * block-fold.js - 折叠/展开块
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: block-fold <blockId> [选项]
 

@@ -2,8 +2,8 @@
 /**
  * tags.js - 管理块/文档的标签
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: tags <id> [tags] [选项]
 

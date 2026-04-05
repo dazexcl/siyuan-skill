@@ -51,6 +51,15 @@
 | `HYBRID_SPARSE_WEIGHT` | 关键词搜索权重 | `0.3` |
 | `HYBRID_SEARCH_LIMIT` | 搜索结果数量限制 | `20` |
 
+### NLP（可选）
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `NLP_ENABLED` | 启用 NLP 功能 | `false` |
+| `NLP_LANGUAGE` | 语言设置 | `zh` |
+| `NLP_EXTRACT_ENTITIES` | 提取实体 | `true` |
+| `NLP_EXTRACT_KEYWORDS` | 提取关键词 | `true` |
+
 ## 配置示例
 
 ### Bash / Zsh

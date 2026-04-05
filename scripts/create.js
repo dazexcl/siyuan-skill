@@ -6,9 +6,10 @@
  * - 通过 parentId 在指定父文档下创建
  * - 通过 path 在指定路径创建（自动创建中间目录）
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const fs = require('fs');
 
 const HELP_TEXT = `用法: create <title> [选项]
 
@@ -21,6 +22,7 @@ const HELP_TEXT = `用法: create <title> [选项]
   -p, --parent-id <id>   父文档/笔记本ID（不能是内容块ID）
   -P, --path <path>      文档路径（与 --parent-id 二选一，路径首位支持笔记本名称或ID）
   -c, --content <text>   文档内容
+  -f, --file <path>      从文件读取内容
   --force                强制创建（忽略重名检测）
   -h, --help             显示帮助信息
 
@@ -29,13 +31,14 @@ const HELP_TEXT = `用法: create <title> [选项]
   create "标题" --parent-id <doc-id> --content "内容"
   create "标题" --path "/笔记本名/目录/文档名"
   create "子文档" --path "/笔记本名/目录/" --force
+  create "文档" --file content.md --parent-id <id>
 
 注意:
   - 使用 --parent-id 时，参数可以是笔记本ID或文档ID，但不能是内容块ID
   - 使用 --path 时，路径首位支持笔记本名称或笔记本ID`;
 
 /** 短选项到长选项的映射 */
-const SHORT_OPTS = { p: 'parentId', P: 'path', c: 'content' };
+const SHORT_OPTS = { p: 'parentId', P: 'path', c: 'content', f: 'file' };
 
 /**
  * 将短横线命名转为驼峰命名
@@ -54,7 +57,7 @@ function camelCase(str) {
 function parseArgs(argv) {
   const positional = [];
   const options = {};
-  const hasValueOpts = new Set(['parentId', 'path', 'content']);
+  const hasValueOpts = new Set(['parentId', 'path', 'content', 'file']);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -72,7 +75,7 @@ function parseArgs(argv) {
       }
     } else if (arg.startsWith('-') && arg.length === 2) {
       const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey && i + 1 < argv.length) {
+      if (shortKey && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
         options[shortKey] = argv[++i];
       }
     } else {
@@ -250,40 +253,83 @@ async function main() {
         process.exit(1);
       }
 
-      // 获取父块信息以确定笔记本ID
-      try {
-        const parentInfo = await connector.request('/api/block/getBlockInfo', { id: parentId });
-        if (parentInfo && parentInfo.box) {
-          // 检查是否是内容块ID（通过比较 parentId 和 rootID）
-          // 文档ID: parentId === rootID
-          // 内容块ID: parentId !== rootID
-          if (parentInfo.rootID && parentId !== parentInfo.rootID) {
-            console.error(`错误: --parent-id 不能是内容块ID。请使用文档ID或笔记本ID。`);
-            console.error(`提供的ID: ${parentId}`);
-            console.error(`文档根ID: ${parentInfo.rootID}`);
-            console.error(`提示: 内容块ID只能在文档内使用，不能作为父级创建文档`);
+      // 智能分层检查：优先使用不会被索引阻塞的API
+      let isContentBlock = false;
+      
+      // 1️⃣ 首先检查是否是笔记本ID（不需要API调用，不会被索引阻塞）
+      const notebooks = await getNotebooks(connector);
+      const matchedNotebook = notebooks.find(nb => nb.id === parentId);
+      
+      if (matchedNotebook) {
+        // 是笔记本ID
+        notebookId = parentId;
+        checkPermission(config, notebookId);
+      } else {
+        // 2️⃣ 不是笔记本，尝试使用 getPathByID（不会被索引阻塞）
+        try {
+          const pathInfo = await connector.request('/api/filetree/getPathByID', { id: parentId });
+          if (pathInfo && pathInfo.notebook) {
+            // 是文档ID，获取到笔记本ID
+            notebookId = pathInfo.notebook;
+            checkPermission(config, notebookId);
+          } else {
+            // 3️⃣ getPathByID 失败，使用 getBlockInfo（会被索引阻塞，但需要检查内容块）
+            const parentInfo = await connector.request('/api/block/getBlockInfo', { id: parentId });
+            if (parentInfo && parentInfo.box) {
+              // 检查是否是内容块ID（通过比较 parentId 和 rootID）
+              // 文档ID: parentId === rootID
+              // 内容块ID: parentId !== rootID
+              if (parentInfo.rootID && parentId !== parentInfo.rootID) {
+                isContentBlock = true;
+              } else {
+                // 是文档ID，使用 box 字段获取笔记本ID
+                notebookId = parentInfo.box;
+                checkPermission(config, notebookId);
+              }
+            } else {
+              // 无法识别的ID，假设是笔记本ID进行权限检查
+              notebookId = parentId;
+              checkPermission(config, notebookId);
+            }
+          }
+        } catch (pathError) {
+          // getPathByID 失败，使用 getBlockInfo（会被索引阻塞）
+          try {
+            const parentInfo = await connector.request('/api/block/getBlockInfo', { id: parentId });
+            if (parentInfo && parentInfo.box) {
+              // 检查是否是内容块ID
+              if (parentInfo.rootID && parentId !== parentInfo.rootID) {
+                isContentBlock = true;
+              } else {
+                notebookId = parentInfo.box;
+                checkPermission(config, notebookId);
+              }
+            } else {
+              // 无法识别的ID，尝试验证是否是笔记本ID
+              const notebook = notebooks.find(nb => nb.id === parentId);
+              if (notebook) {
+                notebookId = parentId;
+                checkPermission(config, notebookId);
+              } else {
+                console.error(`错误: 无法验证 parent-id "${parentId}"，请确认它是有效的笔记本ID或文档ID`);
+                console.error(`详情: ${pathError.message}`);
+                process.exit(1);
+              }
+            }
+          } catch (blockError) {
+            console.error(`错误: 无法验证 parent-id "${parentId}"，请确认它是有效的笔记本ID或文档ID`);
+            console.error(`详情: ${blockError.message}`);
             process.exit(1);
           }
-          notebookId = parentInfo.box;
-          checkPermission(config, notebookId);
-        } else {
-          // 可能是笔记本ID
-          notebookId = parentId;
-          checkPermission(config, notebookId);
         }
-      } catch (e) {
-        // 如果获取块信息失败，假设是笔记本ID
-        // 尝试验证是否是笔记本ID
-        const notebooks = await getNotebooks(connector);
-        const notebook = notebooks.find(nb => nb.id === parentId);
-        if (notebook) {
-          notebookId = parentId;
-          checkPermission(config, notebookId);
-        } else {
-          console.error(`错误: 无法验证 parent-id "${parentId}"，请确认它是有效的笔记本ID或文档ID`);
-          console.error(`详情: ${e.message}`);
-          process.exit(1);
-        }
+      }
+      
+      // 如果检测到是内容块ID，报错
+      if (isContentBlock) {
+        console.error(`错误: --parent-id 不能是内容块ID。请使用文档ID或笔记本ID。`);
+        console.error(`提供的ID: ${parentId}`);
+        console.error(`提示: 内容块ID只能在文档内使用，不能作为父级创建文档`);
+        process.exit(1);
       }
 
       // 构建完整路径
@@ -331,13 +377,24 @@ async function main() {
       }
     }
 
-    // 处理内容
-    const processedContent = processContent(params.content || '');
+    let content = params.content;
+
+    // 从文件读取内容
+    if (params.file) {
+      try {
+        content = fs.readFileSync(params.file, 'utf8');
+      } catch (fileError) {
+        console.error('错误: 无法读取文件', params.file);
+        console.error(fileError.message);
+        process.exit(1);
+      }
+    }
+
+    const processedContent = processContent(content || '');
 
     let createResult = null;
 
     if (existingDocId) {
-      // 文档已存在，使用更新 API
       try {
         await connector.request('/api/block/updateBlock', {
           dataType: 'markdown',
@@ -346,7 +403,6 @@ async function main() {
         });
         createResult = existingDocId;
 
-        // 如果提供了 --title 参数，更新文档标题
         if (params.title) {
           try {
             await connector.request('/api/attr/setBlockAttrs', {
@@ -355,7 +411,6 @@ async function main() {
             });
             displayTitle = params.title;
           } catch (e) {
-            // 忽略标题设置错误
           }
         }
       } catch (e) {
@@ -363,7 +418,6 @@ async function main() {
         process.exit(1);
       }
     } else {
-      // 创建新文档
       createResult = await connector.request('/api/filetree/createDocWithMd', {
         notebook: notebookId,
         path: fullPath,
@@ -371,7 +425,6 @@ async function main() {
       });
 
       if (createResult) {
-        // 路径模式下，需要设置文档标题（因为 API 可能会使用内容第一行作为标题）
         if (params.path) {
           try {
             await connector.request('/api/filetree/renameDocByID', {
@@ -379,7 +432,6 @@ async function main() {
               title: displayTitle
             });
           } catch (e) {
-            // 忽略标题设置错误
           }
         }
       }

@@ -1,106 +1,106 @@
 /**
- * vector-manager.js - Qdrant 向量数据库交互共享模块
- *
- * 负责与 Qdrant 向量数据库交互，支持向量存储、搜索和混合检索
- * 使用 Node.js 原生 http 模块，零外部依赖
+ * Vector 管理器
+ * 管理 Qdrant 向量数据库连接和搜索操作
  */
-'use strict';
-
-const http = require('http');
-const https = require('https');
 
 /**
  * VectorManager 类
- * 管理 Qdrant 向量数据库的集合、向量存储和搜索
+ * 管理 Qdrant 向量数据库的连接、索引和搜索
  */
 class VectorManager {
   /**
    * 构造函数
    * @param {Object} config - 配置对象
-   * @param {Object} config.qdrant - Qdrant 配置
-   * @param {string} config.qdrant.url - Qdrant 服务地址 (默认: 'http://localhost:6333')
-   * @param {string} config.qdrant.apiKey - API 密钥 (可选)
-   * @param {string} config.qdrant.collectionName - 集合名称 (默认: 'siyuan_notes')
-   * @param {Object} config.embedding - 嵌入配置
-   * @param {number} config.embedding.dimension - 向量维度 (默认: 768)
-   * @param {Object} config.hybridSearch - 混合搜索配置
-   * @param {number} config.hybridSearch.denseWeight - 稠密向量权重 (默认: 0.7)
-   * @param {number} config.hybridSearch.sparseWeight - 稀疏向量权重 (默认: 0.3)
-   * @param {number} config.hybridSearch.limit - 搜索结果数量限制 (默认: 20)
-   * @param {number} config.qdrant.timeout - 请求超时时间（毫秒，默认: 30000）
+   * @param {Object} embeddingManager - Embedding 管理器实例
    */
-  constructor(config = {}) {
-    const qdrantConfig = config.qdrant || {};
-    const embeddingConfig = config.embedding || {};
-    const hybridConfig = config.hybridSearch || {};
-
-    this.url = qdrantConfig.url || 'http://localhost:6333';
-    this.apiKey = qdrantConfig.apiKey || '';
-    this.collectionName = qdrantConfig.collectionName || 'siyuan_notes';
-    this.dimension = embeddingConfig.dimension || 768;
-    this.denseWeight = hybridConfig.denseWeight || 0.7;
-    this.sparseWeight = hybridConfig.sparseWeight || 0.3;
-    this.defaultLimit = hybridConfig.limit || 20;
-    this.timeout = qdrantConfig.timeout || 30000;
-
-    // 解析 URL
-    this._parseUrl();
+  constructor(config = {}, embeddingManager = null) {
+    this.qdrantConfig = config.qdrant || {
+      url: null,
+      apiKey: '',
+      collectionName: 'siyuan_notes'
+    };
+    this.embeddingConfig = config.embedding || {
+      model: 'nomic-embed-text',
+      dimension: 768,
+      batchSize: 8
+    };
+    this.hybridConfig = config.hybridSearch || {
+      denseWeight: 0.7,
+      sparseWeight: 0.3,
+      limit: 20
+    };
+    this.embeddingManager = embeddingManager;
+    this.initialized = false;
+    this.collectionName = this.qdrantConfig.collectionName;
   }
 
   /**
-   * 解析 URL
-   * @private
+   * 获取配置信息
+   * @returns {Object} 配置对象
    */
-  _parseUrl() {
-    try {
-      const parsedUrl = new URL(this.url);
-      this.protocol = parsedUrl.protocol;
-      this.hostname = parsedUrl.hostname;
-      this.port = parsedUrl.port || (this.protocol === 'https:' ? 443 : 6333);
-    } catch (error) {
-      throw new Error(`无效的 Qdrant URL: ${this.url}`);
+  getConfig() {
+    return {
+      qdrant: { ...this.qdrantConfig },
+      embedding: { ...this.embeddingConfig },
+      hybridSearch: { ...this.hybridConfig }
+    };
+  }
+
+  /**
+   * 安全序列化 JSON，处理特殊字符
+   * @param {Object} obj - 要序列化的对象
+   * @returns {string} 安全的 JSON 字符串
+   */
+  safeStringify(obj) {
+    return JSON.stringify(obj, (key, value) => {
+      if (typeof value === 'string') {
+        // 移除或替换可能导致问题的控制字符
+        // eslint-disable-next-line no-control-regex
+        return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+          // 处理未配对的代理对
+          .replace(/[\uD800-\uDFFF]/g, char => {
+            const code = char.charCodeAt(0);
+            return `\\u${code.toString(16).padStart(4, '0')}`;
+          });
+      }
+      return value;
+    });
+  }
+
+  /**
+   * 发送 HTTP 请求到 Qdrant API
+   * @param {string} path - API 路径
+   * @param {string} method - HTTP 方法
+   * @param {Object} body - 请求体
+   * @param {boolean} silentError - 是否静默处理错误（不打印日志）
+   * @returns {Promise<Object>} 响应数据
+   */
+  async fetchAPI(path, method = 'GET', body = null, silentError = false) {
+    const http = require('http');
+    const https = require('https');
+    const url = require('url');
+
+    const parsedUrl = url.parse(this.qdrantConfig.url);
+    const isHttps = parsedUrl.protocol === 'https:';
+    const lib = isHttps ? https : http;
+
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 6333),
+      path: path,
+      method: method,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+
+    if (this.qdrantConfig.apiKey) {
+      options.headers['api-key'] = this.qdrantConfig.apiKey;
     }
-  }
 
-  /**
-   * 发送 HTTP 请求到 Qdrant
-   * @private
-   * @param {string} method - HTTP 方法 (GET, POST, PUT, DELETE)
-   * @param {string} endpoint - API 端点
-   * @param {Object} [data] - 请求数据 (可选)
-   * @returns {Promise<any>} 响应数据
-   */
-  _makeRequest(method, endpoint, data) {
     return new Promise((resolve, reject) => {
-      const options = {
-        hostname: this.hostname,
-        port: this.port,
-        path: endpoint,
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'SiyuanVectorManager/1.0.0'
-        },
-        timeout: this.timeout
-      };
-
-      // 添加 API Key
-      if (this.apiKey) {
-        options.headers['api-key'] = this.apiKey;
-      }
-
-      // 处理 HTTPS
-      let agent = null;
-      if (this.protocol === 'https:') {
-        agent = new https.Agent({
-          rejectUnauthorized: true
-        });
-        options.agent = agent;
-      }
-
-      const req = (this.protocol === 'https:' ? https : http).request(options, (res) => {
+      const req = lib.request(options, (res) => {
         let responseData = '';
-        const statusCode = res.statusCode;
 
         res.on('data', (chunk) => {
           responseData += chunk;
@@ -108,20 +108,11 @@ class VectorManager {
 
         res.on('end', () => {
           try {
-            if (!responseData) {
-              if (statusCode >= 200 && statusCode < 300) {
-                resolve(null);
-              } else {
-                reject(new Error(`Qdrant HTTP ${statusCode}: 空响应`));
-              }
-              return;
-            }
+            const parsedData = JSON.parse(responseData || '{}');
 
-            const parsedData = JSON.parse(responseData);
-
-            if (statusCode >= 400) {
+            if (res.statusCode >= 400) {
               const errorMsg = parsedData.error || parsedData.message ||
-                parsedData.status?.error || `HTTP ${statusCode}`;
+                parsedData.status?.error || `HTTP ${res.statusCode}`;
               reject(new Error(`Qdrant API 错误: ${errorMsg}`));
             } else {
               resolve(parsedData);
@@ -132,26 +123,128 @@ class VectorManager {
         });
       });
 
-      // 超时处理
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error(`Qdrant 请求超时 (${this.timeout}ms)`));
-      });
-
-      // 错误处理
       req.on('error', (error) => {
-        reject(new Error(`Qdrant 连接失败: ${error.message}`));
+        if (!silentError) {
+
+        }
+        reject(error);
       });
 
-      // 发送请求数据
-      if (data) {
-        const postData = JSON.stringify(data);
-        options.headers['Content-Length'] = Buffer.byteLength(postData);
-        req.write(postData);
+      if (body) {
+        req.write(this.safeStringify(body));
       }
 
       req.end();
     });
+  }
+
+  /**
+   * 初始化 Qdrant 连接
+   * @returns {Promise<boolean>} 初始化是否成功
+   */
+  async initialize() {
+    if (this.initialized) {
+      return true;
+    }
+
+    try {
+      // 获取集合列表，同时检查服务可访问性和集合是否存在
+      const response = await this.fetchAPI('/collections');
+      
+      // Qdrant API 返回格式: { result: { collections: [...] } }
+      const collections = response.result?.collections || response.collections || [];
+      
+      // 检查集合是否存在
+      const collectionExists = collections.some(
+        c => c.name === this.collectionName
+      );
+      
+      if (!collectionExists) {
+        try {
+          await this.createCollection();
+        } catch (createError) {
+          // 如果创建失败是因为集合已存在（竞态条件），忽略错误
+          if (createError.message.includes('already exists') || createError.message.includes('409')) {
+
+          } else {
+            throw createError;
+          }
+        }
+      }
+
+      this.initialized = true;
+      return true;
+    } catch (error) {
+
+      this.initialized = false;
+      return false;
+    }
+  }
+
+  /**
+   * 检查集合是否存在
+   * @returns {Promise<boolean>}
+   */
+  async checkCollectionExists() {
+    try {
+      const collections = await this.fetchAPI('/collections');
+      return collections.collections.some(
+        c => c.name === this.collectionName
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * 创建向量集合
+   * @returns {Promise<boolean>}
+   */
+  async createCollection() {
+    try {
+      await this.fetchAPI(`/collections/${this.collectionName}`, 'PUT', {
+        vectors: {
+          dense: {
+            size: this.embeddingConfig.dimension,
+            distance: 'Cosine'
+          }
+        },
+        sparse_vectors: {
+          sparse: {}
+        }
+      }, true);
+
+      await this.delay(300);
+
+      let indexErrors = [];
+      for (const [field, schema] of [
+        ['block_id', 'keyword'],
+        ['notebook_id', 'keyword'],
+        ['updated', 'integer']
+      ]) {
+        try {
+          await this.fetchAPI(`/collections/${this.collectionName}/indexes/${field}`, 'PUT', {
+            field_name: field,
+            field_schema: schema
+          }, true);
+        } catch (indexError) {
+          if (!indexError.message.includes('404')) {
+            indexErrors.push(`${field}: ${indexError.message}`);
+          }
+        }
+      }
+
+      if (indexErrors.length > 0) {
+
+      }
+
+      return true;
+    } catch (error) {
+      if (error.status === 409 || error.message.includes('already exists')) {
+        return true;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -161,39 +254,21 @@ class VectorManager {
   async ensureCollection() {
     try {
       // 检查集合是否存在
-      const collectionInfo = await this._makeRequest(
-        'GET',
-        `/collections/${this.collectionName}`
-      );
-
-      if (collectionInfo && collectionInfo.result) {
+      const collections = await this.fetchAPI('/collections');
+      const collectionExists = (collections.result?.collections || collections.collections || [])
+        .some(c => c.name === this.collectionName);
+      
+      if (collectionExists) {
         return {
           success: true,
           created: false,
           message: `集合 ${this.collectionName} 已存在`
         };
       }
-    } catch (error) {
-      // 集合不存在，继续创建
-      if (!error.message.includes('404') && !error.message.includes('Not found')) {
-        // 其他错误
-        console.error('检查集合失败:', error.message);
-      }
-    }
 
-    // 创建集合
-    try {
-      await this._makeRequest(
-        'PUT',
-        `/collections/${this.collectionName}`,
-        {
-          vectors: {
-            size: this.dimension,
-            distance: 'Cosine'
-          }
-        }
-      );
-
+      // 创建集合
+      await this.createCollection();
+      
       return {
         success: true,
         created: true,
@@ -203,355 +278,770 @@ class VectorManager {
       return {
         success: false,
         created: false,
-        message: `创建集合失败: ${error.message}`
+        message: `确保集合存在失败: ${error.message}`
       };
     }
   }
 
   /**
-   * 批量插入/更新向量
-   * @param {Array<{id: string, vector: number[], payload: Object}>} vectors - 向量数据数组
-   * @returns {Promise<{success: boolean, count: number, message: string}>}
+   * 检查是否已初始化
+   * @returns {boolean}
    */
-  async upsertVectors(vectors) {
-    if (!Array.isArray(vectors) || vectors.length === 0) {
-      return {
-        success: false,
-        count: 0,
-        message: '向量数据为空'
-      };
+  isReady() {
+    return this.initialized;
+  }
+
+  /**
+   * 索引单个文档
+   * @param {string} docId - 文档 ID
+   * @param {string} content - 文档内容
+   * @param {Object} metadata - 元数据
+   * @returns {Promise<Object>} 索引结果
+   */
+  async indexDocument(docId, content, metadata = {}) {
+    if (!this.isReady()) {
+      const success = await this.initialize();
+      if (!success) {
+        throw new Error('Qdrant 未初始化');
+      }
     }
 
-    try {
-      // 转换为 Qdrant 格式
-      const points = vectors.map(v => ({
-        id: v.id,
-        vector: v.vector,
-        payload: v.payload || {}
-      }));
+    if (!this.embeddingManager || !this.embeddingManager.isReady()) {
+      throw new Error('Embedding 管理器未初始化');
+    }
 
-      await this._makeRequest(
-        'PUT',
-        `/collections/${this.collectionName}/points`,
-        {
-          points: points,
-          wait: true
-        }
-      );
+    const denseVector = await this.embeddingManager.generateEmbedding(content);
+    const sparseVector = this.embeddingManager.generateSparseVector(content);
+
+    const point = {
+      id: docId,
+      vector: {
+        dense: denseVector,
+        sparse: sparseVector
+      },
+      payload: {
+        block_id: docId,
+        notebook_id: metadata.notebookId || '',
+        title: metadata.title || '',
+        path: metadata.path || '',
+        content_preview: content.substring(0, 500),
+        updated: metadata.updated || Date.now(),
+        tags: metadata.tags || [],
+        is_chunk: metadata.isChunk || false,
+        chunk_index: metadata.chunkIndex,
+        total_chunks: metadata.totalChunks,
+        original_doc_id: metadata.originalDocId
+      }
+    };
+
+    try {
+      await this.fetchAPI(`/collections/${this.collectionName}/points?wait=true`, 'PUT', {
+        points: [point]
+      });
 
       return {
         success: true,
-        count: points.length,
-        message: `成功插入/更新 ${points.length} 个向量`
+        docId,
+        vectorSize: denseVector.length
       };
     } catch (error) {
-      return {
-        success: false,
-        count: 0,
-        message: `插入向量失败: ${error.message}`
-      };
+
+      throw error;
     }
   }
 
   /**
-   * 向量相似度搜索
-   * @param {number[]} queryVector - 查询向量
-   * @param {number} [limit] - 返回结果数量限制
-   * @param {number} [threshold] - 相似度阈值 (0-1)
-   * @returns {Promise<Array<{id: string, score: number, payload: Object}>>}
+   * 批量索引文档
+   * @param {Array} documents - 文档数组 [{docId, content, metadata}]
+   * @returns {Promise<Object>} 索引结果
    */
-  async searchSimilar(queryVector, limit, threshold) {
-    const searchLimit = limit || this.defaultLimit;
-    const scoreThreshold = threshold || 0;
-
-    if (!Array.isArray(queryVector) || queryVector.length === 0) {
-      return [];
+  async indexBatch(documents) {
+    if (!Array.isArray(documents) || documents.length === 0) {
+      return { success: true, indexed: 0 };
     }
 
-    try {
-      const response = await this._makeRequest(
-        'POST',
-        `/collections/${this.collectionName}/points/search`,
-        {
-          vector: queryVector,
-          limit: searchLimit,
-          score_threshold: scoreThreshold,
-          with_payload: true
-        }
-      );
-
-      if (response && response.result) {
-        return response.result.map(item => ({
-          id: item.id,
-          score: item.score,
-          payload: item.payload || {}
-        }));
+    if (!this.isReady()) {
+      const success = await this.initialize();
+      if (!success) {
+        throw new Error('Qdrant 未初始化');
       }
-
-      return [];
-    } catch (error) {
-      console.error('向量搜索失败:', error.message);
-      return [];
-    }
-  }
-
-  /**
-   * 混合搜索 - 结合向量搜索和 Siyuan 原生搜索结果
-   * @param {number[]} queryVector - 查询向量
-   * @param {Array<{id: string, score: number, content?: string}>} siyuanResults - Siyuan 搜索结果
-   * @param {number} [limit] - 返回结果数量限制
-   * @returns {Promise<Array<{id: string, score: number, vectorScore: number, keywordScore: number, payload: Object}>>}
-   */
-  async hybridSearch(queryVector, siyuanResults, limit) {
-    const searchLimit = limit || this.defaultLimit;
-
-    // 执行向量搜索
-    const vectorResults = await this.searchSimilar(queryVector, searchLimit * 2);
-
-    // 构建结果映射
-    const resultMap = new Map();
-
-    // 处理向量搜索结果
-    for (const item of vectorResults) {
-      resultMap.set(item.id, {
-        id: item.id,
-        vectorScore: item.score,
-        keywordScore: 0,
-        payload: item.payload
-      });
     }
 
-    // 处理 Siyuan 搜索结果
-    for (const item of siyuanResults || []) {
-      const existing = resultMap.get(item.id);
-      if (existing) {
-        existing.keywordScore = item.score || 0.5;
-      } else {
-        resultMap.set(item.id, {
-          id: item.id,
-          vectorScore: 0,
-          keywordScore: item.score || 0.5,
-          payload: { id: item.id, content: item.content || '' }
+    const batchSize = this.embeddingConfig.batchSize || 8;
+    let indexed = 0;
+    const errors = [];
+
+    for (let i = 0; i < documents.length; i += batchSize) {
+      const batch = documents.slice(i, i + batchSize);
+      
+      try {
+        const points = await Promise.all(
+          batch.map(async (doc) => {
+            const denseVector = await this.embeddingManager.generateEmbedding(doc.content);
+            const sparseVector = this.embeddingManager.generateSparseVector(doc.content);
+
+            // 转换 Siyuan Notes 文档 ID 为 Qdrant 可接受的格式（使用哈希函数）
+            function hashStringToUint(str) {
+              let hash = 0;
+              for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 转换为 32 位无符号整数
+              }
+              return Math.abs(hash);
+            }
+
+            return {
+              id: hashStringToUint(doc.docId),
+              vector: {
+                dense: denseVector,
+                sparse: sparseVector
+              },
+              payload: {
+                block_id: doc.docId,
+                notebook_id: doc.metadata?.notebook_id || '',
+                title: doc.metadata?.title || '',
+                path: doc.metadata?.path || '',
+                content_preview: doc.content.substring(0, 500),
+                updated: doc.metadata?.updated || Date.now(),
+                tags: doc.metadata?.tags || [],
+                is_chunk: doc.metadata?.is_chunk || false,
+                chunk_index: doc.metadata?.chunk_index,
+                total_chunks: doc.metadata?.total_chunks,
+                original_doc_id: doc.metadata?.original_doc_id
+              }
+            };
+          })
+        );
+
+        await this.fetchAPI(`/collections/${this.collectionName}/points?wait=true`, 'PUT', {
+          points: points
+        });
+
+        indexed += batch.length;
+      } catch (error) {
+
+        errors.push({
+          batch: Math.floor(i / batchSize) + 1,
+          error: error.message
         });
       }
     }
 
-    // 计算混合分数并排序
-    const combinedResults = Array.from(resultMap.values()).map(item => {
-      // 归一化分数（假设 Siyuan 分数已经是 0-1 范围）
-      const normalizedVectorScore = item.vectorScore;
-      const normalizedKeywordScore = item.keywordScore;
+    return {
+      success: errors.length === 0,
+      indexed,
+      total: documents.length,
+      errors
+    };
+  }
 
-      // 加权融合
-      const hybridScore = (normalizedVectorScore * this.denseWeight) +
-        (normalizedKeywordScore * this.sparseWeight);
+  /**
+   * 混合搜索（Dense + Sparse）
+   * @param {string} query - 查询文本
+   * @param {Object} options - 搜索选项
+   * @returns {Promise<Object>} 搜索结果
+   */
+  async hybridSearch(query, options = {}) {
+    if (!this.isReady()) {
+      const success = await this.initialize();
+      if (!success) {
+        throw new Error('Qdrant 未初始化');
+      }
+    }
+
+    const {
+      denseWeight = this.hybridConfig.denseWeight,
+      sparseWeight = this.hybridConfig.sparseWeight,
+      limit = this.hybridConfig.limit,
+      threshold = 0.0,
+      filter = null
+    } = options;
+
+    const queryDenseVector = await this.embeddingManager.generateEmbedding(query);
+    const querySparseVector = this.embeddingManager.generateSparseVector(query);
+
+    try {
+      // 执行 dense 搜索
+      const denseSearchOptions = {
+        vector: {
+          name: 'dense',
+          vector: queryDenseVector
+        },
+        limit,
+        with_payload: true,
+        score_threshold: threshold > 0 ? threshold : undefined
+      };
+
+      if (filter) {
+        denseSearchOptions.filter = this.buildFilter(filter);
+      }
+
+      const denseResults = await this.fetchAPI(`/collections/${this.collectionName}/points/search`, 'POST', denseSearchOptions);
+
+      let sparseResultPoints = [];
+      if (querySparseVector.indices && querySparseVector.indices.length > 0) {
+        const sparseSearchOptions = {
+          query: {
+            indices: querySparseVector.indices,
+            values: querySparseVector.values
+          },
+          using: 'sparse',
+          limit,
+          with_payload: true
+        };
+
+        if (filter) {
+          sparseSearchOptions.filter = this.buildFilter(filter);
+        }
+
+        const sparseResponse = await this.fetchAPI(`/collections/${this.collectionName}/points/query`, 'POST', sparseSearchOptions);
+        if (sparseResponse.result?.points && Array.isArray(sparseResponse.result.points)) {
+          sparseResultPoints = sparseResponse.result.points;
+        } else if (Array.isArray(sparseResponse.result)) {
+          sparseResultPoints = sparseResponse.result;
+        } else if (sparseResponse.points && Array.isArray(sparseResponse.points)) {
+          sparseResultPoints = sparseResponse.points;
+        }
+      }
+
+      const mergedResults = this.mergeSearchResults(
+        denseResults.result || [],
+        sparseResultPoints,
+        denseWeight,
+        sparseWeight
+      );
 
       return {
-        id: item.id,
-        score: hybridScore,
-        vectorScore: item.vectorScore,
-        keywordScore: item.keywordScore,
-        payload: item.payload
+        query,
+        mode: 'hybrid',
+        results: mergedResults.slice(0, limit),
+        total: mergedResults.length,
+        denseWeight,
+        sparseWeight
       };
+    } catch (error) {
+
+      throw error;
+    }
+  }
+
+  /**
+   * 语义搜索（仅 Dense Vector）
+   * @param {string} query - 查询文本
+   * @param {Object} options - 搜索选项
+   * @returns {Promise<Object>} 搜索结果
+   */
+  async semanticSearch(query, options = {}) {
+    if (!this.isReady()) {
+      const success = await this.initialize();
+      if (!success) {
+        throw new Error('Qdrant 未初始化');
+      }
+    }
+
+    const { limit = this.hybridConfig.limit, threshold = 0.0, filter = null } = options;
+
+    const queryVector = await this.embeddingManager.generateEmbedding(query);
+
+    try {
+      const searchOptions = {
+        vector: {
+          name: 'dense',
+          vector: queryVector
+        },
+        limit,
+        with_payload: true,
+        score_threshold: threshold > 0 ? threshold : undefined
+      };
+
+      if (filter) {
+        searchOptions.filter = this.buildFilter(filter);
+      }
+
+      const results = await this.fetchAPI(`/collections/${this.collectionName}/points/search`, 'POST', searchOptions);
+
+      return {
+        query,
+        mode: 'semantic',
+        results: results.result.map(r => ({
+          id: r.payload.block_id,
+          score: r.score,
+          title: r.payload.title,
+          path: r.payload.path,
+          notebookId: r.payload.notebook_id,
+          contentPreview: r.payload.content_preview,
+          updated: r.payload.updated,
+          tags: r.payload.tags
+        })),
+        total: results.result.length
+      };
+    } catch (error) {
+
+      throw error;
+    }
+  }
+
+  /**
+   * 关键词搜索（仅 Sparse Vector）
+   * 使用 Qdrant Query API 进行稀疏向量搜索
+   * @param {string} query - 查询文本
+   * @param {Object} options - 搜索选项
+   * @returns {Promise<Object>} 搜索结果
+   */
+  async keywordSearch(query, options = {}) {
+    if (!this.isReady()) {
+      const success = await this.initialize();
+      if (!success) {
+        throw new Error('Qdrant 未初始化');
+      }
+    }
+
+    const { limit = this.hybridConfig.limit, filter = null } = options;
+
+    const querySparseVector = this.embeddingManager.generateSparseVector(query);
+
+    if (!querySparseVector.indices || querySparseVector.indices.length === 0) {
+      return {
+        query,
+        mode: 'keyword',
+        results: [],
+        total: 0
+      };
+    }
+
+    try {
+      const searchOptions = {
+        query: {
+          indices: querySparseVector.indices,
+          values: querySparseVector.values
+        },
+        using: 'sparse',
+        limit,
+        with_payload: true
+      };
+
+      if (filter) {
+        searchOptions.filter = this.buildFilter(filter);
+      }
+
+      const response = await this.fetchAPI(`/collections/${this.collectionName}/points/query`, 'POST', searchOptions);
+
+      let resultPoints = [];
+      if (response.result?.points && Array.isArray(response.result.points)) {
+        resultPoints = response.result.points;
+      } else if (Array.isArray(response.result)) {
+        resultPoints = response.result;
+      } else if (response.points && Array.isArray(response.points)) {
+        resultPoints = response.points;
+      }
+
+      return {
+        query,
+        mode: 'keyword',
+        results: resultPoints.map(r => ({
+          id: r.payload?.block_id || r.id,
+          score: r.score,
+          title: r.payload?.title || '',
+          path: r.payload?.path || '',
+          notebookId: r.payload?.notebook_id || '',
+          contentPreview: r.payload?.content_preview || '',
+          updated: r.payload?.updated || 0,
+          tags: r.payload?.tags || []
+        })),
+        total: resultPoints.length
+      };
+    } catch (error) {
+
+      throw error;
+    }
+  }
+
+  /**
+   * 合并搜索结果（使用 RRF 算法）
+   * @param {Array} denseResults - Dense 搜索结果
+   * @param {Array} sparseResults - Sparse 搜索结果
+   * @param {number} denseWeight - Dense 权重
+   * @param {number} sparseWeight - Sparse 权重
+   * @returns {Array} 合并后的结果
+   */
+  mergeSearchResults(denseResults, sparseResults, denseWeight, sparseWeight) {
+    const k = 60;
+    const scores = new Map();
+
+    denseResults.forEach((result, index) => {
+      const docId = result.payload.block_id;
+      const rrfScore = denseWeight / (k + index + 1);
+      
+      if (!scores.has(docId)) {
+        scores.set(docId, {
+          id: docId,
+          denseScore: result.score,
+          sparseScore: 0,
+          rrfScore: 0,
+          payload: result.payload
+        });
+      }
+      scores.get(docId).rrfScore += rrfScore;
     });
 
-    // 按混合分数降序排序
-    combinedResults.sort((a, b) => b.score - a.score);
+    sparseResults.forEach((result, index) => {
+      const docId = result.payload.block_id;
+      const rrfScore = sparseWeight / (k + index + 1);
+      
+      if (!scores.has(docId)) {
+        scores.set(docId, {
+          id: docId,
+          denseScore: 0,
+          sparseScore: result.score,
+          rrfScore: 0,
+          payload: result.payload
+        });
+      }
+      const existing = scores.get(docId);
+      existing.sparseScore = result.score;
+      existing.rrfScore += rrfScore;
+    });
 
-    // 返回前 limit 个结果
-    return combinedResults.slice(0, searchLimit);
+    const merged = Array.from(scores.values())
+      .sort((a, b) => b.rrfScore - a.rrfScore)
+      .map(item => ({
+        id: item.id,
+        score: item.rrfScore,
+        denseScore: item.denseScore,
+        sparseScore: item.sparseScore,
+        title: item.payload.title,
+        path: item.payload.path,
+        notebookId: item.payload.notebook_id,
+        contentPreview: item.payload.content_preview,
+        updated: item.payload.updated,
+        tags: item.payload.tags
+      }));
+
+    return merged;
   }
 
   /**
-   * 删除指定笔记本的所有向量
-   * @param {string} notebookId - 笔记本 ID
-   * @returns {Promise<{success: boolean, message: string}>}
+   * 构建过滤条件
+   * @param {Object} filter - 过滤条件
+   * @returns {Object} Qdrant 过滤条件
    */
-  async deleteByNotebook(notebookId) {
-    if (!notebookId) {
-      return {
-        success: false,
-        message: '笔记本 ID 不能为空'
-      };
+  buildFilter(filter) {
+    const conditions = [];
+
+    if (filter.notebookId) {
+      conditions.push({
+        key: 'notebook_id',
+        match: { value: filter.notebookId }
+      });
+    }
+
+    if (filter.notebookIds && Array.isArray(filter.notebookIds)) {
+      conditions.push({
+        key: 'notebook_id',
+        match: { any: filter.notebookIds }
+      });
+    }
+
+    if (filter.tags && Array.isArray(filter.tags)) {
+      conditions.push({
+        key: 'tags',
+        match: { any: filter.tags }
+      });
+    }
+
+    if (filter.updatedAfter) {
+      conditions.push({
+        key: 'updated',
+        range: { gte: filter.updatedAfter }
+      });
+    }
+
+    if (conditions.length === 0) {
+      return undefined;
+    }
+
+    return {
+      must: conditions
+    };
+  }
+
+  /**
+   * 删除文档索引
+   * @param {string} docId - 文档 ID
+   * @returns {Promise<boolean>}
+   */
+  async deleteDocument(docId) {
+    if (!this.isReady()) {
+      await this.initialize();
     }
 
     try {
-      await this._makeRequest(
-        'POST',
-        `/collections/${this.collectionName}/points/delete`,
-        {
+      await this.fetchAPI(`/collections/${this.collectionName}/points/delete?wait=true`, 'POST', {
+        points: [docId]
+      });
+      return true;
+    } catch (error) {
+
+      return false;
+    }
+  }
+
+  /**
+   * 删除指定文档及其所有分块的索引
+   * @param {Array<string>} docIds - 原始文档 ID 数组
+   * @returns {Promise<boolean>}
+   */
+  async deleteDocumentsWithChunks(docIds) {
+    if (!this.isReady()) {
+      await this.initialize();
+    }
+
+    if (!docIds || docIds.length === 0) {
+      return true;
+    }
+
+    try {
+      const conditions = [];
+      
+      for (const docId of docIds) {
+        conditions.push({
+          key: 'block_id',
+          match: { value: docId }
+        });
+        conditions.push({
+          key: 'original_doc_id',
+          match: { value: docId }
+        });
+      }
+
+      await this.fetchAPI(`/collections/${this.collectionName}/points/delete?wait=true`, 'POST', {
+        filter: {
+          should: conditions
+        }
+      });
+
+      return true;
+    } catch (error) {
+
+      return false;
+    }
+  }
+
+  /**
+   * 获取集合统计信息
+   * @returns {Promise<Object>}
+   */
+  async getCollectionStats() {
+    if (!this.isReady()) {
+      await this.initialize();
+    }
+
+    try {
+      const info = await this.fetchAPI(`/collections/${this.collectionName}`);
+      return {
+        name: this.collectionName,
+        vectorsCount: info.result.points_count || 0,
+        indexedVectorsCount: info.result.indexed_vectors_count || 0,
+        segmentsCount: info.result.segments_count || 0,
+        status: info.result.status || 'unknown'
+      };
+    } catch (error) {
+
+      return null;
+    }
+  }
+
+  /**
+   * 获取已索引文档的更新时间
+   * @param {Array} docIds - 文档 ID 数组
+   * @returns {Promise<Map<string, number>>} 文档ID -> 更新时间的映射
+   */
+  async getIndexedDocumentsUpdateTime(docIds) {
+    if (!this.isReady()) {
+      await this.initialize();
+    }
+
+    const updateTimes = new Map();
+    
+    if (!docIds || docIds.length === 0) {
+      return updateTimes;
+    }
+
+    try {
+      for (const docId of docIds) {
+        const result = await this.fetchAPI(`/collections/${this.collectionName}/points/scroll`, 'POST', {
+          limit: 1,
+          with_payload: true,
           filter: {
-            must: [
+            should: [
               {
-                key: 'notebookId',
-                match: {
-                  value: notebookId
-                }
+                key: 'block_id',
+                match: { value: docId }
+              },
+              {
+                key: 'original_doc_id',
+                match: { value: docId }
               }
             ]
-          },
-          wait: true
-        }
-      );
+          }
+        });
 
-      return {
-        success: true,
-        message: `已删除笔记本 ${notebookId} 的所有向量`
-      };
+        if (result.result?.points?.length > 0) {
+          const point = result.result.points[0];
+          updateTimes.set(docId, point.payload?.updated || 0);
+        }
+      }
     } catch (error) {
-      return {
-        success: false,
-        message: `删除笔记本向量失败: ${error.message}`
-      };
+
     }
+
+    return updateTimes;
   }
 
-  /**
-   * 根据 ID 删除单个向量
-   * @param {string} pointId - 向量点 ID
-   * @returns {Promise<{success: boolean, message: string}>}
-   */
-  async deleteById(pointId) {
-    if (!pointId) {
-      return {
-        success: false,
-        message: '向量 ID 不能为空'
-      };
+  async getIndexedOriginalDocIds(options = {}) {
+    if (!this.isReady()) {
+      await this.initialize();
     }
+
+    const { notebookId } = options;
+    const docIds = new Set();
+    let hasMore = true;
+    let nextPageOffset = null;
 
     try {
-      await this._makeRequest(
-        'POST',
-        `/collections/${this.collectionName}/points/delete`,
-        {
-          points: [pointId],
-          wait: true
-        }
-      );
-
-      return {
-        success: true,
-        message: `已删除向量 ${pointId}`
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `删除向量失败: ${error.message}`
-      };
-    }
-  }
-
-  /**
-   * 批量删除向量
-   * @param {string[]} pointIds - 向量点 ID 数组
-   * @returns {Promise<{success: boolean, count: number, message: string}>}
-   */
-  async deleteByIds(pointIds) {
-    if (!Array.isArray(pointIds) || pointIds.length === 0) {
-      return {
-        success: false,
-        count: 0,
-        message: '向量 ID 数组为空'
-      };
-    }
-
-    try {
-      await this._makeRequest(
-        'POST',
-        `/collections/${this.collectionName}/points/delete`,
-        {
-          points: pointIds,
-          wait: true
-        }
-      );
-
-      return {
-        success: true,
-        count: pointIds.length,
-        message: `已删除 ${pointIds.length} 个向量`
-      };
-    } catch (error) {
-      return {
-        success: false,
-        count: 0,
-        message: `批量删除向量失败: ${error.message}`
-      };
-    }
-  }
-
-  /**
-   * 获取集合信息
-   * @returns {Promise<{success: boolean, info: Object|null, message: string}>}
-   */
-  async getCollectionInfo() {
-    try {
-      const response = await this._makeRequest(
-        'GET',
-        `/collections/${this.collectionName}`
-      );
-
-      if (response && response.result) {
-        return {
-          success: true,
-          info: {
-            name: this.collectionName,
-            status: response.result.status,
-            vectorsCount: response.result.vectors_count || 0,
-            pointsCount: response.result.points_count || 0,
-            dimension: response.result.config?.params?.vectors?.size || this.dimension,
-            distance: response.result.config?.params?.vectors?.distance || 'Unknown'
-          },
-          message: '获取集合信息成功'
+      while (hasMore) {
+        const requestBody = {
+          limit: 100,
+          with_payload: true
         };
-      }
 
-      return {
-        success: false,
-        info: null,
-        message: '获取集合信息失败: 响应格式无效'
-      };
+        if (nextPageOffset) {
+          requestBody.offset = nextPageOffset;
+        }
+
+        const filterConditions = [];
+
+        if (notebookId) {
+          filterConditions.push({
+            key: 'notebook_id',
+            match: { value: notebookId }
+          });
+        }
+
+        if (filterConditions.length > 0) {
+          requestBody.filter = {
+            must: filterConditions
+          };
+        }
+
+        const result = await this.fetchAPI(
+          `/collections/${this.collectionName}/points/scroll`,
+          'POST',
+          requestBody
+        );
+
+        if (result.result?.points?.length > 0) {
+          for (const point of result.result.points) {
+            const originalDocId = point.payload?.original_doc_id || point.payload?.block_id;
+            if (originalDocId && !originalDocId.includes('_chunk_')) {
+              docIds.add(originalDocId);
+            }
+          }
+          
+          nextPageOffset = result.result.next_page_offset;
+          hasMore = !!nextPageOffset && result.result.points.length === 100;
+        } else {
+          hasMore = false;
+        }
+      }
     } catch (error) {
-      return {
-        success: false,
-        info: null,
-        message: `获取集合信息失败: ${error.message}`
-      };
+
     }
+
+    return docIds;
   }
 
   /**
-   * 测试 Qdrant 连接
-   * @returns {Promise<boolean>} 连接是否成功
+   * 删除指定笔记本的所有索引
+   * @param {string} notebookId - 笔记本 ID
+   * @returns {Promise<boolean>}
    */
-  async testConnection() {
+  async deleteNotebookDocuments(notebookId) {
+    if (!this.isReady()) {
+      await this.initialize();
+    }
+
     try {
-      const response = await this._makeRequest('GET', '/collections');
-      if (response) {
-        console.log(`Qdrant 连接成功，地址: ${this.url}`);
-        return true;
-      }
-      return false;
+      await this.fetchAPI(`/collections/${this.collectionName}/points/delete?wait=true`, 'POST', {
+        filter: {
+          must: [
+            {
+              key: 'notebook_id',
+              match: { value: notebookId }
+            }
+          ]
+        }
+      });
+      return true;
     } catch (error) {
-      console.error('Qdrant 连接测试失败:', error.message);
+
       return false;
     }
   }
 
   /**
-   * 获取配置信息
-   * @returns {Object} 当前配置
+   * 延迟函数
+   * @param {number} ms - 延迟毫秒数
    */
-  getConfig() {
-    return {
-      url: this.url,
-      collectionName: this.collectionName,
-      dimension: this.dimension,
-      denseWeight: this.denseWeight,
-      sparseWeight: this.sparseWeight,
-      defaultLimit: this.defaultLimit,
-      timeout: this.timeout,
-      hasApiKey: !!this.apiKey
-    };
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 清空集合
+   * @returns {Promise<boolean>}
+   */
+  async clearCollection() {
+    try {
+      await this.fetchAPI(`/collections/${this.collectionName}`, 'DELETE');
+      
+    } catch (error) {
+      if (!error.message.includes('404') && !error.message.includes('Not Found')) {
+        
+      }
+    }
+
+    this.initialized = false;
+
+    await this.delay(500);
+
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.createCollection();
+        this.initialized = true;
+
+        return true;
+      } catch (error) {
+
+        if (attempt < maxRetries) {
+          await this.delay(1000 * attempt);
+        } else {
+
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 设置 Embedding 管理器
+   * @param {Object} manager - Embedding 管理器实例
+   */
+  setEmbeddingManager(manager) {
+    this.embeddingManager = manager;
   }
 }
 

@@ -2,8 +2,8 @@
 /**
  * exists.js - 检查文档是否存在
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: exists [选项]
 
@@ -106,57 +106,74 @@ async function main() {
     });
 
     let searchPath = params.path;
+    let notebookId = null;
 
     // 如果提供了 title 和 parentId，构建完整路径
     if (params.title && params.parentId) {
-      const parentInfo = await connector.request('/api/block/getBlockInfo', {
-        id: params.parentId
-      });
-      if (parentInfo?.data && parentInfo.data.rootPath) {
-        searchPath = parentInfo.data.rootPath + '/' + params.title;
+      try {
+        const parentInfo = await connector.request('/api/block/getBlockInfo', {
+          id: params.parentId
+        });
+        if (parentInfo && parentInfo.box) {
+          notebookId = parentInfo.box;
+          const parentHPath = await connector.request('/api/filetree/getHPathByID', {
+            id: params.parentId
+          });
+          if (parentHPath) {
+            searchPath = parentHPath + '/' + params.title;
+          }
+        }
+      } catch (err) {
+        // 获取父文档信息失败，继续
       }
     } else if (params.title && params.notebookId) {
       // 获取笔记本信息
       const notebooks = await connector.request('/api/notebook/lsNotebooks');
-      const notebook = notebooks.data?.notebooks?.find(n => n.id === params.notebookId);
+      const notebook = notebooks?.notebooks?.find(n => n.id === params.notebookId);
       if (notebook) {
-        searchPath = '/' + notebook.name + '/' + params.title;
+        notebookId = notebook.id;
+        searchPath = '/' + params.title;
       }
     } else if (params.title) {
       // 只有标题，尝试搜索
-      searchPath = params.title;
+      searchPath = '/' + params.title;
     }
 
     // 检查文档是否存在
     let exists = false;
     let docIds = [];
-    let notebookId = null;
 
-    if (searchPath) {
+    // 如果还没有 notebookId，尝试从路径中解析
+    if (searchPath && !notebookId && searchPath.startsWith('/')) {
       try {
-        // 如果路径以 / 开头，需要解析笔记本
-        if (searchPath.startsWith('/')) {
-          const pathParts = searchPath.split('/').filter(p => p);
-          if (pathParts.length > 0) {
-            const notebookName = pathParts[0];
-            // 获取笔记本列表
-            const notebooks = await connector.request('/api/notebook/lsNotebooks');
-            const notebook = notebooks.data?.notebooks?.find(n => n.name === notebookName);
-            if (notebook) {
-              notebookId = notebook.id;
+        const pathParts = searchPath.split('/').filter(p => p);
+        if (pathParts.length > 0) {
+          const notebookName = pathParts[0];
+          const notebooks = await connector.request('/api/notebook/lsNotebooks');
+          const notebook = notebooks?.notebooks?.find(n => n.name === notebookName);
+          if (notebook) {
+            notebookId = notebook.id;
+            // 重新构建 searchPath，只保留相对路径
+            if (pathParts.length > 1) {
+              searchPath = '/' + pathParts.slice(1).join('/');
+            } else {
+              searchPath = '/';
             }
           }
         }
-
-        if (notebookId) {
-          docIds = await connector.request('/api/filetree/getIDsByHPath', {
-            notebook: notebookId,
-            path: searchPath
-          });
-          exists = docIds && docIds.length > 0;
-        }
       } catch (err) {
-        // 路径不存在
+        // 解析失败
+      }
+    }
+
+    if (notebookId && searchPath) {
+      try {
+        docIds = await connector.request('/api/filetree/getIDsByHPath', {
+          notebook: notebookId,
+          path: searchPath
+        });
+        exists = docIds && docIds.length > 0;
+      } catch (err) {
         exists = false;
       }
     }

@@ -2,8 +2,8 @@
 /**
  * block-update.js - 更新块内容
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
 const fs = require('fs');
 

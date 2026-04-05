@@ -97,13 +97,13 @@ node scripts/search.js "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
 
 ```bash
 # 增量索引所有笔记本
-node scripts/index-docs.js
+node scripts/index.js
 
 # 索引指定笔记本
-node scripts/index-docs.js --notebook <notebook-id>
+node scripts/index.js --notebook <notebook-id>
 
 # 强制重建索引
-node scripts/index-docs.js --notebook <notebook-id> --force
+node scripts/index.js --notebook <notebook-id> --force
 ```
 
 ### 2. 搜索文档

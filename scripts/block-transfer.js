@@ -2,8 +2,8 @@
 /**
  * block-transfer.js - 转移块引用
  */
-const ConfigManager = require('../config');
-const SiyuanConnector = require('../connector');
+const ConfigManager = require('./lib/config');
+const SiyuanConnector = require('./lib/connector');
 
 const HELP_TEXT = `用法: block-transfer <sourceId> <targetId>
 
@@ -21,12 +21,28 @@ const HELP_TEXT = `用法: block-transfer <sourceId> <targetId>
 
 function parseArgs(argv) {
   const positional = [];
-  for (const arg of argv) {
-    if (!arg.startsWith('-')) {
+  const options = {};
+  const hasValueOpts = new Set(['from-id', 'to-id', 'fromId', 'toId']);
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith('--')) {
+      const eqIndex = arg.indexOf('=');
+      if (eqIndex > -1) {
+        const key = arg.slice(2, eqIndex);
+        const value = arg.slice(eqIndex + 1);
+        options[key === 'from-id' ? 'fromId' : key === 'to-id' ? 'toId' : key] = value;
+      } else {
+        const key = arg.slice(2);
+        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
+          options[key === 'from-id' ? 'fromId' : key === 'to-id' ? 'toId' : key] = argv[++i];
+        }
+      }
+    } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
   }
-  return { positional };
+  return { positional, ...options };
 }
 
 async function main() {
@@ -37,13 +53,13 @@ async function main() {
   }
 
   const params = parseArgs(args);
-  if (params.positional.length < 2) {
+  let sourceId = params.fromId || params.positional[0];
+  let targetId = params.toId || params.positional[1];
+
+  if (!sourceId || !targetId) {
     console.error('错误: 请提供源块ID和目标块ID');
     process.exit(1);
   }
-
-  const sourceId = params.positional[0];
-  const targetId = params.positional[1];
 
   try {
     const configManager = new ConfigManager();
