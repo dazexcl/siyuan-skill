@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "name": "siyuan-skill",
+  "description": "思源笔记工具，支持笔记本管理、文档操作、内容搜索、块控制",
+  "skillType": "cli",
+  "runtime": "node",
+  "runtimeVersion": ">=14.0.0",
+  "entryPoint": "scripts/notebooks.js",
+  "commands": 25,
+  "directories": {
+    "scripts": "scripts/",
+    "references": "references/",
+    "examples": "examples/",
+    "assets": "assets/"
+  },
+  "scripts": [
+    "scripts/notebooks.js",
+    "scripts/structure.js",
+    "scripts/content.js",
+    "scripts/info.js",
+    "scripts/create.js",
+    "scripts/update.js",
+    "scripts/delete.js",
+    "scripts/move.js",
+    "scripts/rename.js",
+    "scripts/protect.js",
+    "scripts/exists.js",
+    "scripts/convert.js",
+    "scripts/icon.js",
+    "scripts/block-attrs.js",
+    "scripts/block-get.js",
+    "scripts/block-insert.js",
+    "scripts/block-update.js",
+    "scripts/block-delete.js",
+    "scripts/block-move.js",
+    "scripts/block-fold.js",
+    "scripts/block-transfer.js",
+    "scripts/tags.js",
+    "scripts/search.js",
+    "scripts/index.js",
+    "scripts/nlp.js"
+  ]
+}

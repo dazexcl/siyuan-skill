@@ -23,14 +23,14 @@
 
 ```bash
 # 启用调试输出
-DEBUG=* node siyuan.js <command>
+DEBUG=* node scripts/<command>
 ```
 
 ### 连接测试
 
 ```bash
 # 测试 API 连接
-node siyuan.js notebooks
+node scripts/notebooks.js
 ```
 
 ---
@@ -39,7 +39,7 @@ node siyuan.js notebooks
 
 本工具完全开源，欢迎审计：
 
-- **主要源码**：`connector.js`, `config.js`, `index.js`, `siyuan.js`
+- **主要源码**：`connector.js`, `config.js`, `scripts/`
 - **TLS 证书验证**：默认启用
 - **日志脱敏**：Token/密码自动隐藏
 

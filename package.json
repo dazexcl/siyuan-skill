@@ -1,11 +1,9 @@
 {
   "name": "siyuan-skill",
-  "version": "1.7.8",
-  "description": "思源笔记命令行工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能",
-  "main": "siyuan.js",
-  "bin": {
-    "siyuan": "./siyuan.js"
-  },
+  "version": "2.0.0",
+  "description": "思源笔记工具，提供便捷的命令行操作方式，支持笔记本管理、文档操作、内容搜索、块控制等功能",
+  "main": "scripts/notebooks.js",
+  "bin": {},
   "keywords": [
     "siyuan",
     "notes",
@@ -18,14 +16,7 @@
   "author": "Siyuan Skills",
   "license": "MIT",
   "dependencies": {},
-  "devDependencies": {
-    "jest": "^29.7.0"
-  },
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/dazexcl/siyuan-skill.git"

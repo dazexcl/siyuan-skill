@@ -48,18 +48,17 @@ cd siyuan-skill
 > **注意：** 需要先配置好环境变量或 config.json，才能运行命令。
 
 ```bash
-cd siyuan-skill
-
 # 方式1：临时设置环境变量后运行（Windows PowerShell）
-$env:SIYUAN_BASE_URL="http://localhost:6806"; $env:SIYUAN_TOKEN="你的token"; node siyuan.js notebooks
+$env:SIYUAN_BASE_URL="http://localhost:6806"; $env:SIYUAN_TOKEN="你的token"; node {baseDir}/scripts/notebooks.js
 
 # 方式2：临时设置环境变量后运行（macOS/Linux）
-SIYUAN_BASE_URL="http://localhost:6806" SIYUAN_TOKEN="你的token" node siyuan.js notebooks
+SIYUAN_BASE_URL="http://localhost:6806" SIYUAN_TOKEN="你的token" node {baseDir}/scripts/notebooks.js
 
 # 方式3：先创建 config.json，再运行
-cp config.example.json config.json
+cd {baseDir}
+cp assets/config-template.json config.json
 # 编辑 config.json 填入 token，然后运行
-node siyuan.js notebooks
+node {baseDir}/scripts/notebooks.js
 ```
 
 ### 步骤 3：配置环境变量
@@ -79,8 +78,7 @@ SIYUAN_PERMISSION_MODE=all
 ### 步骤 4：验证安装
 
 ```bash
-cd siyuan-skill
-node siyuan.js notebooks
+node {baseDir}/scripts/notebooks.js
 ```
 
 成功输出示例：
@@ -113,7 +111,7 @@ node siyuan.js notebooks
 
 ```bash
 cd siyuan-skill
-cp config.example.json config.json
+cp assets/config-template.json config.json
 ```
 
 编辑 `config.json`：
@@ -158,17 +156,17 @@ OLLAMA_EMBED_MODEL=nomic-embed-text
 
 ```bash
 # 查看帮助
-node siyuan.js help
+node {baseDir}/scripts/notebooks.js
 
 # 获取笔记本列表
-node siyuan.js notebooks
+node {baseDir}/scripts/notebooks.js
 
 # 获取文档结构（需要指定笔记本ID或路径）
-node siyuan.js structure <notebook-id>
-node siyuan.js structure --path "/笔记本名"
+node {baseDir}/scripts/structure.js <notebook-id>
+node {baseDir}/scripts/structure.js --path "/笔记本名"
 
 # 搜索内容
-node siyuan.js search "关键词"
+node {baseDir}/scripts/search.js "关键词"
 ```
 
 
@@ -176,7 +174,6 @@ node siyuan.js search "关键词"
 # 更新
 
 ```bash
-cd <skills-directory>/siyuan-skill
 git pull origin main
-node siyuan.js help  # 验证
+node {baseDir}/scripts/notebooks.js  # 验证
 ```
