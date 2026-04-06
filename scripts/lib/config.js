@@ -71,7 +71,6 @@ class ConfigManager {
       
       // NLP 配置
       nlp: {
-        enabled: false,
         language: 'zh',
         extractEntities: true,
         extractKeywords: true
@@ -401,7 +400,6 @@ class ConfigManager {
       validatedConfig.nlp = { ...this.defaultConfig.nlp };
     } else {
       validatedConfig.nlp = {
-        enabled: validatedConfig.nlp.enabled ?? this.defaultConfig.nlp.enabled,
         language: validatedConfig.nlp.language || this.defaultConfig.nlp.language,
         extractEntities: validatedConfig.nlp.extractEntities ?? this.defaultConfig.nlp.extractEntities,
         extractKeywords: validatedConfig.nlp.extractKeywords ?? this.defaultConfig.nlp.extractKeywords

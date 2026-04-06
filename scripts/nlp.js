@@ -512,15 +512,6 @@ async function main() {
     const allEntities = extractEntities(text);
     result.stats = generateStats(text, allTokens, allKeywords, allEntities);
 
-    if (config.nlp && config.nlp.enabled) {
-      const connector = new SiyuanConnector({
-        baseURL: config.baseURL,
-        token: config.token,
-        timeout: config.timeout,
-        tls: config.tls
-      });
-    }
-
     console.log(JSON.stringify(result, null, 2));
     process.exit(0);
   } catch (error) {

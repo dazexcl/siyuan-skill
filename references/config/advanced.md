@@ -41,7 +41,6 @@
     "limit": 20
   },
   "nlp": {
-    "enabled": false,
     "language": "zh",
     "extractEntities": true,
     "extractKeywords": true
