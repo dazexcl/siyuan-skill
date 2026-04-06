@@ -4,6 +4,8 @@
  * 支持 SQL 搜索、语义搜索、关键词搜索和混合搜索
  */
 
+const Reranker = require('./reranker');
+
 /**
  * SearchManager 类
  * 管理搜索功能
@@ -14,11 +16,13 @@ class SearchManager {
    * @param {Object} connector - Siyuan 连接器实例
    * @param {Object} vectorManager - Vector 管理器实例（可选）
    * @param {Object} nlpManager - NLP 管理器实例（可选）
+   * @param {Object} config - 配置对象（可选）
    */
-  constructor(connector, vectorManager = null, nlpManager = null) {
+  constructor(connector, vectorManager = null, nlpManager = null, config = null) {
     this.connector = connector;
     this.vectorManager = vectorManager;
     this.nlpManager = nlpManager;
+    this.config = config;
     this.concurrencyLimit = 5;
     this.batchSize = 10;
   }
@@ -173,19 +177,76 @@ class SearchManager {
       throw new Error(`配置不完整，${mode} 搜索需要设置 QDRANT_URL 和 Ollama 相关配置`);
     }
 
+    let searchResult;
+
     if (mode === 'legacy') {
-      return this.searchContent(validatedQuery, options);
+      searchResult = await this.searchContent(validatedQuery, options);
+    } else {
+      switch (mode) {
+        case 'semantic':
+          searchResult = await this.semanticSearch(validatedQuery, options);
+          break;
+        case 'keyword':
+          searchResult = await this.keywordSearch(validatedQuery, options);
+          break;
+        case 'hybrid':
+        default:
+          searchResult = await this.hybridSearch(validatedQuery, options);
+          break;
+      }
     }
 
-    switch (mode) {
-      case 'semantic':
-        return this.semanticSearch(validatedQuery, options);
-      case 'keyword':
-        return this.keywordSearch(validatedQuery, options);
-      case 'hybrid':
-      default:
-        return this.hybridSearch(validatedQuery, options);
+    if (searchResult.rerank?.enabled) {
+      return searchResult;
     }
+
+    const { enableRerank, rerankTopK, rerankWeight, rerankNoCache, checkPermissionFn } = options;
+    if (enableRerank && this.vectorManager && this.vectorManager.embeddingManager) {
+      try {
+        const Reranker = require('./reranker');
+        const rerankConfig = this.config?.rerank || {};
+        const reranker = new Reranker(
+          this.vectorManager.embeddingManager,
+          {
+            rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
+            rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
+            enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
+            preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
+            batchSize: rerankConfig.batchSize || 10,
+            enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
+            segmentMaxLength: this.config?.embedding?.maxChunkLength || 4000,
+            segmentOverlap: Math.floor((this.config?.embedding?.minChunkLength || 200) / 2) || 100,
+            maxContentLength: this.config?.embedding?.maxContentLength || 4000
+          }
+        );
+
+        let resultsToRerank = searchResult.results || [];
+        if (checkPermissionFn && typeof checkPermissionFn === 'function') {
+          resultsToRerank = resultsToRerank.filter(result => {
+            const notebookId = result.box || result.notebookId;
+            return !notebookId || checkPermissionFn(notebookId);
+          });
+        }
+
+        const enrichedResults = await this.enrichResultsWithContent(resultsToRerank);
+        const finalResults = await reranker.rerank(validatedQuery, enrichedResults);
+
+        searchResult = {
+          ...searchResult,
+          results: finalResults,
+          total: finalResults.length,
+          rerank: {
+            enabled: true,
+            rerankCount: finalResults.length,
+            cacheStats: reranker.getCacheStats()
+          }
+        };
+      } catch (error) {
+        console.warn('Legacy 模式重排失败，使用原始结果:', error.message);
+      }
+    }
+
+    return searchResult;
   }
 
   /**
@@ -244,7 +305,11 @@ class SearchManager {
       sqlWeight = 0,
       threshold = 0.0,
       checkPermissionFn,
-      enableSQLFallback = true
+      enableSQLFallback = true,
+      enableRerank = false,
+      rerankTopK = 50,
+      rerankWeight = 0.5,
+      rerankNoCache = false
     } = options;
 
     try {
@@ -285,7 +350,8 @@ class SearchManager {
           );
         }
 
-        vectorProcessed = await this.enrichResultsWithContent(results);
+        const deduplicatedResults = this.deduplicateByDocId(results);
+        vectorProcessed = await this.enrichResultsWithContent(deduplicatedResults);
       }
 
       let sqlProcessed = [];
@@ -316,12 +382,78 @@ class SearchManager {
         sqlWeight
       );
 
+      let finalResults = mergedResults;
+      let rerankInfo = null;
+
+      console.error(`重排条件检查: enableRerank=${enableRerank}, vectorManager=${!!this.vectorManager}, embeddingManager=${!!(this.vectorManager?.embeddingManager)}`);
+      console.log(`合并结果数量: ${mergedResults.length}`);
+
+      if (enableRerank && this.vectorManager && this.vectorManager.embeddingManager) {
+        try {
+          console.error(`创建重排器...`);
+          
+          const rerankConfig = this.config?.rerank || {};
+          const reranker = new Reranker(
+            this.vectorManager.embeddingManager,
+            {
+              rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
+              rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
+              enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
+              preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
+              batchSize: rerankConfig.batchSize || 10,
+              enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
+              segmentMaxLength: this.config?.embedding?.maxChunkLength || 4000,
+              segmentOverlap: Math.floor((this.config?.embedding?.minChunkLength || 200) / 2) || 100,
+              maxContentLength: this.config?.embedding?.maxContentLength || 4000
+            }
+          );
+          console.error(`重排器创建成功，开始重排 ${mergedResults.length} 个结果...`);
+          console.error(`查询文本: "${query}"`);
+
+          if (mergedResults.length > 0) {
+            console.error(`第一个结果预览:`, {
+              id: mergedResults[0].id,
+              content: mergedResults[0].content?.substring(0, 50),
+              relevanceScore: mergedResults[0].relevanceScore
+            });
+          }
+
+          finalResults = await reranker.rerank(query, mergedResults);
+          console.error(`重排完成，得到 ${finalResults.length} 个结果`);
+
+          if (finalResults.length > 0) {
+            console.error(`第一个重排结果:`, {
+              id: finalResults[0].id,
+              originalScore: finalResults[0].originalScore,
+              rerankScore: finalResults[0].rerankScore,
+              finalScore: finalResults[0].finalScore
+            });
+          }
+
+          rerankInfo = {
+            enabled: true,
+            rerankCount: finalResults.length,
+            cacheStats: reranker.getCacheStats()
+          };
+        } catch (error) {
+          console.warn('重排失败，使用原始结果:', error.message);
+          console.error('重排错误详情:', error);
+          finalResults = mergedResults;
+          rerankInfo = {
+            enabled: false,
+            error: error.message
+          };
+        }
+      } else {
+        console.log('重排条件不满足，跳过重排');
+      }
+
       return {
         query,
         mode: 'hybrid',
         notebookId,
-        results: mergedResults,
-        total: mergedResults.length,
+        results: finalResults,
+        total: finalResults.length,
         limit,
         denseWeight,
         sparseWeight,
@@ -329,7 +461,8 @@ class SearchManager {
         vectorSearch: true,
         sqlSearch: enableSQLFallback && sqlProcessed.length > 0,
         vectorCount: vectorProcessed.length,
-        sqlCount: sqlProcessed.length
+        sqlCount: sqlProcessed.length,
+        rerank: rerankInfo
       };
     } catch (error) {
       return this.searchContent(query, options);
@@ -351,12 +484,16 @@ class SearchManager {
       notebookId,
       limit = 20,
       threshold = 0.0,
-      checkPermissionFn
+      checkPermissionFn,
+      enableRerank = false,
+      rerankTopK = 50,
+      rerankWeight = 0.5,
+      rerankNoCache = false
     } = options;
 
     try {
       const filter = this.buildVectorFilter(options);
-      
+
       const vectorResults = await this.vectorManager.semanticSearch(query, {
         limit,
         threshold,
@@ -366,21 +503,61 @@ class SearchManager {
       let results = vectorResults.results;
 
       if (checkPermissionFn && typeof checkPermissionFn === 'function') {
-        results = results.filter(result => 
+        results = results.filter(result =>
           !result.notebookId || checkPermissionFn(result.notebookId)
         );
       }
 
-      const processedResults = await this.enrichResultsWithContent(results);
+      const deduplicatedResults = this.deduplicateByDocId(results);
+      const processedResults = await this.enrichResultsWithContent(deduplicatedResults);
+
+      let finalResults = processedResults;
+      let rerankInfo = null;
+
+      if (enableRerank && this.vectorManager && this.vectorManager.embeddingManager) {
+        try {
+          const rerankConfig = this.config?.rerank || {};
+          const reranker = new Reranker(
+            this.vectorManager.embeddingManager,
+            {
+              rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
+              rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
+              enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
+              preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
+              batchSize: rerankConfig.batchSize || 10,
+              enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
+              segmentMaxLength: this.config?.embedding?.maxChunkLength || 4000,
+              segmentOverlap: Math.floor((this.config?.embedding?.minChunkLength || 200) / 2) || 100,
+              maxContentLength: this.config?.embedding?.maxContentLength || 4000
+            }
+          );
+
+          finalResults = await reranker.rerank(query, processedResults);
+
+          rerankInfo = {
+            enabled: true,
+            rerankCount: finalResults.length,
+            cacheStats: reranker.getCacheStats()
+          };
+        } catch (error) {
+          console.warn('重排失败，使用原始结果:', error.message);
+          finalResults = processedResults;
+          rerankInfo = {
+            enabled: false,
+            error: error.message
+          };
+        }
+      }
 
       return {
         query,
         mode: 'semantic',
         notebookId,
-        results: processedResults,
-        total: processedResults.length,
+        results: finalResults,
+        total: finalResults.length,
         limit,
-        vectorSearch: true
+        vectorSearch: true,
+        rerank: rerankInfo
       };
     } catch (error) {
       return this.searchContent(query, options);
@@ -401,12 +578,16 @@ class SearchManager {
     const {
       notebookId,
       limit = 20,
-      checkPermissionFn
+      checkPermissionFn,
+      enableRerank = false,
+      rerankTopK = 50,
+      rerankWeight = 0.5,
+      rerankNoCache = false
     } = options;
 
     try {
       const filter = this.buildVectorFilter(options);
-      
+
       const vectorResults = await this.vectorManager.keywordSearch(query, {
         limit,
         filter
@@ -415,21 +596,61 @@ class SearchManager {
       let results = vectorResults.results;
 
       if (checkPermissionFn && typeof checkPermissionFn === 'function') {
-        results = results.filter(result => 
+        results = results.filter(result =>
           !result.notebookId || checkPermissionFn(result.notebookId)
         );
       }
 
-      const processedResults = await this.enrichResultsWithContent(results);
+      const deduplicatedResults = this.deduplicateByDocId(results);
+      const processedResults = await this.enrichResultsWithContent(deduplicatedResults);
+
+      let finalResults = processedResults;
+      let rerankInfo = null;
+
+      if (enableRerank && this.vectorManager && this.vectorManager.embeddingManager) {
+        try {
+          const rerankConfig = this.config?.rerank || {};
+          const reranker = new Reranker(
+            this.vectorManager.embeddingManager,
+            {
+              rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
+              rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
+              enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
+              preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
+              batchSize: rerankConfig.batchSize || 10,
+              enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
+              segmentMaxLength: this.config?.embedding?.maxChunkLength || 4000,
+              segmentOverlap: Math.floor((this.config?.embedding?.minChunkLength || 200) / 2) || 100,
+              maxContentLength: this.config?.embedding?.maxContentLength || 4000
+            }
+          );
+
+          finalResults = await reranker.rerank(query, processedResults);
+
+          rerankInfo = {
+            enabled: true,
+            rerankCount: finalResults.length,
+            cacheStats: reranker.getCacheStats()
+          };
+        } catch (error) {
+          console.warn('重排失败，使用原始结果:', error.message);
+          finalResults = processedResults;
+          rerankInfo = {
+            enabled: false,
+            error: error.message
+          };
+        }
+      }
 
       return {
         query,
         mode: 'keyword',
         notebookId,
-        results: processedResults,
-        total: processedResults.length,
+        results: finalResults,
+        total: finalResults.length,
         limit,
-        vectorSearch: true
+        vectorSearch: true,
+        rerank: rerankInfo
       };
     } catch (error) {
       return this.searchContent(query, options);
@@ -499,6 +720,7 @@ class SearchManager {
       return {
         id: result.id,
         originalId,
+        blockId: result.blockId || originalId,
         isChunk,
         content,
         type: 'd',
@@ -510,6 +732,7 @@ class SearchManager {
         tags,
         title: result.title || '',
         relevanceScore: result.score || 0,
+        finalScore: result.score || 0,
         denseScore: result.denseScore,
         sparseScore: result.sparseScore,
         excerpt: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
@@ -519,6 +742,7 @@ class SearchManager {
       return {
         id: result.id,
         originalId,
+        blockId: result.blockId || originalId,
         isChunk,
         content: result.contentPreview || '',
         type: 'd',
@@ -530,6 +754,7 @@ class SearchManager {
         tags: [],
         title: result.title || '',
         relevanceScore: result.score || 0,
+        finalScore: result.score || 0,
         denseScore: result.denseScore,
         sparseScore: result.sparseScore,
         excerpt: (result.contentPreview || '').substring(0, 200),
@@ -742,6 +967,7 @@ class SearchManager {
         root_id: result.root_id || '',
         tags,
         relevanceScore,
+        finalScore: relevanceScore,
         excerpt: content.substring(0, 200) + (content.length > 200 ? '...' : '')
       };
     });
@@ -821,9 +1047,35 @@ class SearchManager {
    */
   normalizeScore(score, minScore, maxScore) {
     if (maxScore === minScore) {
-      return score > 0 ? 1 : 0;
+      return score;
     }
     return Math.min(Math.max((score - minScore) / (maxScore - minScore), 0), 1);
+  }
+
+  /**
+   * 按文档ID去重，每个文档只保留得分最高的结果
+   * @param {Array} results - 搜索结果数组
+   * @returns {Array} 去重后的结果数组
+   */
+  deduplicateByDocId(results) {
+    if (!Array.isArray(results) || results.length === 0) {
+      return [];
+    }
+
+    const docMap = new Map();
+
+    results.forEach(result => {
+      const docId = result.blockId || result.id;
+      const existing = docMap.get(docId);
+      const currentScore = result.score || result.relevanceScore || 0;
+      const existingScore = existing?.score || existing?.relevanceScore || 0;
+
+      if (!existing || currentScore > existingScore) {
+        docMap.set(docId, result);
+      }
+    });
+
+    return Array.from(docMap.values());
   }
 
   /**
@@ -849,10 +1101,10 @@ class SearchManager {
     const vectorScores = vectorResults.map(r => r.relevanceScore || 0);
     const sqlScores = sqlResults.map(r => r.relevanceScore || 0);
 
-    const vectorMin = vectorScores.length > 0 ? Math.min(...vectorScores) : 0;
-    const vectorMax = vectorScores.length > 0 ? Math.max(...vectorScores) : 1;
-    const sqlMin = sqlScores.length > 0 ? Math.min(...sqlScores) : 0;
-    const sqlMax = sqlScores.length > 0 ? Math.max(...sqlScores) : 1;
+    const vectorMin = 0;
+    const vectorMax = 1;
+    const sqlMin = 0;
+    const sqlMax = 1;
 
     const exactMatchBoost = sqlWeight > 0 ? 0.5 : 0;
 
@@ -931,7 +1183,11 @@ class SearchManager {
 
     return allResults.slice(0, limit).map(result => ({
       ...result,
-      relevanceScore: result.weightedScore
+      relevanceScore: result.weightedScore,
+      finalScore: result.weightedScore,
+      originalVectorScore: result.vectorScore,
+      originalSqlScore: result.sqlScore,
+      source: result.source || 'unknown'
     }));
   }
 }

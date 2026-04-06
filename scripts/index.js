@@ -210,10 +210,10 @@ async function indexDocument(doc, connector, embeddingManager, vectorManager, co
         if (embedding) {
           const vectorData = createVectorData(`${doc.id}_chunk_${i}`, chunk, {
             ...metadata,
-            block_id: `${doc.id}_chunk_${i}`,
+            id: `${doc.id}_chunk_${i}`,
+            block_id: doc.id,
             chunk_index: i,
             total_chunks: chunks.length,
-            original_doc_id: doc.id,
             is_chunk: true
           });
           result.vectors.push(vectorData);
@@ -226,6 +226,7 @@ async function indexDocument(doc, connector, embeddingManager, vectorManager, co
       if (embedding) {
         const vectorData = createVectorData(doc.id, docContent, {
           ...metadata,
+          id: doc.id,
           block_id: doc.id
         });
         result.vectors.push(vectorData);
