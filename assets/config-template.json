@@ -18,10 +18,11 @@
     "baseUrl": "http://localhost:11434",
     "model": "nomic-embed-text",
     "dimension": 768,
-    "maxContentLength": 1000,
-    "maxChunkLength": 800,
+    "maxContentLength": 4000,
+    "maxChunkLength": 4000,
     "minChunkLength": 200,
-    "batchSize": 3,
+    "maxDepth": 10,
+    "indexConcurrency": 2,
     "skipIndexAttrs": ["custom-skip-index"]
   },
   "hybridSearch": {

@@ -21,8 +21,7 @@ class VectorManager {
     };
     this.embeddingConfig = config.embedding || {
       model: 'nomic-embed-text',
-      dimension: 768,
-      batchSize: 8
+      dimension: 768
     };
     this.hybridConfig = config.hybridSearch || {
       denseWeight: 0.7,
@@ -367,73 +366,62 @@ class VectorManager {
       }
     }
 
-    const batchSize = this.embeddingConfig.batchSize || 8;
-    let indexed = 0;
-    const errors = [];
+    try {
+      const points = await Promise.all(
+        documents.map(async (doc) => {
+          const denseVector = await this.embeddingManager.generateEmbedding(doc.content);
+          const sparseVector = this.embeddingManager.generateSparseVector(doc.content);
 
-    for (let i = 0; i < documents.length; i += batchSize) {
-      const batch = documents.slice(i, i + batchSize);
-      
-      try {
-        const points = await Promise.all(
-          batch.map(async (doc) => {
-            const denseVector = await this.embeddingManager.generateEmbedding(doc.content);
-            const sparseVector = this.embeddingManager.generateSparseVector(doc.content);
-
-            // 转换 Siyuan Notes 文档 ID 为 Qdrant 可接受的格式（使用哈希函数）
-            function hashStringToUint(str) {
-              let hash = 0;
-              for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // 转换为 32 位无符号整数
-              }
-              return Math.abs(hash);
+          function hashStringToUint(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+              const char = str.charCodeAt(i);
+              hash = ((hash << 5) - hash) + char;
+              hash = hash & hash;
             }
+            return Math.abs(hash);
+          }
 
-            return {
-              id: hashStringToUint(doc.docId),
-              vector: {
-                dense: denseVector,
-                sparse: sparseVector
-              },
-              payload: {
-                block_id: doc.docId,
-                notebook_id: doc.metadata?.notebook_id || '',
-                title: doc.metadata?.title || '',
-                path: doc.metadata?.path || '',
-                content_preview: doc.content.substring(0, 500),
-                updated: doc.metadata?.updated || Date.now(),
-                tags: doc.metadata?.tags || [],
-                is_chunk: doc.metadata?.is_chunk || false,
-                chunk_index: doc.metadata?.chunk_index,
-                total_chunks: doc.metadata?.total_chunks,
-                original_doc_id: doc.metadata?.original_doc_id
-              }
-            };
-          })
-        );
+          return {
+            id: hashStringToUint(doc.docId),
+            vector: {
+              dense: denseVector,
+              sparse: sparseVector
+            },
+            payload: {
+              block_id: doc.docId,
+              notebook_id: doc.metadata?.notebookId || doc.metadata?.notebook_id || '',
+              title: doc.metadata?.title || '',
+              path: doc.metadata?.path || '',
+              content_preview: doc.content.substring(0, 500),
+              updated: doc.metadata?.updated || Date.now(),
+              tags: doc.metadata?.tags || [],
+              is_chunk: doc.metadata?.is_chunk || false,
+              chunk_index: doc.metadata?.chunk_index,
+              total_chunks: doc.metadata?.total_chunks,
+              original_doc_id: doc.metadata?.original_doc_id
+            }
+          };
+        })
+      );
 
-        await this.fetchAPI(`/collections/${this.collectionName}/points?wait=true`, 'PUT', {
-          points: points
-        });
+      await this.fetchAPI(`/collections/${this.collectionName}/points?wait=true`, 'PUT', {
+        points: points
+      });
 
-        indexed += batch.length;
-      } catch (error) {
-
-        errors.push({
-          batch: Math.floor(i / batchSize) + 1,
-          error: error.message
-        });
-      }
+      return {
+        success: true,
+        indexed: documents.length,
+        total: documents.length
+      };
+    } catch (error) {
+      return {
+        success: false,
+        indexed: 0,
+        total: documents.length,
+        message: error.message
+      };
     }
-
-    return {
-      success: errors.length === 0,
-      indexed,
-      total: documents.length,
-      errors
-    };
   }
 
   /**

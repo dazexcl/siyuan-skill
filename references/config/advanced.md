@@ -28,10 +28,10 @@
   "embedding": {
     "model": "nomic-embed-text",
     "dimension": 768,
-    "batchSize": 5,
+    "indexConcurrency": 2,
     "baseUrl": "http://localhost:11434",
-    "maxContentLength": 1000,
-    "maxChunkLength": 800,
+    "maxContentLength": 4000,
+    "maxChunkLength": 4000,
     "minChunkLength": 200,
     "skipIndexAttrs": []
   },
@@ -100,11 +100,12 @@
 |------|------|--------|------|
 | `embedding.model` | string | `nomic-embed-text` | 模型名称 |
 | `embedding.dimension` | number | `768` | 向量维度 |
-| `embedding.batchSize` | number | `5` | 批处理大小 |
+| `embedding.indexConcurrency` | number | `2` | 索引队列并发数 |
 | `embedding.baseUrl` | string | `null` | Ollama 地址 |
 | `embedding.maxContentLength` | number | `4000` | 触发分块的内容长度阈值 |
 | `embedding.maxChunkLength` | number | `4000` | 单个分块最大长度 |
 | `embedding.minChunkLength` | number | `200` | 单个分块最小长度 |
+| `embedding.maxDepth` | number | `10` | 文档递归处理最大深度 |
 | `embedding.skipIndexAttrs` | array | `[]` | 跳过索引的属性名列表 |
 
 ### 混合搜索（可选）

@@ -185,31 +185,7 @@ node scripts/tags.js <blockId> --get
 
 ## 配置说明
 
-### 环境变量配置
-
-```bash
-# 基础配置（必需）
-SIYUAN_BASE_URL="http://localhost:6806"
-SIYUAN_TOKEN="your-api-token-here"
-SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id-here"
-
-# 权限配置
-SIYUAN_PERMISSION_MODE="all"           # all/whitelist/blacklist
-SIYUAN_NOTEBOOK_LIST="id1,id2,id3"     # 白名单/黑名单笔记本ID
-
-# 删除保护
-SIYUAN_DELETE_SAFE_MODE="true"         # 安全模式
-SIYUAN_DELETE_REQUIRE_CONFIRMATION="false"
-
-# 向量搜索（可选）
-QDRANT_URL="http://localhost:6333"
-QDRANT_API_KEY=""
-QDRANT_COLLECTION_NAME="siyuan_notes"
-OLLAMA_BASE_URL="http://localhost:11434"
-OLLAMA_EMBED_MODEL="nomic-embed-text"
-```
-
-### 配置文件
+### 快速配置
 
 创建 `config.json` 文件：
 
@@ -217,27 +193,18 @@ OLLAMA_EMBED_MODEL="nomic-embed-text"
 {
   "baseURL": "http://localhost:6806",
   "token": "your-api-token-here",
-  "defaultNotebook": "your-notebook-id-here",
-  "permissionMode": "all",
-  "notebookList": [],
-  "deleteProtection": {
-    "safeMode": true,
-    "requireConfirmation": false,
-    "protectedNotebooks": [],
-    "protectedPaths": []
-  },
-  "qdrant": {
-    "url": "http://localhost:6333",
-    "apiKey": "",
-    "collectionName": "siyuan_notes"
-  },
-  "embedding": {
-    "model": "nomic-embed-text",
-    "dimension": 768,
-    "batchSize": 5,
-    "baseUrl": "http://localhost:11434"
-  }
+  "defaultNotebook": "your-notebook-id-here"
 }
+```
+
+### 环境变量（可选）
+
+也可以使用环境变量配置：
+
+```bash
+SIYUAN_BASE_URL="http://localhost:6806"
+SIYUAN_TOKEN="your-api-token-here"
+SIYUAN_DEFAULT_NOTEBOOK="your-notebook-id-here"
 ```
 
 > 📋 完整配置说明参见：[配置文档](references/config/advanced.md)

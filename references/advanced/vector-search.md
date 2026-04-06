@@ -22,46 +22,26 @@ docker run -p 6333:6333 qdrant/qdrant
 ollama pull nomic-embed-text
 ```
 
-## 配置方式
+## 配置
 
-### 环境变量配置
-
-```bash
-# Qdrant 配置
-export QDRANT_URL="http://127.0.0.1:6333"
-export QDRANT_API_KEY=""
-export QDRANT_COLLECTION_NAME="siyuan_notes"
-
-# Ollama 配置
-export OLLAMA_BASE_URL="http://127.0.0.1:11434"
-export OLLAMA_EMBED_MODEL="nomic-embed-text"
-```
-
-### 配置文件配置
+向量搜索需要在 `config.json` 中配置以下部分：
 
 ```json
 {
   "qdrant": {
-    "url": "http://127.0.0.1:6333",
+    "url": "http://localhost:6333",
     "apiKey": "",
     "collectionName": "siyuan_notes"
   },
   "embedding": {
-    "baseUrl": "http://127.0.0.1:11434",
+    "baseUrl": "http://localhost:11434",
     "model": "nomic-embed-text",
-    "dimension": 768,
-    "maxContentLength": 4000,
-    "maxChunkLength": 4000,
-    "minChunkLength": 200,
-    "batchSize": 5
-  },
-  "hybridSearch": {
-    "denseWeight": 0.7,
-    "sparseWeight": 0.3,
-    "limit": 20
+    "dimension": 768
   }
 }
 ```
+
+> 📋 完整配置说明参见：[配置文档](../config/advanced.md)
 
 ## 搜索模式
 
@@ -121,18 +101,6 @@ node scripts/search.js "机器学习技术" --mode semantic
 # 混合搜索
 node scripts/search.js "人工智能应用" --mode hybrid
 ```
-
-## 配置参数说明
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `embedding.baseUrl` | `http://127.0.0.1:11434` | Ollama 服务地址 |
-| `embedding.model` | `nomic-embed-text` | Embedding 模型名称 |
-| `embedding.dimension` | `768` | 向量维度 |
-| `embedding.maxContentLength` | `4000` | 触发分块的内容长度阈值 |
-| `embedding.batchSize` | `5` | 批处理大小 |
-| `hybridSearch.denseWeight` | `0.7` | 稠密向量权重 |
-| `hybridSearch.sparseWeight` | `0.3` | 稀疏向量权重 |
 
 ## 故障排除
 

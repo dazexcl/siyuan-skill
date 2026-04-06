@@ -53,11 +53,12 @@ class ConfigManager {
       embedding: {
         model: 'nomic-embed-text',
         dimension: 768,
-        batchSize: 5,
+        indexConcurrency: 2,
         baseUrl: null,
         maxContentLength: 4000,
         maxChunkLength: 4000,
         minChunkLength: 200,
+        maxDepth: 10,
         skipIndexAttrs: []
       },
       
@@ -243,15 +244,16 @@ class ConfigManager {
     }
     
     // Embedding 配置
-    if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_EMBED_MODEL || process.env.EMBEDDING_MODEL || process.env.EMBEDDING_DIMENSION || process.env.EMBEDDING_BATCH_SIZE || process.env.SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH || process.env.SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH || process.env.SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH || process.env.SIYUAN_SKIP_INDEX_ATTRS) {
+    if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_EMBED_MODEL || process.env.EMBEDDING_MODEL || process.env.EMBEDDING_DIMENSION || process.env.EMBEDDING_INDEX_CONCURRENCY || process.env.SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH || process.env.SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH || process.env.SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH || process.env.SIYUAN_EMBEDDING_MAX_DEPTH || process.env.SIYUAN_SKIP_INDEX_ATTRS) {
       envConfig.embedding = {
         model: process.env.OLLAMA_EMBED_MODEL || process.env.EMBEDDING_MODEL || this.defaultConfig.embedding.model,
         dimension: parseInt(process.env.EMBEDDING_DIMENSION, 10) || this.defaultConfig.embedding.dimension,
-        batchSize: parseInt(process.env.EMBEDDING_BATCH_SIZE, 10) || this.defaultConfig.embedding.batchSize,
+        indexConcurrency: parseInt(process.env.EMBEDDING_INDEX_CONCURRENCY, 10) || this.defaultConfig.embedding.indexConcurrency,
         baseUrl: process.env.OLLAMA_BASE_URL || process.env.EMBEDDING_BASE_URL || this.defaultConfig.embedding.baseUrl,
         maxContentLength: parseInt(process.env.SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH, 10) || this.defaultConfig.embedding.maxContentLength,
         maxChunkLength: parseInt(process.env.SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH, 10) || this.defaultConfig.embedding.maxChunkLength,
         minChunkLength: parseInt(process.env.SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH, 10) || this.defaultConfig.embedding.minChunkLength,
+        maxDepth: parseInt(process.env.SIYUAN_EMBEDDING_MAX_DEPTH, 10) || this.defaultConfig.embedding.maxDepth,
         skipIndexAttrs: process.env.SIYUAN_SKIP_INDEX_ATTRS ? process.env.SIYUAN_SKIP_INDEX_ATTRS.split(',').map(a => a.trim()).filter(Boolean) : this.defaultConfig.embedding.skipIndexAttrs
       };
     }
@@ -373,11 +375,12 @@ class ConfigManager {
       validatedConfig.embedding = {
         model: validatedConfig.embedding.model || this.defaultConfig.embedding.model,
         dimension: validatedConfig.embedding.dimension || this.defaultConfig.embedding.dimension,
-        batchSize: validatedConfig.embedding.batchSize || this.defaultConfig.embedding.batchSize,
+        indexConcurrency: validatedConfig.embedding.indexConcurrency || this.defaultConfig.embedding.indexConcurrency,
         baseUrl: validatedConfig.embedding.baseUrl || this.defaultConfig.embedding.baseUrl,
         maxContentLength: validatedConfig.embedding.maxContentLength || this.defaultConfig.embedding.maxContentLength,
         maxChunkLength: validatedConfig.embedding.maxChunkLength || this.defaultConfig.embedding.maxChunkLength,
         minChunkLength: validatedConfig.embedding.minChunkLength || this.defaultConfig.embedding.minChunkLength,
+        maxDepth: validatedConfig.embedding.maxDepth || this.defaultConfig.embedding.maxDepth,
         skipIndexAttrs: Array.isArray(validatedConfig.embedding.skipIndexAttrs) ? validatedConfig.embedding.skipIndexAttrs : this.defaultConfig.embedding.skipIndexAttrs
       };
     }

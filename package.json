@@ -108,12 +108,12 @@
       {
         "name": "SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH",
         "description": "Embedding 最大内容长度",
-        "default": "4000"
+        "default": "1000"
       },
       {
         "name": "SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH",
         "description": "Embedding 最大分块长度",
-        "default": "4000"
+        "default": "800"
       },
       {
         "name": "SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH",

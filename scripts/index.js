@@ -10,6 +10,7 @@ const SiyuanConnector = require('./lib/connector');
 const EmbeddingManager = require('./lib/embedding-manager');
 const VectorManager = require('./lib/vector-manager');
 const { checkPermission } = require('./lib/permission');
+const ConcurrentQueue = require('./lib/concurrent-queue');
 
 const HELP_TEXT = `用法: index [<id>] [选项]
 
@@ -23,7 +24,6 @@ const HELP_TEXT = `用法: index [<id>] [选项]
   --doc-ids <ids>       指定文档 ID 列表（逗号分隔）
   --force               强制重建索引
   --remove              只移除索引，不重新索引
-  --batch-size <size>   批处理大小（默认：5）
   -h, --help            显示帮助信息
 
 示例:
@@ -67,7 +67,7 @@ function camelCase(str) {
  */
 function parseArgs(argv) {
   const options = {};
-  const hasValueOpts = new Set(['notebook', 'docIds', 'batchSize']);
+  const hasValueOpts = new Set(['notebook', 'docIds']);
   const positionalArgs = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -102,8 +102,8 @@ function parseArgs(argv) {
 class IndexStats {
   constructor() {
     this.totalDocs = 0;
+    this.processedDocs = 0;
     this.indexedDocs = 0;
-    this.totalChunks = 0;
     this.indexedChunks = 0;
     this.failedDocs = 0;
     this.errors = [];
@@ -118,6 +118,22 @@ class IndexStats {
     this.failedDocs++;
     this.errors.push({ docId, error });
   }
+
+  /**
+   * 记录成功的索引
+   * @param {number} chunkCount - 成功索引的分块数
+   */
+  addIndexed(chunkCount = 1) {
+    this.indexedDocs++;
+    this.indexedChunks += chunkCount;
+  }
+
+  /**
+   * 跳过文档
+   */
+  skipDoc() {
+    this.processedDocs++;
+  }
 }
 
 /**
@@ -127,20 +143,23 @@ class IndexStats {
  * @param {EmbeddingManager} embeddingManager - 嵌入管理器
  * @param {VectorManager} vectorManager - 向量管理器
  * @param {Object} config - 配置对象
- * @param {IndexStats} stats - 统计对象
- * @returns {Promise<Object>} { vectors: [], skipped: boolean }
+ * @returns {Promise<Object>} { vectors: [], skipped: boolean, docId, docName, docLength, chunkCount }
  */
-async function indexDocument(doc, connector, embeddingManager, vectorManager, config, stats) {
+async function indexDocument(doc, connector, embeddingManager, vectorManager, config) {
   try {
     const result = {
       vectors: [],
       skipped: false,
       docId: doc.id,
-      originalDocId: doc.id
+      originalDocId: doc.id,
+      docName: doc.name,
+      docLength: 0,
+      chunkCount: 0
     };
 
+    // 优化：一次性获取配置，避免重复访问 config?.embedding
     const embeddingConfig = config?.embedding || {};
-    const maxContentLength = embeddingConfig.maxContentLength || 1000;
+    const maxContentLength = embeddingConfig.maxContentLength;
     const skipIndexAttrs = embeddingConfig.skipIndexAttrs || [];
 
     // 获取文档属性（包含 tags 和原始 attrs）
@@ -156,8 +175,7 @@ async function indexDocument(doc, connector, embeddingManager, vectorManager, co
     // 获取文档内容
     const content = await connector.request('/api/export/exportMdContent', { id: doc.id });
     if (!content?.content) {
-      stats.addError(doc.id, '无法获取文档内容');
-      return result;
+      throw new Error('无法获取文档内容');
     }
 
     const docContent = content.content.trim();
@@ -167,9 +185,9 @@ async function indexDocument(doc, connector, embeddingManager, vectorManager, co
     }
 
     const pathInfo = await fetchPathInfo(connector, doc.id);
+    const notebookId = doc.box || pathInfo?.box || pathInfo?.notebook || '';
     const docTitle = content.hPath?.split('/').pop() || doc.id;
     const docPath = content.hPath || '';
-    const notebookId = doc.box || pathInfo?.notebook || '';
     const docUpdatedTime = doc.updated ? doc.updated * 1000 : Date.now();
 
     const metadata = { 
@@ -182,54 +200,41 @@ async function indexDocument(doc, connector, embeddingManager, vectorManager, co
 
     if (docContent.length > maxContentLength) {
       const chunks = await fetchDocumentChunks(connector, doc.id, docContent, config);
-      stats.totalChunks += chunks.length;
+      result.docLength = docContent.length;
+      result.chunkCount = chunks.length;
 
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         const embedding = await embeddingManager.generateEmbedding(chunk);
 
         if (embedding) {
-          const contentPreview = chunk.length > 200 ? chunk.substring(0, 200) + '...' : chunk;
-
-          result.vectors.push({
-            docId: `${doc.id}_chunk_${i}`,
-            content: chunk,
-            metadata: {
-              ...metadata,
-              block_id: `${doc.id}_chunk_${i}`,
-              content_preview: contentPreview,
-              chunk_index: i,
-              total_chunks: chunks.length,
-              original_doc_id: doc.id,
-              is_chunk: true
-            }
+          const vectorData = createVectorData(`${doc.id}_chunk_${i}`, chunk, {
+            ...metadata,
+            block_id: `${doc.id}_chunk_${i}`,
+            chunk_index: i,
+            total_chunks: chunks.length,
+            original_doc_id: doc.id,
+            is_chunk: true
           });
-          stats.indexedChunks++;
+          result.vectors.push(vectorData);
         }
       }
     } else {
+      result.docLength = docContent.length;
+      result.chunkCount = 1;
       const embedding = await embeddingManager.generateEmbedding(docContent);
       if (embedding) {
-        const contentPreview = docContent.length > 200 ? docContent.substring(0, 200) + '...' : docContent;
-
-        result.vectors.push({
-          docId: doc.id,
-          content: docContent,
-          metadata: {
-            ...metadata,
-            block_id: doc.id,
-            content_preview: contentPreview
-          }
+        const vectorData = createVectorData(doc.id, docContent, {
+          ...metadata,
+          block_id: doc.id
         });
-        stats.indexedChunks++;
+        result.vectors.push(vectorData);
       }
     }
 
-    stats.indexedDocs++;
     return result;
   } catch (error) {
-    stats.addError(doc.id, error.message);
-    return { vectors: [], skipped: false, docId: doc.id, originalDocId: doc.id };
+    throw error;
   }
 }
 
@@ -272,6 +277,47 @@ async function fetchPathInfo(connector, docId) {
 }
 
 /**
+ * 轻量级检查文档是否需要索引
+ * @param {Object} doc - 文档对象
+ * @param {SiyuanConnector} connector - Siyuan 连接器
+ * @param {Object} config - 配置对象
+ * @returns {Promise<Object>} { needsIndex: boolean, docInfo: Object }
+ */
+async function checkDocumentNeedsIndex(doc, connector, config) {
+  try {
+    const embeddingConfig = config?.embedding || {};
+    const maxContentLength = embeddingConfig.maxContentLength;
+
+    const content = await connector.request('/api/export/exportMdContent', { id: doc.id });
+    if (!content?.content) {
+      return { needsIndex: false, docInfo: { ...doc, length: 0, chunks: 0, skip: true, skipReason: '无法获取文档内容' } };
+    }
+
+    const docContent = content.content.trim();
+    if (!docContent) {
+      return { needsIndex: false, docInfo: { ...doc, length: 0, chunks: 0, skip: true, skipReason: '文档内容为空' } };
+    }
+
+    const docInfo = {
+      ...doc,
+      length: docContent.length,
+      chunks: docContent.length > maxContentLength ? 0 : 1,
+      updated: doc.updated ? doc.updated * 1000 : Date.now(),
+      skip: false
+    };
+
+    const pathInfo = await fetchPathInfo(connector, doc.id);
+    const notebookId = doc.box || pathInfo?.box || pathInfo?.notebook || '';
+    docInfo.notebookId = notebookId;
+    docInfo.box = notebookId;
+
+    return { needsIndex: true, docInfo };
+  } catch (error) {
+    return { needsIndex: false, docInfo: { ...doc, length: 0, chunks: 0, skip: true, skipReason: error.message } };
+  }
+}
+
+/**
  * 检查文档是否应该跳过索引
  * @param {Object} attrs - 文档属性 { tags: [], _raw: {} }
  * @param {string[]} skipIndexAttrs - 跳过索引的属性名列表
@@ -300,11 +346,19 @@ function shouldSkipIndex(attrs, skipIndexAttrs) {
  * @param {Object} config - 配置对象
  * @returns {Promise<string[]>} 分块内容数组
  */
-async function fetchDocumentChunks(connector, docId, fallbackContent = null, config = {}) {
+async function fetchDocumentChunks(connector, docId, fallbackContent = null, config = {}, depth = 0) {
   const chunks = [];
   const embeddingConfig = config?.embedding || {};
-  const maxChunkLength = embeddingConfig.maxChunkLength || 800;
-  const minChunkLength = embeddingConfig.minChunkLength || 200;
+  const maxChunkLength = embeddingConfig.maxChunkLength;
+  const minChunkLength = embeddingConfig.minChunkLength;
+  const maxDepth = embeddingConfig.maxDepth;
+
+  // 防止无限递归
+  if (depth > maxDepth) {
+    console.warn(`文档 ${docId} 超过最大递归深度 ${maxDepth}`);
+    if (fallbackContent) chunks.push(fallbackContent);
+    return chunks;
+  }
 
   try {
     const childBlocks = await connector.request('/api/block/getChildBlocks', { id: docId });
@@ -323,7 +377,7 @@ async function fetchDocumentChunks(connector, docId, fallbackContent = null, con
 
       // 子文档块递归处理
       if (block.type === 'd') {
-        const subChunks = await fetchDocumentChunks(connector, block.id, null, config);
+        const subChunks = await fetchDocumentChunks(connector, block.id, null, config, depth + 1);
         subChunks.forEach(subChunk => chunks.push(subChunk));
         continue;
       }
@@ -341,6 +395,25 @@ async function fetchDocumentChunks(connector, docId, fallbackContent = null, con
     if (fallbackContent) chunks.push(fallbackContent);
   }
   return chunks;
+}
+
+/**
+ * 生成向量数据
+ * @param {string} docId - 文档ID
+ * @param {string} content - 内容
+ * @param {Object} metadata - 元数据
+ * @returns {Object} 向量数据
+ */
+function createVectorData(docId, content, metadata) {
+  const contentPreview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+  return {
+    docId,
+    content,
+    metadata: {
+      ...metadata,
+      content_preview: contentPreview
+    }
+  };
 }
 
 /**
@@ -399,21 +472,43 @@ async function getAllDocs(connector, notebookId) {
  * 通过文档ID获取文档列表
  * @param {SiyuanConnector} connector - Siyuan 连接器
  * @param {string[]} docIds - 文档ID列表
+ * @param {Object} config - 配置对象（用于白名单检查）
  * @returns {Promise<Array>} 文档列表
  */
-async function getDocsByIds(connector, docIds) {
+async function getDocsByIds(connector, docIds, config = null) {
   const docs = [];
   for (const docId of docIds) {
     try {
       const docInfo = await connector.request('/api/block/getBlockInfo', { id: docId });
       if (docInfo) {
-        docs.push({
+        let notebookId = docInfo.box || '';
+        if (!notebookId) {
+          try {
+            const pathInfo = await connector.request('/api/filetree/getPathByID', { id: docId });
+            notebookId = pathInfo?.box || pathInfo?.notebook || '';
+          } catch (e) {
+            // 忽略错误，使用空字符串
+          }
+        }
+        
+        const doc = {
           id: docId,
           name: docInfo.rootTitle || docId,
-          box: docInfo.box || '',
+          box: notebookId,
           path: docInfo.path || '',
           updated: docInfo.updated
-        });
+        };
+        
+        if (config && notebookId) {
+          try {
+            checkPermission(config, notebookId);
+            docs.push(doc);
+          } catch (e) {
+            // 跳过不在白名单中的文档，不输出
+          }
+        } else {
+          docs.push(doc);
+        }
       }
     } catch (error) {
       console.warn(`获取文档 ${docId} 失败:`, error.message);
@@ -459,83 +554,6 @@ async function cleanOrphanedIndices(vectorManager, siyuanDocIds, notebookId = nu
     return orphanedDocIds.length;
   }
   return 0;
-}
-
-/**
- * 增量索引：清理孤立索引 + 检查更新 + 清理跳过文档的索引
- * @param {Object} params - 参数对象
- * @param {Array} documentResults - 文档索引结果列表
- * @param {SiyuanConnector} connector - Siyuan 连接器
- * @param {VectorManager} vectorManager - 向量管理器
- * @returns {Promise<Object>} { skippedCount, cleanedCount, docsNeedIndex }
- */
-async function processIncrementalIndex(params, documentResults, connector, vectorManager) {
-  const { notebookId } = params;
-  let skippedCount = 0;
-  let cleanedCount = 0;
-
-  console.log('增量索引模式：检查文档更新状态...');
-
-  // 跳过索引的文档
-  const skippedDocIds = documentResults
-    .filter(r => r.skipped)
-    .map(r => r.docId);
-  const skippedDocIdSet = new Set(skippedDocIds);
-
-  // 清理跳过索引文档的旧索引
-  if (skippedDocIds.length > 0) {
-    console.log(`清理 ${skippedDocIds.length} 个跳过索引文档的旧索引...`);
-    await vectorManager.deleteDocumentsWithChunks(skippedDocIds);
-    cleanedCount += skippedDocIds.length;
-  }
-
-  // 获取需要索引的文档（未跳过的）
-  const docsToIndex = documentResults.filter(r => !r.skipped);
-  const originalDocIds = new Set(docsToIndex.map(d => d.originalDocId || d.docId));
-
-  if (originalDocIds.size === 0) {
-    return { skippedCount, cleanedCount, docsNeedIndex: [] };
-  }
-
-  // 清理孤立索引（只在索引笔记本或全部文档时执行）
-  if (!params.docIds || params.docIds.length === 0) {
-    const orphanedCount = await cleanOrphanedIndices(vectorManager, originalDocIds, notebookId);
-    cleanedCount += orphanedCount;
-  }
-
-  // 获取已索引文档的更新时间，找出需要更新的文档
-  const indexedUpdateTimes = await vectorManager.getIndexedDocumentsUpdateTime(Array.from(originalDocIds));
-  const originalDocsNeedUpdate = new Set();
-
-  for (const docId of originalDocIds) {
-    const indexedTime = indexedUpdateTimes.get(docId);
-    const docResult = docsToIndex.find(d => (d.originalDocId || d.docId) === docId && d.vectors.length > 0);
-    const docTime = docResult?.vectors[0]?.metadata?.updated || 0;
-    if (!indexedTime || docTime > indexedTime) {
-      originalDocsNeedUpdate.add(docId);
-    }
-  }
-
-  // 删除需要更新的文档的旧索引（包括分块）
-  if (originalDocsNeedUpdate.size > 0) {
-    console.log(`删除 ${originalDocsNeedUpdate.size} 个已更新文档的旧索引（含分块）...`);
-    await vectorManager.deleteDocumentsWithChunks(Array.from(originalDocsNeedUpdate));
-  }
-
-  // 分区：需要更新的文档 vs 未变化的文档
-  const docsNeedIndex = [];
-  for (const docResult of docsToIndex) {
-    const originalId = docResult.originalDocId || docResult.docId;
-    if (originalDocsNeedUpdate.has(originalId)) {
-      docsNeedIndex.push(docResult);
-    } else {
-      skippedCount += docResult.vectors.length;
-    }
-  }
-
-  console.log(`发现 ${originalDocsNeedUpdate.size} 个原始文档需要更新，跳过 ${skippedCount} 个未变化的文档/分块`);
-
-  return { skippedCount, cleanedCount, docsNeedIndex };
 }
 
 /**
@@ -666,7 +684,7 @@ async function main() {
     // 获取文档列表（只处理白名单笔记本）
     let docs = [];
     if (params.docIds && params.docIds.length > 0) {
-      docs = await getDocsByIds(connector, params.docIds);
+      docs = await getDocsByIds(connector, params.docIds, config);
     } else if (params.notebook) {
       // 检查笔记本权限
       try {
@@ -690,7 +708,7 @@ async function main() {
           const notebookDocs = await getAllDocs(connector, notebook.id);
           docs.push(...notebookDocs);
         } catch (e) {
-          console.log(`跳过笔记本 ${notebook.name} (${notebook.id}): 不在白名单中`);
+          // 跳过不在白名单中的笔记本，不输出
         }
       }
     }
@@ -714,91 +732,133 @@ async function main() {
       await deleteExistingIndices(vectorManager, params);
     }
 
-    // 处理所有文档
-    const documentResults = [];
-    for (let i = 0; i < docs.length; i++) {
-      const doc = docs[i];
-
-      if ((i + 1) % 10 === 0 || i === docs.length - 1) {
-        console.error(`进度: ${i + 1}/${docs.length} 文档已处理`);
-      }
-
-      const result = await indexDocument(doc, connector, embeddingManager, vectorManager, config, stats);
-      documentResults.push(result);
-    }
-
+    // 增量索引：先检查哪些文档需要更新
+    let docsToProcess = [];
     let skippedCount = 0;
     let cleanedCount = 0;
-    let docsNeedIndex = [];
 
-    if (params.force) {
-      // 强制重建：索引所有文档
-      docsNeedIndex = documentResults;
-      // 跳过索引的文档不计入
-      skippedCount = documentResults.filter(r => r.skipped).length;
+    if (!params.force) {
+      console.error('检查文档更新状态...');
+
+      const allDocInfos = await Promise.all(
+        docs.map(doc => checkDocumentNeedsIndex(doc, connector, config))
+      );
+
+      const docIds = allDocInfos.filter(d => d.needsIndex).map(d => d.docInfo.id);
+      const indexedUpdateTimes = await vectorManager.getIndexedDocumentsUpdateTime(docIds);
+
+      for (const { needsIndex, docInfo } of allDocInfos) {
+        if (!needsIndex || docInfo.skip) {
+          skippedCount++;
+          continue;
+        }
+
+        const indexedTime = indexedUpdateTimes.get(docInfo.id) || 0;
+        if (docInfo.updated > indexedTime) {
+          docsToProcess.push(docInfo);
+        } else {
+          skippedCount++;
+        }
+      }
+
+      console.error(`发现 ${docsToProcess.length} 个文档需要更新，跳过 ${skippedCount} 个未变化文档`);
+
+      const siyuanDocIds = new Set(docs.map(d => d.id));
+      cleanedCount = await cleanOrphanedIndices(vectorManager, siyuanDocIds, params.notebook || null);
+
+      if (docsToProcess.length === 0) {
+        console.log(JSON.stringify({
+          success: true,
+          indexed: 0,
+          skipped: skippedCount,
+          cleaned: 0,
+          message: '所有文档已是最新，无需重新索引'
+        }, null, 2));
+        process.exit(0);
+      }
     } else {
-      // 增量索引：检查更新、清理孤立索引
-      const incrementalResult = await processIncrementalIndex(params, documentResults, connector, vectorManager);
-      skippedCount = incrementalResult.skippedCount;
-      cleanedCount = incrementalResult.cleanedCount;
-      docsNeedIndex = incrementalResult.docsNeedIndex;
+      docsToProcess = docs;
     }
 
-    if (docsNeedIndex.length === 0) {
-      console.log(JSON.stringify({
-        success: true,
-        indexed: 0,
-        skipped: skippedCount,
-        cleaned: cleanedCount,
-        message: skippedCount > 0 ? `跳过 ${skippedCount} 个未变化的文档` : '所有文档已是最新，无需重新索引'
-      }, null, 2));
-      process.exit(0);
-    }
-
-    // 收集所有需要索引的向量
-    const allVectors = [];
-    for (const docResult of docsNeedIndex) {
-      allVectors.push(...docResult.vectors);
-    }
-
-    console.log(`开始索引 ${allVectors.length} 个向量...`);
-
-    // 批量存储向量
-    const batchSize = params.batchSize || config.embedding?.batchSize || 5;
+    // 创建索引队列，并发数由配置控制
+    const indexConcurrency = config.embedding?.indexConcurrency || 2;
+    const indexQueue = new ConcurrentQueue(indexConcurrency);
     let indexedCount = 0;
-    let errors = [];
+    const indexErrors = [];
+    const totalDocs = docsToProcess.length;
+    let processedDocs = 0;
 
-    for (let i = 0; i < allVectors.length; i += batchSize) {
-      const batch = allVectors.slice(i, i + batchSize);
-      const result = await vectorManager.indexBatch(batch);
-      
-      if (result.success) {
-        indexedCount += result.indexed || batch.length;
-      } else {
-        errors.push({
-          batch: Math.floor(i / batchSize),
-          message: result.message || '索引失败'
+    // 处理文档并立即将索引任务加入队列
+    for (let i = 0; i < docsToProcess.length; i++) {
+      const doc = docsToProcess[i];
+
+      try {
+        const result = await indexDocument(doc, connector, embeddingManager, vectorManager, config);
+        processedDocs++;
+
+        const length = result.docLength || 0;
+        const chunks = result.chunkCount || 1;
+        console.error(`${doc.name} (${processedDocs}/${totalDocs}) - ${length}字符/${chunks}块`);
+
+        if (result.vectors.length > 0) {
+          indexQueue.add(async () => {
+            try {
+              const batchResult = await vectorManager.indexBatch(result.vectors);
+              if (batchResult.success) {
+                const indexed = batchResult.indexed || result.vectors.length;
+                indexedCount += indexed;
+                stats.addIndexed(indexed);
+              } else {
+                indexErrors.push({
+                  doc: doc.name,
+                  message: batchResult.message || '索引失败'
+                });
+                stats.addError(doc.id, batchResult.message || '索引失败');
+              }
+            } catch (error) {
+              indexErrors.push({
+                doc: doc.name,
+                message: error.message
+              });
+              stats.addError(doc.id, error.message);
+            }
+          });
+        } else if (!result.skipped) {
+          stats.skipDoc();
+        }
+      } catch (error) {
+        processedDocs++;
+        stats.addError(doc.id, error.message);
+        indexErrors.push({
+          doc: doc.name,
+          message: error.message
         });
+        console.error(`${doc.name} (${processedDocs}/${totalDocs}) - 处理失败: ${error.message}`);
       }
     }
+    console.error('文档处理完成，等待索引队列...');
 
-    // 构建返回结果
+    await indexQueue.waitForAll();
+
     const messages = [];
-    if (indexedCount > 0) messages.push(`成功索引 ${indexedCount} 个向量`);
+    if (stats.indexedDocs > 0) messages.push(`成功索引 ${stats.indexedDocs} 个文档 (${stats.indexedChunks} 个向量)`);
     if (cleanedCount > 0) messages.push(`清理 ${cleanedCount} 个孤立索引`);
-    if (skippedCount > 0) messages.push(`跳过 ${skippedCount} 个未变化的文档/分块`);
+    if (skippedCount > 0) messages.push(`跳过 ${skippedCount} 个未变化的文档`);
+    if (stats.failedDocs > 0) messages.push(`${stats.failedDocs} 个文档处理失败`);
 
     console.log(JSON.stringify({
-      success: errors.length === 0,
-      indexed: indexedCount,
+      success: indexErrors.length === 0,
+      indexedDocs: stats.indexedDocs,
+      indexedChunks: stats.indexedChunks,
       skipped: skippedCount,
       cleaned: cleanedCount,
-      total: allVectors.length + skippedCount,
-      errors: errors.length > 0 ? errors : undefined,
+      failed: stats.failedDocs,
+      total: stats.indexedDocs + skippedCount + stats.failedDocs,
+      errors: indexErrors.length > 0 ? indexErrors : undefined,
       message: messages.length > 0 ? messages.join('，') : '索引完成'
     }, null, 2));
 
-    process.exit(errors.length === 0 ? 0 : 1);
+    process.exit(indexErrors.length === 0 ? 0 : 1);
   } catch (error) {
     console.error('执行失败:', error.message);
     console.log(JSON.stringify({

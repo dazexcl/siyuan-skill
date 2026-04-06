@@ -27,9 +27,9 @@ class EmbeddingManager {
     this.model = config.model || 'nomic-embed-text';
     this.dimension = config.dimension || 768;
     this.baseUrl = config.baseUrl || null;
-    this.maxContentLength = config.maxContentLength || 1000;
-    this.maxChunkLength = config.maxChunkLength || 800;
-    this.minChunkLength = config.minChunkLength || 200;
+    this.maxContentLength = config.maxContentLength;
+    this.maxChunkLength = config.maxChunkLength;
+    this.minChunkLength = config.minChunkLength;
     this.initialized = false;
     this.modelInfo = null;
     this.tokenizer = new ChineseTokenizer();

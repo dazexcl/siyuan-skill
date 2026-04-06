@@ -43,8 +43,8 @@
 | `OLLAMA_EMBED_MODEL` | Embedding 模型 | `nomic-embed-text` |
 | `EMBEDDING_DIMENSION` | 向量维度 | `768` |
 | `EMBEDDING_BATCH_SIZE` | 批处理大小 | `5` |
-| `SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH` | 触发分块的内容长度阈值 | `4000` |
-| `SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH` | 单个分块最大长度 | `4000` |
+| `SIYUAN_EMBEDDING_MAX_CONTENT_LENGTH` | 触发分块的内容长度阈值 | `1000` |
+| `SIYUAN_EMBEDDING_MAX_CHUNK_LENGTH` | 单个分块最大长度 | `800` |
 | `SIYUAN_EMBEDDING_MIN_CHUNK_LENGTH` | 单个分块最小长度 | `200` |
 | `SIYUAN_SKIP_INDEX_ATTRS` | 跳过索引的属性名列表 | `""` |
 | `HYBRID_DENSE_WEIGHT` | 语义搜索权重 | `0.7` |
