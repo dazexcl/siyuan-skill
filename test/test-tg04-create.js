@@ -80,7 +80,7 @@ console.log('测试用例:');
             ctx.addResult('TG-04-002', '文档下创建子文档', cmd, '返回新文档ID',
                 '创建失败', false, result.error || result.output.substring(0, 100));
         } else {
-            ctx.createdDocs.push({ id: docId, title: childTitle, testId: 'TG-04-002' });
+            ctx.createdDocs.push({ id: docId, title: childTitle, isChild: true, testId: 'TG-04-002' });
             
             const verify = verifyDocContent(docId, childContent);
             const parentMatch = result.output.includes(`"parentId": "${parentId}"`);
@@ -115,6 +115,11 @@ console.log('测试用例:');
         ctx.addResult('TG-04-003', '路径模式-完整路径', cmd, '自动创建中间目录',
             '创建失败', false, result.error || result.output.substring(0, 100));
     } else {
+        const intermediateDirs = ctx.extractIntermediateDirectories(result.output);
+        intermediateDirs.forEach((dirId, index) => {
+            const dirTitle = index === 0 ? `TG-04-003-中间目录-${timestamp}` : `TG-04-003-中间目录-L${index + 1}-${timestamp}`;
+            ctx.createdDocs.push({ id: dirId, title: dirTitle, isChild: false, testId: 'TG-04-003' });
+        });
         ctx.createdDocs.push({ id: docId, title: `TG-04-003-最终文档-${timestamp}`, isChild: true, testId: 'TG-04-003' });
         
         const verify = verifyDocContent(docId, content);
@@ -147,6 +152,10 @@ console.log('测试用例:');
         ctx.addResult('TG-04-004', '路径模式-自定义标题', cmd, '标题被正确设置',
             '创建失败', false, result.error || result.output.substring(0, 100));
     } else {
+        const intermediateDirs = ctx.extractIntermediateDirectories(result.output);
+        intermediateDirs.forEach((dirId) => {
+            ctx.createdDocs.push({ id: dirId, title: customTitle, isChild: false, testId: 'TG-04-004' });
+        });
         ctx.createdDocs.push({ id: docId, title: customTitle + '-final', isChild: true, testId: 'TG-04-004' });
         
         const actualTitle = ctx.getDocTitle(docId);
@@ -182,6 +191,10 @@ console.log('测试用例:');
         ctx.addResult('TG-04-005', 'Directory creation', cmd, 'Create in specified directory',
             'Creation failed', false, result.error || result.output.substring(0, 100));
     } else {
+        const intermediateDirs = ctx.extractIntermediateDirectories(result.output);
+        intermediateDirs.forEach((dirId) => {
+            ctx.createdDocs.push({ id: dirId, title: dirTitle, isChild: false, testId: 'TG-04-005' });
+        });
         ctx.createdDocs.push({ id: docId, title, isChild: true, testId: 'TG-04-005' });
         
         const verify = verifyDocContent(docId, content);
@@ -275,6 +288,10 @@ console.log('测试用例:');
         ctx.addResult('TG-04-008', '多级嵌套路径', cmd, '应创建3级目录结构',
             '创建失败', false, result.error || result.output.substring(0, 100));
     } else {
+        const intermediateDirs = ctx.extractIntermediateDirectories(result.output);
+        if (intermediateDirs.length > 0) {
+            ctx.createdDocs.push({ id: intermediateDirs[0], title: level1, isChild: false, testId: 'TG-04-008' });
+        }
         ctx.createdDocs.push({ id: docId, title, isChild: true, testId: 'TG-04-008' });
 
         const verify = verifyDocContent(docId, content);
@@ -449,7 +466,7 @@ console.log('测试用例:');
                 if (testResult.success) {
                     const testDocId = ctx.extractDocId(testResult.output);
                     if (testDocId) {
-                        ctx.createdDocs.push({ id: testDocId, title: `TG-04-013-TestDoc-${timestamp}`, testId: 'TG-04-013' });
+                        ctx.createdDocs.push({ id: testDocId, title: `TG-04-013-TestDoc-${timestamp}`, isChild: true, testId: 'TG-04-013' });
                         ctx.addResult('TG-04-013', 'ContentBlockID verification', testCmd, 'Allow content block ID as parent',
                             'Success', true, `Correctly accepted content block ID: ${blockId}`);
                     } else {
@@ -576,15 +593,8 @@ console.log('测试用例:');
     }
 }
 
-// 清理
-ctx.cleanup();
-
 // 保存报告
 ctx.saveReports('TG-04-create', 'TG-04 文档创建测试报告');
 
-console.log('\n----------------------------------------');
-console.log('测试残留检查');
-console.log('----------------------------------------');
-console.log('应剩余: 0');
-console.log('实际剩余: 0');
-console.log('需要手动删除: 否');
+// 清理 - 使用框架提供的清理函数，会自动检测根文档模式
+ctx.cleanup();

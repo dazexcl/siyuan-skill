@@ -94,8 +94,6 @@ class ConfigManager {
         enable: false,
         rerankTopK: 50,
         rerankWeight: 0.5,
-        cacheEnabled: true,
-        cacheSize: 1000,
         batchSize: 10,
         preserveOriginalScore: true,
         enableSegmentRerank: true
@@ -297,10 +295,17 @@ class ConfigManager {
     // 删除保护配置
     if (process.env.SIYUAN_DELETE_SAFE_MODE !== undefined || 
         process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION !== undefined) {
-      envConfig.deleteProtection = {
-        safeMode: process.env.SIYUAN_DELETE_SAFE_MODE !== 'false',
-        requireConfirmation: process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION === 'true'
-      };
+      const deleteProtection = { ...this.defaultConfig.deleteProtection };
+      
+      if (process.env.SIYUAN_DELETE_SAFE_MODE !== undefined) {
+        deleteProtection.safeMode = process.env.SIYUAN_DELETE_SAFE_MODE !== 'false';
+      }
+      
+      if (process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION !== undefined) {
+        deleteProtection.requireConfirmation = process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION === 'true';
+      }
+      
+      envConfig.deleteProtection = deleteProtection;
     }
     
     // TLS 安全配置
@@ -320,8 +325,6 @@ class ConfigManager {
         enable: process.env.RERANK_ENABLE === 'true',
         rerankTopK: parseInt(process.env.RERANK_TOP_K, 10) || this.defaultConfig.rerank.rerankTopK,
         rerankWeight: parseFloat(process.env.RERANK_WEIGHT) || this.defaultConfig.rerank.rerankWeight,
-        cacheEnabled: process.env.RERANK_CACHE_ENABLED !== 'false',
-        cacheSize: parseInt(process.env.RERANK_CACHE_SIZE, 10) || this.defaultConfig.rerank.cacheSize,
         batchSize: parseInt(process.env.RERANK_BATCH_SIZE, 10) || this.defaultConfig.rerank.batchSize,
         preserveOriginalScore: process.env.RERANK_PRESERVE_ORIGINAL_SCORE !== 'false'
       };
@@ -473,10 +476,6 @@ class ConfigManager {
         rerankWeight: typeof validatedConfig.rerank.rerankWeight === 'number'
           ? Math.max(0, Math.min(validatedConfig.rerank.rerankWeight, 1))
           : this.defaultConfig.rerank.rerankWeight,
-        cacheEnabled: validatedConfig.rerank.cacheEnabled ?? this.defaultConfig.rerank.cacheEnabled,
-        cacheSize: typeof validatedConfig.rerank.cacheSize === 'number' && validatedConfig.rerank.cacheSize > 0
-          ? Math.min(validatedConfig.rerank.cacheSize, 10000)
-          : this.defaultConfig.rerank.cacheSize,
         batchSize: typeof validatedConfig.rerank.batchSize === 'number' && validatedConfig.rerank.batchSize > 0
           ? Math.min(validatedConfig.rerank.batchSize, 50)
           : this.defaultConfig.rerank.batchSize,
@@ -499,6 +498,8 @@ class ConfigManager {
    * @returns {Object} 当前配置
    */
   getConfig() {
+    // 每次获取配置时都重新加载，以支持环境变量的动态变化
+    this.config = this.loadConfig();
     return { ...this.config };
   }
   

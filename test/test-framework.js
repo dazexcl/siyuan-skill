@@ -16,6 +16,9 @@ const REAL_NOTEBOOK_ID = process.env.SIYUAN_DEFAULT_NOTEBOOK || config.defaultNo
 const NOTEBOOK_ID = REAL_NOTEBOOK_ID;
 const PARENT_ID = process.env.TEST_ROOT_DOC_ID || REAL_NOTEBOOK_ID;
 
+// 根文档模式：由 run-all-tests.js 统一管理文档清理
+const IS_ROOT_DOC_MODE = !!process.env.TEST_ROOT_DOC_ID;
+
 /**
  * 将命令字符串解析为参数数组（支持双引号、单引号）
  * 避免通过 shell 执行导致换行符等特殊字符破坏参数边界
@@ -129,9 +132,9 @@ function runCmd(cmd) {
         const scriptPath = path.join(SIYUAN_SKILL_DIR, 'scripts', scriptFile);
         
         const output = execFileSync('node', [scriptPath, ...commandArgs], {
-            encoding: 'utf-8',
+            encoding: 'utf8',
             timeout: 60000,
-            env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' },
+            env: { ...process.env }, // 确保所有环境变量都被传递
             cwd: SIYUAN_SKILL_DIR,
             stdio: ['pipe', 'pipe', 'pipe']
         });
@@ -168,6 +171,18 @@ function runCmd(cmd) {
     function extractDocId(output) {
         const match = output.match(/"id"\s*:\s*"([^"]+)"/);
         return match ? match[1] : null;
+    }
+    
+    /**
+     * 从输出提取中间目录ID列表
+     */
+    function extractIntermediateDirectories(output) {
+        const match = output.match(/"intermediateDirectories"\s*:\s*\[([\s\S]*?)\]/);
+        if (!match) return [];
+        
+        const arrayContent = match[1];
+        const idMatches = arrayContent.match(/"([a-z0-9-]+)"/g);
+        return idMatches ? idMatches.map(id => id.replace(/"/g, '')) : [];
     }
     
     /**
@@ -384,16 +399,50 @@ ${r.details ? `- 详情: ${r.details}` : ''}`;
         console.log(`清理了 ${rootDocsOnly.length} 个根文档（子文档自动级联删除）`);
     }
     
+    /**
+     * 设置环境变量
+     * @param {Object} envVars - 环境变量对象
+     */
+    function setEnv(envVars) {
+        const savedVars = {};
+        for (const [key, value] of Object.entries(envVars)) {
+            savedVars[key] = process.env[key];
+            if (value !== null && value !== undefined) {
+                process.env[key] = String(value);
+            } else {
+                delete process.env[key];
+            }
+        }
+        return savedVars;
+    }
+    
+    /**
+     * 恢复环境变量
+     * @param {Object} savedVars - 保存的环境变量
+     */
+    function restoreEnv(savedVars) {
+        for (const [key, value] of Object.entries(savedVars)) {
+            if (value !== null && value !== undefined) {
+                process.env[key] = value;
+            } else {
+                delete process.env[key];
+            }
+        }
+    }
+
     return {
         runCmd,
         addResult,
         extractDocId,
+        extractIntermediateDirectories,
         getDocTitle,
         getDocPath,
         buildPath,
         sleep,
         saveReports,
         cleanup,
+        setEnv,
+        restoreEnv,
         results,
         createdDocs,
         executionLog,

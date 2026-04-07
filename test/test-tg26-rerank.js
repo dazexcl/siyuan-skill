@@ -155,7 +155,7 @@ const skipReason = '需要配置 Qdrant 和嵌入服务';
         } else {
             const hasRerankInfo = data.rerank && data.rerank.enabled === true;
             const hasRerankScores = data.blocks.some(block => 
-                block.rerankScore !== undefined && block.rerankScore !== null
+                block.scores && block.scores.rerank !== undefined && block.scores.rerank !== null
             );
             const valid = hasRerankInfo && hasRerankScores;
             addResult('TG-26-01', '基本重排功能', cmd, '重排功能正常工作',
@@ -216,16 +216,17 @@ const skipReason = '需要配置 Qdrant 和嵌入服务';
         } else {
             const hasRerankInfo = data.rerank && data.rerank.enabled === true;
             const hasBothScores = data.blocks.some(block =>
-                block.rerankScore !== undefined &&
-                block.rerankScore !== null &&
-                block.originalScore !== undefined &&
+                block.scores &&
+                block.scores.rerank !== undefined &&
+                block.scores.rerank !== null &&
+                block.scores.vector !== undefined &&
                 block.score !== undefined
             );
             const hasScoreCalculated = data.blocks.some(block => {
-                if (block.score === undefined || block.originalScore === undefined || block.rerankScore === undefined) {
+                if (!block.scores || block.score === undefined || block.scores.vector === undefined || block.scores.rerank === undefined) {
                     return false;
                 }
-                const expectedScore = block.originalScore * 0.3 + block.rerankScore * 0.7;
+                const expectedScore = block.scores.vector * 0.3 + block.scores.rerank * 0.7;
                 return Math.abs(block.score - expectedScore) < 0.01;
             });
             const valid = hasRerankInfo && hasBothScores;
@@ -236,29 +237,29 @@ const skipReason = '需要配置 Qdrant 和嵌入服务';
     }
 }
 
-// TG-26-04: 禁用缓存测试
+// TG-26-04: 缓存已移除，测试重排基本功能
 {
-    const cmd = 'search "人工智能" --mode hybrid --enable-rerank --rerank-no-cache --limit 5';
+    const cmd = 'search "人工智能" --mode hybrid --enable-rerank --limit 5';
     const result = runCmd(cmd);
     
     if (!result.success) {
-        addResult('TG-26-04', '禁用缓存测试', cmd, '正确禁用重排缓存',
+        addResult('TG-26-04', '重排基本功能', cmd, '重排功能正常工作',
             '命令执行失败', false, result.error);
     } else {
         const data = parseSearchResult(result.output);
         if (!data) {
-            addResult('TG-26-04', '禁用缓存测试', cmd, '正确禁用重排缓存',
+            addResult('TG-26-04', '重排基本功能', cmd, '重排功能正常工作',
                 '无法解析结果', false, 'JSON解析失败');
         } else if (data.error) {
-            addResult('TG-26-04', '禁用缓存测试', cmd, '正确禁用重排缓存',
+            addResult('TG-26-04', '重排基本功能', cmd, '重排功能正常工作',
                 '返回错误', false, data.error);
         } else if (isDegradedToLegacy(data, 'hybrid')) {
-            addSkipResult('TG-26-04', '禁用缓存测试', cmd, 
+            addSkipResult('TG-26-04', '重排基本功能', cmd, 
                 `hybrid模式降级到legacy，${skipReason}`);
         } else {
             const hasRerankInfo = data.rerank && data.rerank.enabled === true;
             const valid = hasRerankInfo;
-            addResult('TG-26-04', '禁用缓存测试', cmd, '正确禁用重排缓存',
+            addResult('TG-26-04', '重排基本功能', cmd, '重排功能正常工作',
                 valid ? '成功' : '重排未启用', valid,
                 `重排启用: ${hasRerankInfo}`);
         }
@@ -357,11 +358,10 @@ const skipReason = '需要配置 Qdrant 和嵌入服务';
         } else {
             const hasRerankInfo = data.rerank && data.rerank.enabled === true;
             const hasRerankCount = data.rerank && typeof data.rerank.rerankCount === 'number';
-            const hasCacheStats = data.rerank && data.rerank.cacheStats !== undefined;
             const valid = hasRerankInfo && hasRerankCount;
             addResult('TG-26-07', '重排统计信息', cmd, '返回完整的重排统计信息',
                 valid ? '成功' : '统计信息不完整', valid,
-                `重排启用: ${hasRerankInfo}, 重排数: ${hasRerankCount}, 缓存统计: ${hasCacheStats}`);
+                `重排启用: ${hasRerankInfo}, 重排数: ${hasRerankCount}`);
         }
     }
 }
@@ -385,7 +385,7 @@ const skipReason = '需要配置 Qdrant 和嵌入服务';
         } else {
             const noRerankInfo = !data.rerank || data.rerank.enabled !== true;
             const noRerankScores = data.blocks.every(block => 
-                block.rerankScore === undefined || block.rerankScore === null
+                !block.scores || block.scores.rerank === undefined || block.scores.rerank === null
             );
             const valid = noRerankInfo && noRerankScores;
             addResult('TG-26-08', '不启用重排', cmd, '默认不启用重排',
@@ -419,8 +419,9 @@ const skipReason = '需要配置 Qdrant 和嵌入服务';
                 block.score !== undefined && block.score !== null
             );
             const hasBothScores = data.blocks.some(block => 
-                block.originalScore !== undefined && 
-                block.rerankScore !== undefined
+                block.scores &&
+                block.scores.vector !== undefined && 
+                block.scores.rerank !== undefined
             );
             const valid = hasFinalScore && hasBothScores;
             addResult('TG-26-09', '分数融合验证', cmd, '正确融合原始分数和重排分数',

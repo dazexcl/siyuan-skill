@@ -44,6 +44,43 @@
 
 > 📋 详细变更内容参见：[升级日志](CHANGELOG.md)
 
+### v2.1.0 检索功能统一优化
+
+**核心改进**：
+- **数据结构统一**：所有搜索模式（SQL/语义/混合/重排）返回统一格式
+- **字段命名标准化**：统一使用 `notebookId`，废弃 `box` 字段
+- **分数结构优化**：引入结构化 `scores` 对象，清晰展示各类分数
+- **顶层分数字段**：添加顶层 `score` 字段，方便快速访问主要分数
+- **新增 ScoreCalculator**：专门的分数计算类，统一分数计算逻辑
+- **搜索来源标识**：每个结果包含 `source` 字段（sql/vector/hybrid）
+
+**主要优势**：
+- 消除字段不一致问题，提高代码可维护性
+- 统一的分数结构，便于理解和扩展
+- 向后兼容，保留旧字段逐步迁移
+- 完善的单元测试，确保功能稳定性
+
+**数据结构示例**：
+```javascript
+{
+  id: "文档ID",
+  score: 0.6327913679999999,    // 顶层主要分数（方便访问）
+  notebookId: "笔记本ID",
+  content: "内容",
+  title: "标题",
+  source: "sql",                // 搜索来源
+  scores: {
+    relevance: 0.015687263556116014,  // 相关性分数
+    vector: 0.6327913679999999,       // 向量搜索分数（已组合）
+    sql: null,                         // SQL搜索分数
+    rerank: 0.85,                      // 重排分数
+    final: 0.83                        // 最终综合分数
+  }
+}
+```
+
+> 📋 详细使用指南：[向量搜索文档](references/advanced/vector-search.md) | [基础用法示例](examples/basic-usage.md)
+
 ## 运行要求
 
 | 要求          | 版本        | 说明                                   |
@@ -166,11 +203,19 @@ node scripts/search.js "查询内容" --mode semantic
 # 混合搜索
 node scripts/search.js "查询内容" --mode hybrid
 
+# 启用重排
+node scripts/search.js "查询内容" --mode hybrid --enable-rerank
+
+# 权重调整
+node scripts/search.js "查询内容" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
+
 # 向量索引
 node scripts/index.js
 node scripts/index.js --notebook <notebookId>
 node scripts/index.js --force
 ```
+
+> 📋 详细搜索说明：[向量搜索文档](references/advanced/vector-search.md)
 
 #### 属性与标签
 
@@ -277,6 +322,12 @@ node scripts/search.js "查询内容" --mode semantic
 - [安全文档](references/advanced/security.md) - 安全最佳实践
 - [最佳实践](references/advanced/best-practices.md) - 使用建议和技巧
 - [书写规范](references/advanced/writing-guide.md) - 内容书写规范
+
+### 功能文档
+
+- [向量搜索](references/advanced/vector-search.md) - 向量搜索配置和使用
+- [删除保护](references/advanced/delete-protection.md) - 删除保护机制说明
+- [使用指南](references/advanced/usage-guide.md) - 故障排除和安全审计
 
 ### API 参考
 

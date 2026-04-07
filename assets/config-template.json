@@ -43,8 +43,6 @@
     "enable": false,
     "rerankTopK": 50,
     "rerankWeight": 0.5,
-    "cacheEnabled": true,
-    "cacheSize": 1000,
     "batchSize": 10,
     "preserveOriginalScore": true
   }

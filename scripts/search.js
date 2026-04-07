@@ -38,7 +38,6 @@ const HELP_TEXT = `用法: search <query> [选项]
   --enable-rerank             启用嵌入重排
   --rerank-top-k <num>        重排前K个结果 (默认50)
   --rerank-weight <num>       重排分数权重 (默认0.5)
-  --rerank-no-cache           禁用重排缓存
   -h, --help                  显示帮助信息
 
 示例:
@@ -161,7 +160,6 @@ async function main() {
     const enableRerank = params.enableRerank || config.rerank?.enable || false;
     const rerankTopK = parseInt(params.rerankTopK) || config.rerank?.rerankTopK || 50;
     const rerankWeight = parseFloat(params.rerankWeight) || config.rerank?.rerankWeight || 0.5;
-    const rerankNoCache = params.rerankNoCache || false;
     const connector = new SiyuanConnector({
       baseURL: config.baseURL,
       token: config.token,
@@ -203,7 +201,6 @@ async function main() {
       enableRerank: enableRerank,
       rerankTopK: rerankTopK,
       rerankWeight: rerankWeight,
-      rerankNoCache: rerankNoCache,
       checkPermissionFn: (notebookId) => {
         try {
           checkPermission(config, notebookId);
@@ -220,23 +217,26 @@ async function main() {
     });
 
     const blocks = result.results.map(r => {
-      let score = r.relevanceScore || 0;
-      if (r.rerankScore !== undefined) {
-        score = r.rerankScore;
-      } else if (r.finalScore !== undefined) {
-        score = r.finalScore;
-      }
+      const scores = r.scores || {};
+      const finalScore = scores.final || scores.rerank || r.score || r.finalScore || r.relevanceScore || 0;
       
       return {
         id: r.id,
-        score: score,
-        relevanceScore: r.relevanceScore || 0,
-        rerankScore: r.rerankScore !== undefined ? r.rerankScore : null,
-        originalVectorScore: r.originalVectorScore !== undefined ? r.originalVectorScore : null,
-        originalSqlScore: r.originalSqlScore !== undefined ? r.originalSqlScore : null,
+        score: finalScore,
+        scores: {
+          relevance: scores.relevance || r.relevanceScore || 0,
+          vector: {
+            dense: scores.vector?.dense || r.denseScore || null,
+            sparse: scores.vector?.sparse || r.sparseScore || null,
+            combined: scores.vector?.combined || r.score || r.denseScore || r.sparseScore || null
+          },
+          sql: scores.sql || r.sqlScore || r.originalSqlScore || null,
+          rerank: scores.rerank || r.rerankScore || null,
+          final: finalScore
+        },
         content: r.content || r.excerpt || '',
         title: r.title || '',
-        notebookId: r.box || r.notebookId || '',
+        notebookId: r.notebookId || r.box || '',
         path: r.path || '',
         type: r.type || 'd',
         blockId: r.blockId,
@@ -263,8 +263,7 @@ async function main() {
     if (result.rerank && result.rerank.enabled) {
       outputData.rerank = {
         enabled: true,
-        rerankCount: result.rerank.rerankCount,
-        cacheStats: result.rerank.cacheStats
+        rerankCount: result.rerank.rerankCount
       };
     }
 

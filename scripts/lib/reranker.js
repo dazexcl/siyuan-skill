@@ -14,27 +14,23 @@ class Reranker {
    * @param {Object} options - 配置选项
    * @param {number} options.rerankTopK - 重排前K个结果
    * @param {number} options.rerankWeight - 重排分数权重 (0-1)
-   * @param {boolean} options.enableCache - 是否启用缓存
-   * @param {number} options.cacheSize - 缓存大小
    * @param {number} options.batchSize - 批量处理大小
    * @param {boolean} options.preserveOriginalScore - 是否保留原始分数
+   * @param {boolean} options.enableSegmentRerank - 是否启用分段重排
+   * @param {number} options.segmentMaxLength - 分段最大长度
+   * @param {number} options.segmentOverlap - 分段重叠长度
    */
   constructor(embeddingManager, options = {}) {
     this.embeddingManager = embeddingManager;
     this.rerankTopK = options.rerankTopK || 50;
     this.rerankWeight = options.rerankWeight || 0.5;
-    this.enableCache = options.enableCache !== false;
-    this.cacheSize = options.cacheSize || 1000;
     this.batchSize = options.batchSize || 10;
     this.preserveOriginalScore = options.preserveOriginalScore !== false;
     this.enableSegmentRerank = options.enableSegmentRerank !== false;
     this.segmentMaxLength = options.segmentMaxLength || 8000;
     this.segmentOverlap = options.segmentOverlap || 200;
 
-    this.cache = new Map();
     this.stats = {
-      cacheHits: 0,
-      cacheMisses: 0,
       totalReranks: 0,
       totalRerankTime: 0,
       segmentRerankCount: 0
@@ -226,41 +222,20 @@ class Reranker {
    * @returns {Promise<Array>} 嵌入向量
    */
   async generateCandidateEmbedding(candidate) {
-    const cacheKey = this.getCacheKey(candidate);
-    console.error(`检查缓存，key: ${cacheKey.substring(0, 20)}...，缓存启用: ${this.enableCache}`);
-
-    if (this.enableCache && this.cache.has(cacheKey)) {
-      console.error(`缓存命中！跳过生成`);
-      this.stats.cacheHits++;
-      return this.cache.get(cacheKey);
-    }
-
-    console.error(`缓存未命中，开始生成嵌入`);
-    this.stats.cacheMisses++;
+    console.error(`开始生成候选嵌入，ID: ${candidate.id}`);
 
     const content = this.extractContent(candidate);
     console.error(`提取内容类型: ${Array.isArray(content) ? `分段(${content.length}段)` : `单段(${content.length}字符)`}`);
 
     let embedding;
     if (Array.isArray(content)) {
-      // 多段内容，生成多个嵌入并融合
       this.stats.segmentRerankCount++;
       embedding = await this.generateMultiSegmentEmbedding(content);
     } else {
-      // 单段内容，使用带超时和截断的嵌入生成
       embedding = await this.generateEmbeddingWithTimeout(content);
     }
 
     console.error(`嵌入生成完成，维度: ${embedding.length}`);
-
-    if (this.enableCache) {
-      this.cache.set(cacheKey, embedding);
-      if (this.cache.size > this.cacheSize) {
-        const firstKey = this.cache.keys().next().value;
-        this.cache.delete(firstKey);
-      }
-    }
-
     return embedding;
   }
 
@@ -423,12 +398,10 @@ class Reranker {
       extractedContent = content;
     }
 
-    // 如果启用分段重排且内容超过最大长度，则进行分段
     if (this.enableSegmentRerank && extractedContent.length > this.segmentMaxLength) {
       return this.segmentContent(extractedContent);
     }
 
-    // 单段内容，直接返回字符串
     return extractedContent;
   }
 
@@ -498,74 +471,18 @@ class Reranker {
   }
 
   /**
-   * 生成缓存键
-   * @param {Object} candidate - 候选结果
-   * @returns {string} 缓存键
+   * 获取统计信息
+   * @returns {Object} 统计信息
    */
-  getCacheKey(candidate) {
-    if (!candidate) {
-      return '';
-    }
-
-    const id = candidate.id || candidate.originalId || '';
-    const content = this.extractContent(candidate);
-
-    // 处理分段内容的情况
-    let contentStr = '';
-    if (Array.isArray(content)) {
-      contentStr = content.join('');
-    } else {
-      contentStr = content;
-    }
-
-    const hash = this.simpleHash(id + contentStr.substring(0, 200));
-    return `${id}_${hash}`;
-  }
-
-  /**
-   * 简单的哈希函数
-   * @param {string} str - 输入字符串
-   * @returns {string} 哈希值
-   */
-  simpleHash(str) {
-    let hash = 0;
-    if (str.length === 0) return hash.toString();
-
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-
-    return Math.abs(hash).toString(36);
-  }
-
-  /**
-   * 清空缓存
-   */
-  clearCache() {
-    this.cache.clear();
-  }
-
-  /**
-   * 获取缓存统计信息
-   * @returns {Object} 缓存统计信息
-   */
-  getCacheStats() {
-    const totalRequests = this.stats.cacheHits + this.stats.cacheMisses;
-    const hitRate = totalRequests > 0 ? (this.stats.cacheHits / totalRequests * 100).toFixed(2) : 0;
+  getStats() {
     const avgRerankTime = this.stats.totalReranks > 0 
       ? (this.stats.totalRerankTime / this.stats.totalReranks).toFixed(2) 
       : 0;
 
     return {
-      size: this.cache.size,
-      maxSize: this.cacheSize,
-      hits: this.stats.cacheHits,
-      misses: this.stats.cacheMisses,
-      hitRate: `${hitRate}%`,
       totalReranks: this.stats.totalReranks,
-      avgRerankTime: `${avgRerankTime}ms`
+      avgRerankTime: `${avgRerankTime}ms`,
+      segmentRerankCount: this.stats.segmentRerankCount
     };
   }
 
@@ -574,10 +491,9 @@ class Reranker {
    */
   resetStats() {
     this.stats = {
-      cacheHits: 0,
-      cacheMisses: 0,
       totalReranks: 0,
-      totalRerankTime: 0
+      totalRerankTime: 0,
+      segmentRerankCount: 0
     };
   }
 }

@@ -5,6 +5,7 @@
  */
 
 const Reranker = require('./reranker');
+const ScoreCalculator = require('./score-calculator');
 
 /**
  * SearchManager 类
@@ -25,6 +26,108 @@ class SearchManager {
     this.config = config;
     this.concurrencyLimit = 5;
     this.batchSize = 10;
+    this.scoreCalculator = new ScoreCalculator(config?.scoreWeights || {});
+  }
+
+  /**
+   * 标准化搜索结果对象，统一字段格式
+   * @param {Object} result - 原始搜索结果
+   * @returns {Object} 标准化后的搜索结果
+   */
+  normalizeResult(result) {
+    if (!result || typeof result !== 'object') {
+      return result;
+    }
+
+    const normalized = {
+      ...result,
+      notebookId: result.notebookId || result.box || '',
+      _legacy_box: result.box || null,
+      source: result.source || this.determineSource(result),
+      vectorSearch: result.vectorSearch ?? this.isVectorResult(result),
+      isChunk: result.isChunk ?? false,
+      chunkIndex: result.chunkIndex ?? null,
+      totalChunks: result.totalChunks ?? null
+    };
+
+    if (!normalized.scores && (result.relevanceScore !== undefined || result.denseScore !== undefined || result.sparseScore !== undefined)) {
+      normalized.scores = this.createScoreObject(result);
+    } else if (!normalized.scores) {
+      normalized.scores = {
+        relevance: result.relevanceScore || 0,
+        vector: { dense: null, sparse: null, combined: 0 },
+        sql: null,
+        rerank: null,
+        final: result.relevanceScore || result.finalScore || 0
+      };
+    }
+
+    return normalized;
+  }
+
+  /**
+   * 判断结果是否来自向量搜索
+   * @param {Object} result - 搜索结果
+   * @returns {boolean} 是否为向量搜索结果
+   */
+  isVectorResult(result) {
+    return result.vectorSearch === true || 
+           result.denseScore !== undefined || 
+           result.sparseScore !== undefined ||
+           result.source === 'vector' ||
+           result.source === 'hybrid';
+  }
+
+  /**
+   * 确定搜索结果的来源
+   * @param {Object} result - 搜索结果
+   * @returns {string} 来源标识：sql/vector/hybrid/unknown
+   */
+  determineSource(result) {
+    if (result.source) {
+      return result.source;
+    }
+    
+    if (this.isVectorResult(result)) {
+      if (result.sqlScore !== undefined || result.sourceScore !== undefined) {
+        return 'hybrid';
+      }
+      return 'vector';
+    }
+    
+    if (result.sqlSearch !== false || result.box !== undefined) {
+      return 'sql';
+    }
+    
+    return 'unknown';
+  }
+
+  /**
+   * 创建分数对象
+   * @param {Object} result - 包含分数信息的结果对象
+   * @returns {Object} 标准化的分数对象
+   */
+  createScoreObject(result) {
+    return this.scoreCalculator.createScoreObject({
+      relevanceScore: result.relevanceScore || 0,
+      denseScore: result.denseScore || null,
+      sparseScore: result.sparseScore || null,
+      sqlScore: result.sqlScore || result.sourceScore || null,
+      rerankScore: result.rerankScore || null,
+      weights: this.config?.scoreWeights
+    });
+  }
+
+  /**
+   * 批量标准化搜索结果
+   * @param {Array} results - 搜索结果数组
+   * @returns {Array} 标准化后的结果数组
+   */
+  batchNormalizeResults(results) {
+    if (!Array.isArray(results)) {
+      return [];
+    }
+    return results.map(result => this.normalizeResult(result));
   }
 
   /**
@@ -200,7 +303,7 @@ class SearchManager {
       return searchResult;
     }
 
-    const { enableRerank, rerankTopK, rerankWeight, rerankNoCache, checkPermissionFn } = options;
+    const { enableRerank, rerankTopK, rerankWeight, checkPermissionFn } = options;
     if (enableRerank && this.vectorManager && this.vectorManager.embeddingManager) {
       try {
         const Reranker = require('./reranker');
@@ -210,7 +313,6 @@ class SearchManager {
           {
             rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
             rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
-            enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
             preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
             batchSize: rerankConfig.batchSize || 10,
             enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
@@ -237,8 +339,7 @@ class SearchManager {
           total: finalResults.length,
           rerank: {
             enabled: true,
-            rerankCount: finalResults.length,
-            cacheStats: reranker.getCacheStats()
+            rerankCount: finalResults.length
           }
         };
       } catch (error) {
@@ -308,8 +409,7 @@ class SearchManager {
       enableSQLFallback = true,
       enableRerank = false,
       rerankTopK = 50,
-      rerankWeight = 0.5,
-      rerankNoCache = false
+      rerankWeight = 0.5
     } = options;
 
     try {
@@ -398,7 +498,6 @@ class SearchManager {
             {
               rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
               rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
-              enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
               preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
               batchSize: rerankConfig.batchSize || 10,
               enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
@@ -432,8 +531,7 @@ class SearchManager {
 
           rerankInfo = {
             enabled: true,
-            rerankCount: finalResults.length,
-            cacheStats: reranker.getCacheStats()
+            rerankCount: finalResults.length
           };
         } catch (error) {
           console.warn('重排失败，使用原始结果:', error.message);
@@ -487,8 +585,7 @@ class SearchManager {
       checkPermissionFn,
       enableRerank = false,
       rerankTopK = 50,
-      rerankWeight = 0.5,
-      rerankNoCache = false
+      rerankWeight = 0.5
     } = options;
 
     try {
@@ -522,7 +619,6 @@ class SearchManager {
             {
               rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
               rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
-              enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
               preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
               batchSize: rerankConfig.batchSize || 10,
               enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
@@ -536,8 +632,7 @@ class SearchManager {
 
           rerankInfo = {
             enabled: true,
-            rerankCount: finalResults.length,
-            cacheStats: reranker.getCacheStats()
+            rerankCount: finalResults.length
           };
         } catch (error) {
           console.warn('重排失败，使用原始结果:', error.message);
@@ -581,8 +676,7 @@ class SearchManager {
       checkPermissionFn,
       enableRerank = false,
       rerankTopK = 50,
-      rerankWeight = 0.5,
-      rerankNoCache = false
+      rerankWeight = 0.5
     } = options;
 
     try {
@@ -615,7 +709,6 @@ class SearchManager {
             {
               rerankTopK: rerankTopK || rerankConfig.rerankTopK || 50,
               rerankWeight: rerankWeight !== undefined ? rerankWeight : (rerankConfig.rerankWeight || 0.5),
-              enableCache: rerankNoCache ? false : (rerankConfig.cacheEnabled !== false),
               preserveOriginalScore: rerankConfig.preserveOriginalScore !== false,
               batchSize: rerankConfig.batchSize || 10,
               enableSegmentRerank: rerankConfig.enableSegmentRerank !== false,
@@ -629,8 +722,7 @@ class SearchManager {
 
           rerankInfo = {
             enabled: true,
-            rerankCount: finalResults.length,
-            cacheStats: reranker.getCacheStats()
+            rerankCount: finalResults.length
           };
         } catch (error) {
           console.warn('重排失败，使用原始结果:', error.message);
@@ -716,17 +808,21 @@ class SearchManager {
 
       const content = docContent?.content || result.contentPreview || '';
       const tags = this.extractTags(content);
+      const excerpt = content.substring(0, 200) + (content.length > 200 ? '...' : '');
 
-      return {
+      const baseResult = {
         id: result.id,
         originalId,
         blockId: result.blockId || originalId,
         isChunk,
+        chunkIndex: result.chunkIndex || null,
+        totalChunks: result.totalChunks || null,
         content,
         type: 'd',
         path: result.path || '',
         updated: result.updated || Date.now(),
         box: result.notebookId || '',
+        notebookId: result.notebookId || '',
         parent_id: '',
         root_id: originalId,
         tags,
@@ -735,20 +831,26 @@ class SearchManager {
         finalScore: result.score || 0,
         denseScore: result.denseScore,
         sparseScore: result.sparseScore,
-        excerpt: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
-        vectorSearch: true
+        excerpt,
+        vectorSearch: true,
+        source: 'vector'
       };
+
+      return this.normalizeResult(baseResult);
     } catch (error) {
-      return {
+      const baseResult = {
         id: result.id,
         originalId,
         blockId: result.blockId || originalId,
         isChunk,
+        chunkIndex: result.chunkIndex || null,
+        totalChunks: result.totalChunks || null,
         content: result.contentPreview || '',
         type: 'd',
         path: result.path || '',
         updated: result.updated || Date.now(),
         box: result.notebookId || '',
+        notebookId: result.notebookId || '',
         parent_id: '',
         root_id: originalId,
         tags: [],
@@ -758,8 +860,11 @@ class SearchManager {
         denseScore: result.denseScore,
         sparseScore: result.sparseScore,
         excerpt: (result.contentPreview || '').substring(0, 200),
-        vectorSearch: true
+        vectorSearch: true,
+        source: 'vector'
       };
+
+      return this.normalizeResult(baseResult);
     }
   }
 
@@ -954,29 +1059,35 @@ class SearchManager {
     const processedResults = results.map(result => {
       const content = result.content || '';
       const tags = this.extractTags(content);
-      const relevanceScore = this.calculateRelevanceScore(content, query, tags);
+      const relevanceScore = this.scoreCalculator.calculateRelevanceScore(content, query, tags);
+      const excerpt = content.substring(0, 200) + (content.length > 200 ? '...' : '');
 
-      return {
+      const baseResult = {
         id: result.id,
         content,
         type: result.type || 'block',
         path: result.path || '',
         updated: result.updated || Date.now(),
         box: result.box || '',
+        notebookId: result.notebookId || result.box || '',
         parent_id: result.parent_id || '',
         root_id: result.root_id || '',
         tags,
         relevanceScore,
         finalScore: relevanceScore,
-        excerpt: content.substring(0, 200) + (content.length > 200 ? '...' : '')
+        excerpt,
+        source: 'sql',
+        vectorSearch: false
       };
+
+      return this.normalizeResult(baseResult);
     });
 
     return processedResults.sort((a, b) => {
       if (sort === 'date') {
         return new Date(b.updated) - new Date(a.updated);
       }
-      return b.relevanceScore - a.relevanceScore;
+      return (b.scores?.final || 0) - (a.scores?.final || 0);
     });
   }
 
@@ -993,63 +1104,6 @@ class SearchManager {
       tags.push(match[1]);
     }
     return tags;
-  }
-
-  /**
-   * 计算相关性分数（归一化到 0-1 范围）
-   * @param {string} content - 内容文本
-   * @param {string} query - 搜索查询
-   * @param {Array} tags - 标签数组
-   * @returns {number} 相关性分数 (0-1)
-   */
-  calculateRelevanceScore(content, query, tags) {
-    if (!content || !query) {
-      return 0;
-    }
-
-    let score = 0;
-    const queryLower = query.toLowerCase();
-    const contentLower = content.toLowerCase();
-
-    if (contentLower.includes(queryLower)) {
-      score += 0.4;
-    }
-
-    const queryWords = queryLower.split(/\s+/).filter(word => word.length > 2);
-    const matchedWords = queryWords.filter(word => contentLower.includes(word));
-    if (queryWords.length > 0) {
-      score += 0.3 * (matchedWords.length / queryWords.length);
-    }
-
-    const contentLengthBonus = Math.min(content.length / 5000, 0.1);
-    score += contentLengthBonus;
-
-    const tagBonus = Math.min(tags.length * 0.02, 0.1);
-    score += tagBonus;
-
-    if (content.startsWith('#')) {
-      const headingMatch = content.match(/^#{1,6}/);
-      if (headingMatch) {
-        const headingLevel = headingMatch[0].length;
-        score += (7 - headingLevel) * 0.02;
-      }
-    }
-
-    return Math.min(Math.max(score, 0), 1);
-  }
-
-  /**
-   * 归一化分数到 0-1 范围
-   * @param {number} score - 原始分数
-   * @param {number} minScore - 最小分数
-   * @param {number} maxScore - 最大分数
-   * @returns {number} 归一化后的分数
-   */
-  normalizeScore(score, minScore, maxScore) {
-    if (maxScore === minScore) {
-      return score;
-    }
-    return Math.min(Math.max((score - minScore) / (maxScore - minScore), 0), 1);
   }
 
   /**
@@ -1079,7 +1133,7 @@ class SearchManager {
   }
 
   /**
-   * 合并和去重搜索结果（改进的权重归一化版本）
+   * 合并和去重搜索结果（使用 ScoreCalculator 统一分数计算）
    * @param {Array} vectorResults - 向量搜索结果
    * @param {Array} sqlResults - SQL搜索结果
    * @param {number} limit - 结果限制
@@ -1094,44 +1148,32 @@ class SearchManager {
       return [];
     }
 
-    const normalizedDenseWeight = denseWeight / totalWeight;
-    const normalizedSparseWeight = sparseWeight / totalWeight;
-    const normalizedSqlWeight = sqlWeight / totalWeight;
-
-    const vectorScores = vectorResults.map(r => r.relevanceScore || 0);
-    const sqlScores = sqlResults.map(r => r.relevanceScore || 0);
-
-    const vectorMin = 0;
-    const vectorMax = 1;
-    const sqlMin = 0;
-    const sqlMax = 1;
-
+    const weights = { dense: denseWeight, sparse: sparseWeight, sql: sqlWeight };
     const exactMatchBoost = sqlWeight > 0 ? 0.5 : 0;
-
     const resultMap = new Map();
 
     vectorResults.forEach(result => {
       const id = result.id;
-      const normalizedVectorScore = this.normalizeScore(result.relevanceScore || 0, vectorMin, vectorMax);
-      const weightedScore = normalizedVectorScore * (normalizedDenseWeight + normalizedSparseWeight);
+      const denseScore = result.denseScore || result.scores?.vector?.dense || null;
+      const sparseScore = result.sparseScore || result.scores?.vector?.sparse || null;
+      const vectorScore = this.scoreCalculator.calculateVectorScore(denseScore, sparseScore, weights);
+      const weightedScore = vectorScore * ((denseWeight + sparseWeight) / totalWeight);
 
       if (!resultMap.has(id)) {
         resultMap.set(id, {
           ...result,
           source: 'vector',
-          normalizedScore: normalizedVectorScore,
           weightedScore,
-          vectorScore: result.relevanceScore || 0
+          vectorScore: result.relevanceScore || vectorScore
         });
       } else {
         const existing = resultMap.get(id);
-        if (weightedScore > existing.weightedScore) {
+        if (weightedScore > (existing.weightedScore || 0)) {
           resultMap.set(id, {
             ...result,
             source: 'vector',
-            normalizedScore: normalizedVectorScore,
             weightedScore,
-            vectorScore: result.relevanceScore || 0
+            vectorScore: result.relevanceScore || vectorScore
           });
         }
       }
@@ -1139,28 +1181,28 @@ class SearchManager {
 
     sqlResults.forEach(result => {
       const id = result.id;
-      const normalizedSqlScore = this.normalizeScore(result.relevanceScore || 0, sqlMin, sqlMax);
-      const boostedSqlScore = normalizedSqlScore + exactMatchBoost;
-      const weightedSqlScore = Math.min(boostedSqlScore, 1) * normalizedSqlWeight;
+      const sqlScore = result.relevanceScore || result.sourceScore || 0;
+      const normalizedSqlScore = this.scoreCalculator.normalize(sqlScore, 0, 1);
+      const boostedSqlScore = Math.min(normalizedSqlScore + exactMatchBoost, 1);
+      const weightedSqlScore = boostedSqlScore * (sqlWeight / totalWeight);
 
       if (!resultMap.has(id)) {
         resultMap.set(id, {
           ...result,
           source: 'sql',
-          normalizedScore: normalizedSqlScore,
           weightedScore: weightedSqlScore,
-          sqlScore: result.relevanceScore || 0,
+          sqlScore: sqlScore,
           exactMatch: true
         });
       } else {
         const existing = resultMap.get(id);
-        const combinedWeightedScore = existing.weightedScore + weightedSqlScore;
+        const combinedWeightedScore = (existing.weightedScore || 0) + weightedSqlScore;
 
         resultMap.set(id, {
           ...existing,
           source: 'hybrid',
           weightedScore: combinedWeightedScore,
-          sqlScore: result.relevanceScore || 0,
+          sqlScore: sqlScore,
           relevanceScore: combinedWeightedScore,
           exactMatch: true
         });
@@ -1181,14 +1223,24 @@ class SearchManager {
       return scoreB - scoreA;
     });
 
-    return allResults.slice(0, limit).map(result => ({
-      ...result,
-      relevanceScore: result.weightedScore,
-      finalScore: result.weightedScore,
-      originalVectorScore: result.vectorScore,
-      originalSqlScore: result.sqlScore,
-      source: result.source || 'unknown'
-    }));
+    return allResults.slice(0, limit).map(result => {
+      const finalScore = this.scoreCalculator.calculateFinalScore({
+        relevanceScore: result.relevanceScore,
+        denseScore: result.denseScore,
+        sparseScore: result.sparseScore,
+        sqlScore: result.sqlScore,
+        weights
+      });
+
+      return this.normalizeResult({
+        ...result,
+        relevanceScore: result.weightedScore || finalScore,
+        finalScore: finalScore,
+        originalVectorScore: result.vectorScore,
+        originalSqlScore: result.sqlScore,
+        source: result.source || 'unknown'
+      });
+    });
   }
 }
 
