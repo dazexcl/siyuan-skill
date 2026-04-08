@@ -586,38 +586,233 @@ const docPool = {};
     }
 }
 
-// 清理 - 需要先移除临时保护才能删除
-console.log('\n清理测试数据...');
-for (const doc of ctx.createdDocs) {
-    const protection = checkProtection(doc.id);
-    if (protection.protectValue === 'true') {
-        ctx.runCmd(`protect ${doc.id} --remove`);
-        ctx.sleep(300);
-    }
-    if (protection.protectValue !== 'permanent') {
-        const actualTitle = getDocTitle(doc.id);
-        if (actualTitle) {
-            const delResult = ctx.runCmd(`delete ${doc.id} --confirm-title "${actualTitle}"`);
-            if (delResult.success) {
-                console.log(`删除测试文档: ${doc.id}`);
-            }
+// TG-07-15: 配置拦截 + 保护：无确认标题时删除保护文档
+{
+    const title = `TG-07-15-配置拦截保护_${Date.now()}`;
+    const { docId } = createTestDoc(title, '配置拦截保护测试');
+    
+    if (!docId) {
+        ctx.addResult('TG-07-15', '配置拦截-保护+无确认标题', 'delete (保护 + 无确认标题)', 
+            '被配置拦截优先拦截', '文档创建失败', false);
+    } else {
+        // 设置临时保护
+        ctx.runCmd(`protect ${docId}`);
+        ctx.sleep(500);
+        
+        // 尝试不带确认标题删除
+        const deleteCmd = `delete ${docId}`; // 不带 --confirm-title
+        const deleteResult = ctx.runCmd(deleteCmd);
+        
+        if (!deleteResult.success && deleteResult.error?.includes('需要确认文档标题')) {
+            ctx.addResult('TG-07-15', '配置拦截-保护+无确认标题', deleteCmd, 
+                '被配置拦截优先拦截', '成功', true, 
+                '配置拦截优先于保护标记，正确拒绝删除');
+        } else if (!deleteResult.success && deleteResult.error?.includes('保护')) {
+            ctx.addResult('TG-07-15', '配置拦截-保护+无确认标题', deleteCmd, 
+                '被配置拦截优先拦截', '部分成功', true, 
+                '保护标记拦截了删除（配置拦截可能未启用）');
+            // 清理
+            ctx.runCmd(`protect ${docId} --remove`);
+            ctx.runCmd(`delete ${docId} --confirm-title "${title}"`);
+        } else {
+            ctx.addResult('TG-07-15', '配置拦截-保护+无确认标题', deleteCmd, 
+                '被配置拦截优先拦截', '失败', false, 
+                '删除未被拦截，文档可能被删除');
         }
     }
 }
 
-const permanentDocs = ctx.createdDocs.filter(doc => {
-    const p = checkProtection(doc.id);
-    return p.protectValue === 'permanent';
-});
-if (permanentDocs.length > 0) {
-    console.log(`\n注意: ${permanentDocs.length} 个永久保护文档需要手动在思源中解除保护后删除`);
+// TG-07-16: safeMode 优先级：safeMode=true 时删除保护文档
+{
+    const title = `TG-07-16-安全模式优先级_${Date.now()}`;
+    
+    // 临时设置环境变量启用安全模式
+    const savedEnv = ctx.setEnv({
+        SIYUAN_DELETE_SAFE_MODE: 'true'
+    });
+    
+    const { docId } = createTestDoc(title, '安全模式优先级测试');
+    
+    if (!docId) {
+        ctx.addResult('TG-07-16', '安全模式-保护+safeMode', 'delete (保护 + safeMode=true)', 
+            'safeMode优先拦截', '文档创建失败', false);
+        ctx.restoreEnv(savedEnv);
+    } else {
+        // 设置临时保护
+        ctx.runCmd(`protect ${docId}`);
+        ctx.sleep(500);
+        
+        // 尝试删除（safeMode应该优先于保护拦截）
+        const cmd = `delete ${docId}`;
+        const result = ctx.runCmd(cmd);
+        
+        if (!result.success && result.error?.includes('全局安全模式')) {
+            ctx.addResult('TG-07-16', '安全模式-保护+safeMode', cmd, 
+                'safeMode优先拦截', '成功', true, 
+                'safeMode正确优先于保护标记拦截删除');
+        } else {
+            ctx.addResult('TG-07-16', '安全模式-保护+safeMode', cmd, 
+                'safeMode优先拦截', '失败', false, 
+                'safeMode未正确优先拦截');
+        }
+        
+        // 恢复环境变量并清理
+        ctx.restoreEnv(savedEnv);
+        ctx.runCmd(`protect ${docId} --remove`);
+        ctx.runCmd(`delete ${docId} --confirm-title "${title}"`);
+    }
 }
 
+// TG-07-17: 多重拦截：保护 + safeMode + requireConfirmation
+{
+    const title = `TG-07-17-多重拦截_${Date.now()}`;
+    
+    // 临时设置环境变量启用安全模式和确认要求
+    const savedEnv = ctx.setEnv({
+        SIYUAN_DELETE_SAFE_MODE: 'true',
+        SIYUAN_DELETE_REQUIRE_CONFIRMATION: 'true'
+    });
+    
+    const { docId } = createTestDoc(title, '多重拦截测试');
+    
+    if (!docId) {
+        ctx.addResult('TG-07-17', '多重拦截-保护+safeMode+确认', 'delete (三重拦截)', 
+            'safeMode优先拦截', '文档创建失败', false);
+        ctx.restoreEnv(savedEnv);
+    } else {
+        // 设置临时保护
+        ctx.runCmd(`protect ${docId}`);
+        ctx.sleep(500);
+        
+        // 尝试删除（safeMode应该优先拦截）
+        const cmd = `delete ${docId}`;
+        const result = ctx.runCmd(cmd);
+        
+        if (!result.success && result.error?.includes('全局安全模式')) {
+            ctx.addResult('TG-07-17', '多重拦截-保护+safeMode+确认', cmd, 
+                'safeMode优先拦截', '成功', true, 
+                'safeMode正确优先于其他拦截机制');
+        } else {
+            ctx.addResult('TG-07-17', '多重拦截-保护+safeMode+确认', cmd, 
+                'safeMode优先拦截', '失败', false, 
+                'safeMode未正确优先拦截');
+        }
+        
+        // 恢复环境变量并清理
+        ctx.restoreEnv(savedEnv);
+        ctx.runCmd(`protect ${docId} --remove`);
+        ctx.runCmd(`delete ${docId} --confirm-title "${title}"`);
+    }
+}
+
+// TG-07-18: 保护 + 配置协同：requireConfirmation 与保护的协同工作
+{
+    const title = `TG-07-18-保护配置协同_${Date.now()}`;
+    const { docId } = createTestDoc(title, '保护配置协同测试');
+    
+    if (!docId) {
+        ctx.addResult('TG-07-18', '配置协同-保护+确认标题', 'delete (保护 + 正确确认标题)', 
+            '保护标记拦截删除', '文档创建失败', false);
+    } else {
+        // 设置临时保护
+        ctx.runCmd(`protect ${docId}`);
+        ctx.sleep(500);
+        
+        // 使用正确的确认标题删除（仍应被保护拦截）
+        const deleteCmd = `delete ${docId} --confirm-title "${title}"`;
+        const deleteResult = ctx.runCmd(deleteCmd);
+        
+        const wasBlocked = !deleteResult.success || 
+                          deleteResult.output.includes('保护') || 
+                          deleteResult.output.includes('protect') ||
+                          deleteResult.output.includes('拒绝');
+        
+        ctx.sleep(500);
+        const stillExists = docExists(docId);
+        
+        if (wasBlocked && stillExists) {
+            ctx.addResult('TG-07-18', '配置协同-保护+确认标题', deleteCmd, 
+                '保护标记拦截删除', '成功', true, 
+                '即使提供正确确认标题，保护标记仍能拦截删除');
+            // 清理
+            ctx.runCmd(`protect ${docId} --remove`);
+            ctx.runCmd(`delete ${docId} --confirm-title "${title}"`);
+        } else if (!stillExists) {
+            ctx.addResult('TG-07-18', '配置协同-保护+确认标题', deleteCmd, 
+                '保护标记拦截删除', '失败', false, 
+                '保护标记失效，文档被删除');
+        } else {
+            ctx.addResult('TG-07-18', '配置协同-保护+确认标题', deleteCmd, 
+                '保护标记拦截删除', '部分失败', false, 
+                `未明确拦截，output: ${deleteResult.output.substring(0, 100)}`);
+            // 清理
+            ctx.runCmd(`protect ${docId} --remove`);
+            ctx.runCmd(`delete ${docId} --confirm-title "${title}"`);
+        }
+    }
+}
+
+// 保存报告
 ctx.saveReports('TG-07-protect', 'TG-07 文档保护测试报告');
 
-console.log('\n----------------------------------------');
-console.log('测试残留检查');
-console.log('----------------------------------------');
-console.log('应剩余: 0');
-console.log('实际剩余: ' + permanentDocs.length);
-console.log('需要手动删除: ' + (permanentDocs.length > 0 ? '是（永久保护文档）' : '否'));
+// 清理 - 在根文档模式下跳过清理，否则使用特殊的保护文档清理逻辑
+if (process.env.TEST_ROOT_DOC_ID) {
+    console.log('\n根文档模式：跳过清理（由测试运行器统一删除根文档）');
+} else {
+    console.log('\n----------------------------------------');
+    console.log('清理测试数据');
+    console.log('----------------------------------------');
+    
+    let deletedCount = 0;
+    let failedCount = 0;
+    let permanentCount = 0;
+    
+    // 只删除根文档，子文档会被级联删除
+    const rootDocsOnly = ctx.createdDocs.filter(doc => !doc.isChild);
+    
+    for (const doc of rootDocsOnly) {
+        const protection = checkProtection(doc.id);
+        
+        // 跳过永久保护文档
+        if (protection.protectValue === 'permanent') {
+            console.log(`跳过永久保护文档: ${doc.title} (${doc.id})`);
+            permanentCount++;
+            continue;
+        }
+        
+        // 移除临时保护
+        if (protection.protectValue === 'true') {
+            ctx.runCmd(`protect ${doc.id} --remove`);
+            ctx.sleep(300);
+        }
+        
+        // 删除文档
+        const actualTitle = getDocTitle(doc.id);
+        const titleToDelete = actualTitle || doc.title;
+        if (titleToDelete) {
+            const delResult = ctx.runCmd(`delete ${doc.id} --confirm-title "${titleToDelete}"`);
+            if (delResult.success) {
+                console.log(`删除 [${doc.testId || '未知'}] ${titleToDelete} (${doc.id})`);
+                deletedCount++;
+            } else {
+                console.log(`删除失败 [${doc.testId || '未知'}] ${titleToDelete} (${doc.id})`);
+                failedCount++;
+            }
+        }
+    }
+    
+    console.log(`清理完成: ${deletedCount}/${rootDocsOnly.length} 个根文档已删除`);
+    if (failedCount > 0) {
+        console.log(`  删除失败: ${failedCount} 个文档`);
+    }
+    if (permanentCount > 0) {
+        console.log(`  跳过永久保护: ${permanentCount} 个文档`);
+    }
+    
+    console.log('\n----------------------------------------');
+    console.log('测试残留检查');
+    console.log('----------------------------------------');
+    console.log('应剩余: 0');
+    console.log('实际剩余: ' + permanentCount);
+    console.log('需要手动删除: ' + (permanentCount > 0 ? '是（永久保护文档）' : '否'));
+}

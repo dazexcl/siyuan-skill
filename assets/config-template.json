@@ -38,5 +38,12 @@
   "tls": {
     "allowSelfSignedCerts": false,
     "allowedHosts": ["localhost"]
+  },
+  "rerank": {
+    "enable": false,
+    "rerankTopK": 50,
+    "rerankWeight": 0.5,
+    "batchSize": 10,
+    "preserveOriginalScore": true
   }
 }

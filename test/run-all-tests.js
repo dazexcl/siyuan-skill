@@ -70,7 +70,8 @@ function runTestFileAsync(testFile, runDir, rootDocId) {
             cwd: TEST_DIR,
             encoding: 'utf8',
             env: { ...process.env, REPORT_DIR: runDir, TEST_ROOT_DOC_ID: rootDocId },
-            maxBuffer: 10 * 1024 * 1024
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: 120000 // 2分钟超时，防止TG-11/TG-12卡住
         }, (error, stdout, stderr) => {
             let output = stdout || stderr || '';
             let passed = 0;

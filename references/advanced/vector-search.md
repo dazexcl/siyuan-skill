@@ -71,6 +71,61 @@ node scripts/search.js "机器学习" --mode hybrid
 node scripts/search.js "AI" --mode hybrid --dense-weight 0.8 --sparse-weight 0.2
 ```
 
+## 搜索结果数据结构
+
+所有搜索模式现在返回统一格式的数据结构：
+
+```javascript
+{
+  id: "文档ID",
+  score: 0.6327913679999999,    // 顶层主要分数（方便访问）
+  content: "完整内容",
+  title: "文档标题",
+  notebookId: "笔记本ID",        // 统一使用 notebookId（废弃 box）
+  path: "文档路径",
+  type: "d",                    // 文档类型
+  blockId: "块ID",
+  isChunk: false,               // 是否为分块
+  chunkIndex: null,             // 分块索引
+  totalChunks: null,            // 总分块数
+  source: "vector",             // 搜索来源：sql/vector/hybrid
+  
+  // 统一的分数结构
+  scores: {
+    relevance: 0.015687263556116014,  // 相关性分数
+    vector: 0.6327913679999999,       // 向量搜索分数（已组合）
+    sql: null,                         // SQL搜索分数
+    rerank: null,                      // 重排分数
+    final: 0.6327913679999999          // 最终综合分数
+  }
+}
+```
+
+### 搜索来源标识
+
+每个搜索结果都包含 `source` 字段，明确标识搜索来源：
+
+- `sql`: SQL 搜索（传统全文搜索）
+- `vector`: 向量搜索（语义搜索或关键词搜索）
+- `hybrid`: 混合搜索（SQL + 向量搜索）
+
+### 向后兼容性
+
+为了确保向后兼容，保留了以下字段：
+
+```javascript
+{
+  notebookId: "笔记本ID",        // 新的标准字段
+  _legacy_box: "旧box字段",     // 保留的旧字段（已弃用）
+  
+  score: 0.6327913679999999,    // 顶层主要分数
+  scores: { ... },              // 新的标准分数结构
+  relevanceScore: 0.015687263556116014,  // 保留的旧字段（已弃用）
+  finalScore: 0.6327913679999999,       // 保留的旧字段（已弃用）
+  rerankScore: null,            // 保留的旧字段（已弃用）
+}
+```
+
 ## 使用方式
 
 ### 1. 索引文档

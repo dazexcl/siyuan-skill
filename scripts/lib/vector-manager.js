@@ -319,7 +319,8 @@ class VectorManager {
         sparse: sparseVector
       },
       payload: {
-        block_id: docId,
+        id: docId,
+        block_id: metadata.originalDocId || (metadata.isChunk ? docId.replace(/_chunk_\d+$/, '') : docId),
         notebook_id: metadata.notebookId || '',
         title: metadata.title || '',
         path: metadata.path || '',
@@ -328,8 +329,7 @@ class VectorManager {
         tags: metadata.tags || [],
         is_chunk: metadata.isChunk || false,
         chunk_index: metadata.chunkIndex,
-        total_chunks: metadata.totalChunks,
-        original_doc_id: metadata.originalDocId
+        total_chunks: metadata.totalChunks
       }
     };
 
@@ -389,7 +389,8 @@ class VectorManager {
               sparse: sparseVector
             },
             payload: {
-              block_id: doc.docId,
+              id: doc.docId,
+              block_id: doc.metadata?.original_doc_id || (doc.metadata?.is_chunk ? doc.docId.replace(/_chunk_\d+$/, '') : doc.docId),
               notebook_id: doc.metadata?.notebookId || doc.metadata?.notebook_id || '',
               title: doc.metadata?.title || '',
               path: doc.metadata?.path || '',
@@ -398,8 +399,7 @@ class VectorManager {
               tags: doc.metadata?.tags || [],
               is_chunk: doc.metadata?.is_chunk || false,
               chunk_index: doc.metadata?.chunk_index,
-              total_chunks: doc.metadata?.total_chunks,
-              original_doc_id: doc.metadata?.original_doc_id
+              total_chunks: doc.metadata?.total_chunks
             }
           };
         })
@@ -553,14 +553,20 @@ class VectorManager {
         query,
         mode: 'semantic',
         results: results.result.map(r => ({
-          id: r.payload.block_id,
-          score: r.score,
+          id: r.payload.id,
+          score: 1 - r.score,
+          distance: r.score,
+          denseScore: 1 - r.score,
           title: r.payload.title,
           path: r.payload.path,
           notebookId: r.payload.notebook_id,
           contentPreview: r.payload.content_preview,
           updated: r.payload.updated,
-          tags: r.payload.tags
+          tags: r.payload.tags,
+          blockId: r.payload.block_id,
+          isChunk: r.payload.is_chunk,
+          chunkIndex: r.payload.chunk_index,
+          totalChunks: r.payload.total_chunks
         })),
         total: results.result.length
       };
@@ -628,14 +634,19 @@ class VectorManager {
         query,
         mode: 'keyword',
         results: resultPoints.map(r => ({
-          id: r.payload?.block_id || r.id,
+          id: r.payload?.id || r.payload?.block_id || r.id,
           score: r.score,
+          sparseScore: r.score,
           title: r.payload?.title || '',
           path: r.payload?.path || '',
           notebookId: r.payload?.notebook_id || '',
           contentPreview: r.payload?.content_preview || '',
           updated: r.payload?.updated || 0,
-          tags: r.payload?.tags || []
+          tags: r.payload?.tags || [],
+          blockId: r.payload?.block_id,
+          isChunk: r.payload?.is_chunk,
+          chunkIndex: r.payload?.chunk_index,
+          totalChunks: r.payload?.total_chunks
         })),
         total: resultPoints.length
       };
@@ -694,7 +705,7 @@ class VectorManager {
     const merged = Array.from(scores.values())
       .sort((a, b) => b.rrfScore - a.rrfScore)
       .map(item => ({
-        id: item.id,
+        id: item.payload.id || item.id,
         score: item.rrfScore,
         denseScore: item.denseScore,
         sparseScore: item.sparseScore,
@@ -703,7 +714,11 @@ class VectorManager {
         notebookId: item.payload.notebook_id,
         contentPreview: item.payload.content_preview,
         updated: item.payload.updated,
-        tags: item.payload.tags
+        tags: item.payload.tags,
+        blockId: item.payload.block_id,
+        isChunk: item.payload.is_chunk,
+        chunkIndex: item.payload.chunk_index,
+        totalChunks: item.payload.total_chunks
       }));
 
     return merged;

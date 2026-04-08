@@ -86,7 +86,18 @@ class ConfigManager {
       tls: {
           allowSelfSignedCerts: false,
           allowedHosts: ['localhost']
-        }
+        },
+
+      // 嵌入重排配置
+      // 注意: segmentMaxLength 和 segmentOverlap 已统一使用 embedding 配置
+      rerank: {
+        enable: false,
+        rerankTopK: 50,
+        rerankWeight: 0.5,
+        batchSize: 10,
+        preserveOriginalScore: true,
+        enableSegmentRerank: true
+      }
     };
   }
   
@@ -142,6 +153,12 @@ class ConfigManager {
         ...fileConfig.tls,
         ...envConfig.tls,
         ...(this.overrideConfig.tls || {})
+      },
+      rerank: {
+        ...this.defaultConfig.rerank,
+        ...fileConfig.rerank,
+        ...envConfig.rerank,
+        ...(this.overrideConfig.rerank || {})
       }
     };
     
@@ -278,22 +295,41 @@ class ConfigManager {
     // 删除保护配置
     if (process.env.SIYUAN_DELETE_SAFE_MODE !== undefined || 
         process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION !== undefined) {
-      envConfig.deleteProtection = {
-        safeMode: process.env.SIYUAN_DELETE_SAFE_MODE !== 'false',
-        requireConfirmation: process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION === 'true'
-      };
+      const deleteProtection = { ...this.defaultConfig.deleteProtection };
+      
+      if (process.env.SIYUAN_DELETE_SAFE_MODE !== undefined) {
+        deleteProtection.safeMode = process.env.SIYUAN_DELETE_SAFE_MODE !== 'false';
+      }
+      
+      if (process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION !== undefined) {
+        deleteProtection.requireConfirmation = process.env.SIYUAN_DELETE_REQUIRE_CONFIRMATION === 'true';
+      }
+      
+      envConfig.deleteProtection = deleteProtection;
     }
     
     // TLS 安全配置
     if (process.env.SIYUAN_TLS_ALLOW_SELF_SIGNED !== undefined) {
       envConfig.tls = {
         allowSelfSignedCerts: process.env.SIYUAN_TLS_ALLOW_SELF_SIGNED === 'true',
-        allowedHosts: process.env.SIYUAN_TLS_ALLOWED_HOSTS 
+        allowedHosts: process.env.SIYUAN_TLS_ALLOWED_HOSTS
           ? process.env.SIYUAN_TLS_ALLOWED_HOSTS.split(',').map(h => h.trim())
           : this.defaultConfig.tls.allowedHosts
       };
     }
-    
+
+    // 嵌入重排配置
+    if (process.env.RERANK_ENABLE || process.env.RERANK_TOP_K || process.env.RERANK_WEIGHT ||
+        process.env.RERANK_CACHE_ENABLED || process.env.RERANK_CACHE_SIZE || process.env.RERANK_BATCH_SIZE) {
+      envConfig.rerank = {
+        enable: process.env.RERANK_ENABLE === 'true',
+        rerankTopK: parseInt(process.env.RERANK_TOP_K, 10) || this.defaultConfig.rerank.rerankTopK,
+        rerankWeight: parseFloat(process.env.RERANK_WEIGHT) || this.defaultConfig.rerank.rerankWeight,
+        batchSize: parseInt(process.env.RERANK_BATCH_SIZE, 10) || this.defaultConfig.rerank.batchSize,
+        preserveOriginalScore: process.env.RERANK_PRESERVE_ORIGINAL_SCORE !== 'false'
+      };
+    }
+
     return envConfig;
   }
   
@@ -422,12 +458,38 @@ class ConfigManager {
     } else {
       validatedConfig.tls = {
         allowSelfSignedCerts: validatedConfig.tls.allowSelfSignedCerts ?? this.defaultConfig.tls.allowSelfSignedCerts,
-        allowedHosts: Array.isArray(validatedConfig.tls.allowedHosts) 
-          ? validatedConfig.tls.allowedHosts 
+        allowedHosts: Array.isArray(validatedConfig.tls.allowedHosts)
+          ? validatedConfig.tls.allowedHosts
           : this.defaultConfig.tls.allowedHosts
       };
     }
-    
+
+    // 验证重排配置
+    if (!validatedConfig.rerank || typeof validatedConfig.rerank !== 'object') {
+      validatedConfig.rerank = { ...this.defaultConfig.rerank };
+    } else {
+      validatedConfig.rerank = {
+        enable: validatedConfig.rerank.enable ?? this.defaultConfig.rerank.enable,
+        rerankTopK: typeof validatedConfig.rerank.rerankTopK === 'number' && validatedConfig.rerank.rerankTopK > 0
+          ? Math.min(validatedConfig.rerank.rerankTopK, 200)
+          : this.defaultConfig.rerank.rerankTopK,
+        rerankWeight: typeof validatedConfig.rerank.rerankWeight === 'number'
+          ? Math.max(0, Math.min(validatedConfig.rerank.rerankWeight, 1))
+          : this.defaultConfig.rerank.rerankWeight,
+        batchSize: typeof validatedConfig.rerank.batchSize === 'number' && validatedConfig.rerank.batchSize > 0
+          ? Math.min(validatedConfig.rerank.batchSize, 50)
+          : this.defaultConfig.rerank.batchSize,
+        preserveOriginalScore: validatedConfig.rerank.preserveOriginalScore ?? this.defaultConfig.rerank.preserveOriginalScore,
+        enableSegmentRerank: validatedConfig.rerank.enableSegmentRerank ?? this.defaultConfig.rerank.enableSegmentRerank,
+        segmentMaxLength: typeof validatedConfig.rerank.segmentMaxLength === 'number' && validatedConfig.rerank.segmentMaxLength > 100
+          ? Math.min(validatedConfig.rerank.segmentMaxLength, 50000)
+          : this.defaultConfig.rerank.segmentMaxLength,
+        segmentOverlap: typeof validatedConfig.rerank.segmentOverlap === 'number' && validatedConfig.rerank.segmentOverlap > 0
+          ? Math.min(validatedConfig.rerank.segmentOverlap, 1000)
+          : this.defaultConfig.rerank.segmentOverlap
+      };
+    }
+
     return validatedConfig;
   }
   
@@ -436,6 +498,8 @@ class ConfigManager {
    * @returns {Object} 当前配置
    */
   getConfig() {
+    // 每次获取配置时都重新加载，以支持环境变量的动态变化
+    this.config = this.loadConfig();
     return { ...this.config };
   }
   

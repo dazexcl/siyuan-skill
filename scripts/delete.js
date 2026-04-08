@@ -124,20 +124,27 @@ async function main() {
       // 如果获取属性失败（比如文档刚创建还没有属性），假设没有属性，继续执行删除
       attrs = {};
     }
-    
-    if (attrs && attrs['custom-protected']) {
-      console.error('错误: 该文档已被保护，无法删除');
-      process.exit(1);
-    }
 
-    // 检查删除保护
-    if (config.deleteProtection && config.deleteProtection.safeMode) {
-      // 检查是否需要确认标题
+    // 检查删除保护（最高优先级）
+    if (config.deleteProtection) {
+      // 全局安全模式：完全禁止删除（最高优先级）
+      if (config.deleteProtection.safeMode) {
+        console.error('错误: 全局安全模式已启用，禁止删除任何文档');
+        process.exit(1);
+      }
+      
+      // 非安全模式：检查是否需要确认标题
       if (config.deleteProtection.requireConfirmation && !params.confirmTitle) {
         console.error('错误: 需要确认文档标题');
         console.error(`请使用 --confirm-title "${docInfo.rootTitle || docInfo.content}" 确认删除`);
         process.exit(1);
       }
+    }
+    
+    // 检查文档保护标记（低于safeMode，高于requireConfirmation）
+    if (attrs && attrs['custom-protected']) {
+      console.error('错误: 该文档已被保护，无法删除');
+      process.exit(1);
     }
 
     // 如果提供了确认标题，必须验证（无论安全模式是否启用）

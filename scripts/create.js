@@ -438,16 +438,38 @@ async function main() {
     }
 
     if (createResult) {
+      let intermediateDirectories = [];
+      let actualParentId = parentId;
+
+      if (!existingDocId) {
+        try {
+          const pathInfo = await connector.request('/api/filetree/getPathByID', { id: createResult });
+          if (pathInfo && pathInfo.path) {
+            const pathParts = pathInfo.path.split('/').filter(p => p);
+            const docFile = pathParts[pathParts.length - 1];
+            const docId = docFile.replace('.sy', '');
+
+            if (pathParts.length > 1) {
+              const dirParts = pathParts.slice(0, -1);
+              intermediateDirectories = dirParts.map(dir => dir.replace('.sy', ''));
+              actualParentId = intermediateDirectories[intermediateDirectories.length - 1] || null;
+            }
+          }
+        } catch (e) {
+        }
+      }
+
       console.log(JSON.stringify({
         success: true,
         data: {
           id: createResult,
           title: displayTitle,
-          parentId: parentId,
+          parentId: actualParentId,
           notebookId: notebookId,
           path: fullPath,
           contentLength: processedContent.length,
-          overwritten: !!existingDocId
+          overwritten: !!existingDocId,
+          intermediateDirectories: intermediateDirectories
         },
         message: existingDocId ? '文档已更新' : '文档创建成功',
         timestamp: Date.now()

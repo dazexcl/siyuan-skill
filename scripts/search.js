@@ -35,6 +35,9 @@ const HELP_TEXT = `用法: search <query> [选项]
   --sparse-weight <num>       关键词搜索权重 (混合搜索, 默认0.3)
   --sql-weight <num>          SQL搜索权重 (混合搜索, 默认0)
   --threshold <num>           语义搜索阈值 (0-1)
+  --enable-rerank             启用嵌入重排
+  --rerank-top-k <num>        重排前K个结果 (默认50)
+  --rerank-weight <num>       重排分数权重 (默认0.5)
   -h, --help                  显示帮助信息
 
 示例:
@@ -43,7 +46,9 @@ const HELP_TEXT = `用法: search <query> [选项]
   search "笔记" --notebook-id <id>
   search "类似概念" --mode semantic
   search "综合查询" --mode hybrid --threshold 0.5
-  search "标签" --tags "技术,笔记" --sort date`;
+  search "标签" --tags "技术,笔记" --sort date
+  search "机器学习" --mode hybrid --enable-rerank
+  search "深度学习" --enable-rerank --rerank-top-k 100 --rerank-weight 0.7`;
 
 /**
  * 将连字符命名转换为驼峰命名
@@ -64,7 +69,8 @@ function parseArgs(argv) {
   const options = {};
   const hasValueOpts = new Set([
     'mode', 'type', 'types', 'limit', 'path', 'notebookId', 'notebook', 'threshold',
-    'sort', 'tags', 'where', 'denseWeight', 'sparseWeight', 'sqlWeight'
+    'sort', 'tags', 'where', 'denseWeight', 'sparseWeight', 'sqlWeight',
+    'rerankTopK', 'rerankWeight'
   ]);
   const SHORT_OPTS = { m: 'mode', T: 'type', l: 'limit', P: 'path', n: 'notebookId' };
 
@@ -150,6 +156,10 @@ async function main() {
   try {
     const configManager = new ConfigManager();
     const config = configManager.getConfig();
+
+    const enableRerank = params.enableRerank || config.rerank?.enable || false;
+    const rerankTopK = parseInt(params.rerankTopK) || config.rerank?.rerankTopK || 50;
+    const rerankWeight = parseFloat(params.rerankWeight) || config.rerank?.rerankWeight || 0.5;
     const connector = new SiyuanConnector({
       baseURL: config.baseURL,
       token: config.token,
@@ -169,10 +179,11 @@ async function main() {
       } catch (error) {
         console.warn('向量搜索初始化失败，将使用传统搜索:', error.message);
         vectorManager = null;
+        embeddingManager = null;
       }
     }
 
-    const searchManager = new SearchManager(connector, vectorManager);
+    const searchManager = new SearchManager(connector, vectorManager, null, config);
 
     const searchOptions = {
       notebookId: params.notebookId,
@@ -187,6 +198,9 @@ async function main() {
       sqlWeight: sqlWeight,
       limit: limit,
       threshold: threshold,
+      enableRerank: enableRerank,
+      rerankTopK: rerankTopK,
+      rerankWeight: rerankWeight,
       checkPermissionFn: (notebookId) => {
         try {
           checkPermission(config, notebookId);
@@ -202,17 +216,38 @@ async function main() {
       ...searchOptions
     });
 
-    const blocks = result.results.map(r => ({
-      id: r.id,
-      score: r.relevanceScore || 0,
-      content: r.content || r.excerpt || '',
-      title: r.title || '',
-      notebookId: r.box || r.notebookId || '',
-      path: r.path || '',
-      type: r.type || 'd'
-    }));
+    const blocks = result.results.map(r => {
+      const scores = r.scores || {};
+      const finalScore = scores.final || scores.rerank || r.score || r.finalScore || r.relevanceScore || 0;
+      
+      return {
+        id: r.id,
+        score: finalScore,
+        scores: {
+          relevance: scores.relevance || r.relevanceScore || 0,
+          vector: {
+            dense: scores.vector?.dense || r.denseScore || null,
+            sparse: scores.vector?.sparse || r.sparseScore || null,
+            combined: scores.vector?.combined || r.score || r.denseScore || r.sparseScore || null
+          },
+          sql: scores.sql || r.sqlScore || r.originalSqlScore || null,
+          rerank: scores.rerank || r.rerankScore || null,
+          final: finalScore
+        },
+        content: r.content || r.excerpt || '',
+        title: r.title || '',
+        notebookId: r.notebookId || r.box || '',
+        path: r.path || '',
+        type: r.type || 'd',
+        blockId: r.blockId,
+        isChunk: r.isChunk,
+        chunkIndex: r.chunkIndex,
+        totalChunks: r.totalChunks,
+        source: r.source
+      };
+    });
 
-    console.log(JSON.stringify({
+    const outputData = {
       success: true,
       data: {
         blocks
@@ -223,7 +258,16 @@ async function main() {
         limit: limit,
         threshold: threshold
       }
-    }, null, 2));
+    };
+
+    if (result.rerank && result.rerank.enabled) {
+      outputData.rerank = {
+        enabled: true,
+        rerankCount: result.rerank.rerankCount
+      };
+    }
+
+    console.log(JSON.stringify(outputData, null, 2));
 
     process.exit(0);
   } catch (error) {
