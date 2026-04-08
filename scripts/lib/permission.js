@@ -27,7 +27,7 @@ function isNotebookAllowed(config, notebookId) {
   }
 
   if (mode === 'whitelist') {
-    if (list.length === 0 || list.includes(notebookId)) {
+    if (list.includes(notebookId)) {
       return { allowed: true, reason: 'in-whitelist' };
     }
     return { allowed: false, reason: `笔记本 ${notebookId} 不在白名单中` };
