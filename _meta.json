@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "siyuan-skill",
   "description": "思源笔记工具，支持笔记本管理、文档操作、内容搜索、块控制",
   "skillType": "cli",
