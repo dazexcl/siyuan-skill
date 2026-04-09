@@ -10,18 +10,18 @@ const { checkPermission } = require('./lib/permission');
 
 const HELP_TEXT = `用法: info <docId> [选项]
 
-获取文档基础信息（ID、标题、路径、属性等）
+获取文档基础信息（ID、标题、类型、路径、属性、标签、图标、时间等）
 
 位置参数:
-  docId                文档ID
+  docId                文档/块ID
 
 选项:
-  --format <fmt>       输出格式：json/summary（默认：summary）
+  -r, --raw            直接输出数据，不包裹响应对象
   -h, --help           显示帮助信息
 
 示例:
   info 20231030-doc-id
-  info <id> --format json`;
+  info <id> --raw`;
 
 /**
  * 将短横线命名转为驼峰命名
@@ -35,7 +35,7 @@ function camelCase(str) {
 /**
  * 短选项到长选项的映射
  */
-const SHORT_OPTS = { f: 'format', h: 'help' };
+const SHORT_OPTS = { r: 'raw', h: 'help' };
 
 /**
  * 解析命令行参数
@@ -45,7 +45,6 @@ const SHORT_OPTS = { f: 'format', h: 'help' };
 function parseArgs(argv) {
   const positional = [];
   const options = {};
-  const hasValueOpts = new Set(['format']);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -55,20 +54,12 @@ function parseArgs(argv) {
         options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
       } else {
         const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
+        options[key] = true;
       }
     } else if (arg.startsWith('-') && arg.length === 2 && arg !== '-') {
       const shortKey = SHORT_OPTS[arg[1]];
       if (shortKey) {
-        if (hasValueOpts.has(shortKey) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[shortKey] = argv[++i];
-        } else {
-          options[shortKey] = true;
-        }
+        options[shortKey] = true;
       }
     } else {
       positional.push(arg);
@@ -88,7 +79,7 @@ async function main() {
   }
 
   const params = parseArgs(args);
-  
+
   if (params.positional.length === 0) {
     console.error('错误: 必须提供文档ID');
     console.log(HELP_TEXT);
@@ -96,7 +87,7 @@ async function main() {
   }
 
   const docId = params.positional[0];
-  const format = params.format || 'summary';
+  const raw = params.raw || false;
 
   try {
     const configManager = new ConfigManager();
@@ -134,7 +125,7 @@ async function main() {
     // 获取人类可读路径
     const hPath = await connector.request('/api/filetree/getHPathByID', { id: docId });
 
-    // 获取笔记本名称
+    // 获取笔记本列表（只调用一次）
     const notebooksResult = await connector.request('/api/notebook/lsNotebooks');
     let notebookName = null;
     if (notebooksResult && notebooksResult.notebooks) {
@@ -146,6 +137,17 @@ async function main() {
         }
     }
 
+    // 使用 SQL 查询获取块的基础信息（type、content、updated、created 等）
+    const blocksResult = await connector.request('/api/query/sql', {
+        stmt: `SELECT type, content, updated, created FROM blocks WHERE id = '${docId}'`
+    });
+
+    if (!blocksResult || blocksResult.length === 0) {
+        throw new Error(`未找到块信息：${docId}`);
+    }
+
+    const block = blocksResult[0];
+
     // 获取块属性
     const attrs = await connector.request('/api/attr/getBlockAttrs', { id: docId });
 
@@ -153,11 +155,14 @@ async function main() {
     const customAttrs = {};
     const tags = [];
     const rawAttrs = {};
+    const excludeKeys = new Set(['id', 'title', 'type', 'name', 'icon', 'tags', 'updated', 'created']);
     if (attrs) {
         for (const [key, value] of Object.entries(attrs)) {
-            rawAttrs[key] = value;
+            // custom- 开头的属性放入 customAttrs，不放入 rawAttrs
             if (key.startsWith('custom-')) {
                 customAttrs[key.replace('custom-', '')] = value;
+            } else if (!excludeKeys.has(key)) {
+                rawAttrs[key] = value;
             }
         }
         // 同时支持内置的 tags 字段和自定义的 tags 属性
@@ -170,49 +175,47 @@ async function main() {
     // 构建文档信息
     const docInfo = {
         id: docId,
-        title: attrs?.title || null,
-        type: attrs?.type || 'doc',
+        name: attrs?.name || null,
+        title: block.type === 'd' ? (block.content || null) : (attrs?.title || null),
+        type: block.type,
         notebook: {
             id: pathInfo.notebook,
             name: notebookName
         },
         path: {
-            humanReadable: notebookName ? `/${notebookName}${hPath}` : hPath,
+            apath: notebookName ? `/${notebookName}${hPath}` : hPath,
             storage: pathInfo.path,
             hpath: hPath
         },
         attributes: customAttrs,
+        rawAttributes: { ...rawAttrs },
         tags: tags,
-        rawAttributes: rawAttrs,
         icon: attrs?.icon || null,
-        updated: attrs?.updated || null,
-        created: docId.substring(0, docId.indexOf('-'))
+        updated: block.updated || attrs?.updated || null,
+        created: block.created || docId.substring(0, docId.indexOf('-'))
     };
 
-    if (format === 'json') {
-      console.log(JSON.stringify({
-        success: true,
-        data: docInfo,
-        message: '文档信息获取成功'
-      }, null, 2));
+    if (raw) {
+        console.log(JSON.stringify(docInfo, null, 2));
     } else {
-      // summary 格式（默认）
-      console.log(JSON.stringify({
-        id: docInfo.id,
-        title: docInfo.title,
-        type: docInfo.type,
-        notebook: docInfo.notebook,
-        path: docInfo.path.humanReadable,
-        tags: docInfo.tags,
-        icon: docInfo.icon,
-        updated: docInfo.updated,
-        created: docInfo.created
-      }, null, 2));
+        console.log(JSON.stringify({
+            success: true,
+            data: docInfo,
+            message: '文档信息获取成功'
+        }, null, 2));
     }
 
     process.exit(0);
   } catch (error) {
-    console.error('执行失败:', error.message);
+    if (raw) {
+        console.error(error.message);
+    } else {
+        console.log(JSON.stringify({
+            success: false,
+            error: error.message,
+            message: '文档信息获取失败'
+        }, null, 2));
+    }
     process.exit(1);
   }
 }
