@@ -107,7 +107,6 @@ node scripts/notebooks.js
 ```bash
 # 获取 API Token：打开思源笔记 → 设置 → 关于
 # 获取笔记本 ID
-node scripts/notebooks.js
 ```
 
 ### 3. 配置环境变量
@@ -133,11 +132,7 @@ node scripts/notebooks.js
 cd skills/siyuan-skill
 node scripts/<command> [options]
 
-# 方式2：使用 npm link 全局安装
-npm link
-siyuan <command> [options]
-
-# 方式3：直接指定路径运行
+# 方式2：直接指定路径运行
 node <skills-directory>/siyuan-skill/scripts/<command> [options]
 ```
 
