@@ -9,7 +9,7 @@
 | 查看笔记本列表 | `notebooks.js` | `node scripts/notebooks.js` |
 | 查看文档结构 | `structure.js` | `node scripts/structure.js <notebookId>` |
 | 读取文档内容 | `content.js` | `node scripts/content.js <docId>` |
-| 获取文档信息 | `info.js` | `node scripts/info.js <docId>` |
+| 获取文档/块信息 | `info.js` | `node scripts/info.js <id> [--raw]` |
 | 创建文档 | `create.js` | `node scripts/create.js "标题" --parent-id <id>` 或 `--path <path>` |
 | 修改文档全文 | `update.js` | `node scripts/update.js <docId> --content "新内容"` |
 | 删除文档 | `delete.js` | `node scripts/delete.js <docId>` |
@@ -38,8 +38,9 @@
 |------|---------------|----------|
 | `update` / `delete` / `move` / `rename` | **文档 ID** | ❌ `update.js <blockId>` |
 | `block-update` / `block-delete` 等 | **块 ID** | ❌ `block-update.js <docId>` |
-| `content` / `info` | **文档 ID** | |
-| `block-get` | **块 ID** | |
+| `content` | **文档 ID** | ❌ `content.js <blockId>` |
+| `info` | **文档 ID 或块 ID** | - |
+| `block-get` | **块 ID** | ❌ `block-get.js <docId>` |
 
 ## 常见错误预防
 

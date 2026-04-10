@@ -25,7 +25,7 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | `notebooks` | 列出笔记本 | `node {baseDir}/scripts/notebooks.js` |
 | `structure` | 查看文档结构 | `node {baseDir}/scripts/structure.js <docId>` |
 | `content` | 获取文档内容 | `node {baseDir}/scripts/content.js <docId>` |
-| `info` | 获取文档信息 | `node {baseDir}/scripts/info.js <docId>` |
+| `info` | 获取文档/块信息 | `node {baseDir}/scripts/info.js <docId> [--raw]` |
 | `create` | 创建文档 | `node {baseDir}/scripts/create.js <title> --parent-id <id>` 或 `--path <path>` |
 | `update` | 更新文档 | `node {baseDir}/scripts/update.js <docId> --content <md>` |
 | `delete` | 删除文档 | `node {baseDir}/scripts/delete.js <docId>` |

@@ -48,10 +48,20 @@ if (docId) {
 }
 console.log(`创建的文档: ${docId}`);
 
+console.log('\n添加测试属性和标签...');
+
+// 添加自定义属性（custom- 前缀）
+const attrsResult = ctx.runCmd(`block-attrs ${docId} --set version=1.0`);
+console.log('属性设置结果:', attrsResult.success ? '成功' : '失败');
+
+// 添加测试标签
+const tagsResult = ctx.runCmd(`tags ${docId} --add 测试,TG-24,info命令测试`);
+console.log('标签添加结果:', tagsResult.success ? '成功' : '失败');
+
 console.log('\n测试用例:');
 
 // 执行一次 info 命令，多个验证点
-const cmd = `info ${docId} --format json`;
+const cmd = `info ${docId}`;
 const result = ctx.runCmd(cmd);
 
 if (!result.success) {
@@ -87,72 +97,84 @@ if (!result.success) {
             isValidJSON && hasData ? 'JSON格式正确，数据完整' : 'JSON格式或数据异常');
     }
 
-    // TG-24-003: 验证ID和标题
+    // TG-24-003: 验证完整数据结构和内容准确性
     {
+        const issues = [];
+        const details = [];
+
+        // 验证 ID 和标题
         const idMatch = data && data.id === docId;
         const titleMatch = data && data.title === docTitle;
-        const bothMatch = idMatch && titleMatch;
-        ctx.addResult('TG-24-003', '验证ID和标题', cmd, 'ID和标题正确',
-            bothMatch ? '成功' : '不匹配', bothMatch,
-            bothMatch ? `ID: ${data.id}, 标题: ${data.title}` : 
-            idMatch ? 'ID正确但标题错误' : titleMatch ? '标题正确但ID错误' : 'ID和标题都不匹配');
-    }
 
-    // TG-24-004: 验证路径信息
-    {
-        const hasPath = data && data.path && data.path.humanReadable;
-        const pathContainsTitle = hasPath && data.path.humanReadable.includes(docTitle);
-        const pathContainsNotebook = hasPath && data.notebook && data.path.humanReadable.includes(data.notebook.name);
-        
-        if (hasPath && pathContainsTitle && pathContainsNotebook) {
-            ctx.addResult('TG-24-004', '验证路径信息', cmd, '返回正确路径',
-                '成功', true, `路径: ${data.path.humanReadable}`);
-        } else {
-            const issues = [];
-            if (!hasPath) issues.push('路径缺失');
-            if (!pathContainsTitle) issues.push('路径不包含标题');
-            if (!pathContainsNotebook) issues.push('路径不包含笔记本名称');
-            ctx.addResult('TG-24-004', '验证路径信息', cmd, '返回正确路径',
-                '路径不完整', false, issues.join('; '));
-        }
-    }
+        if (!idMatch) issues.push('ID不匹配');
+        if (!titleMatch) issues.push('标题不匹配');
+        if (idMatch && titleMatch) details.push(`ID: ${data.id}, 标题: ${data.title}`);
 
-    // TG-24-005: 验证笔记本信息
-    {
+        // 验证类型
+        const hasType = data && data.type === 'd';
+        if (!hasType) issues.push('类型不正确（应为d）');
+        if (hasType) details.push(`类型: ${data.type}`);
+
+        // 验证路径信息
+        const hasPath = data && data.path && data.path.apath;
+        const pathContainsTitle = hasPath && data.path.apath.includes(docTitle);
+        const pathContainsNotebook = hasPath && data.notebook && data.path.apath.includes(data.notebook.name);
+
+        if (!hasPath) issues.push('路径缺失');
+        else if (!pathContainsTitle) issues.push('路径不包含标题');
+        else if (!pathContainsNotebook) issues.push('路径不包含笔记本名称');
+        else details.push(`路径: ${data.path.apath}`);
+
+        // 验证笔记本信息
         const hasNotebook = data && data.notebook && data.notebook.id && data.notebook.name;
         const notebookIdMatch = hasNotebook && data.notebook.id === ctx.NOTEBOOK_ID;
-        
-        if (hasNotebook && notebookIdMatch) {
-            ctx.addResult('TG-24-005', '验证笔记本信息', cmd, '返回笔记本信息',
-                '成功', true, `笔记本: ${data.notebook.name} (${data.notebook.id})`);
-        } else {
-            const issues = [];
-            if (!hasNotebook) issues.push('笔记本信息缺失');
-            if (!notebookIdMatch) issues.push('笔记本ID不匹配');
-            ctx.addResult('TG-24-005', '验证笔记本信息', cmd, '返回笔记本信息',
-                '笔记本信息错误', false, issues.join('; '));
-        }
-    }
 
-    // TG-24-006: 验证属性字段
-    {
+        if (!hasNotebook) issues.push('笔记本信息缺失');
+        else if (!notebookIdMatch) issues.push('笔记本ID不匹配');
+        else details.push(`笔记本: ${data.notebook.name}`);
+
+        // 验证属性字段
         const hasAttributes = data && 'attributes' in data;
         const hasTags = data && 'tags' in data;
         const hasIcon = data && 'icon' in data;
         const hasRawAttrs = data && 'rawAttributes' in data;
-        
-        if (hasAttributes && hasTags && hasIcon && hasRawAttrs) {
-            ctx.addResult('TG-24-006', '验证属性字段', cmd, '返回属性字段',
-                '成功', true, `标签数: ${(data.tags || []).length}`);
-        } else {
-            const missing = [];
-            if (!hasAttributes) missing.push('attributes');
-            if (!hasTags) missing.push('tags');
-            if (!hasIcon) missing.push('icon');
-            if (!hasRawAttrs) missing.push('rawAttributes');
-            ctx.addResult('TG-24-006', '验证属性字段', cmd, '返回属性字段',
-                '字段缺失', false, `缺少: ${missing.join(', ')}`);
+        const hasName = data && 'name' in data;
+
+        if (!hasAttributes) issues.push('缺少attributes字段');
+        if (!hasTags) issues.push('缺少tags字段');
+        if (!hasIcon) issues.push('缺少icon字段');
+        if (!hasRawAttrs) issues.push('缺少rawAttributes字段');
+        if (!hasName) issues.push('缺少name字段');
+
+        // 验证自定义属性值
+        const versionMatch = data && data.attributes && data.attributes.version === '1.0';
+
+        if (hasAttributes && !versionMatch) issues.push('version值不匹配');
+
+        // 验证标签
+        const expectedTags = ['测试', 'TG-24', 'info命令测试'];
+        const tagsMatch = hasTags && data.tags && expectedTags.every(tag => data.tags.includes(tag));
+        const tagsCount = hasTags && data.tags ? data.tags.length : 0;
+
+        if (hasTags && !tagsMatch) issues.push(`标签不匹配，期望: [${expectedTags.join(', ')}], 实际: [${(data.tags || []).join(', ')}]`);
+
+        if (hasAttributes && hasTags && hasIcon && hasRawAttrs && hasName) {
+            details.push(`标签数: ${tagsCount}`);
+            if (versionMatch) details.push('version: 1.0');
         }
+
+        // 验证时间字段
+        const hasUpdated = data && data.updated;
+        const hasCreated = data && data.created;
+
+        if (!hasUpdated) issues.push('缺少updated字段');
+        if (!hasCreated) issues.push('缺少created字段');
+        if (hasUpdated && hasCreated) details.push(`创建: ${data.created}, 更新: ${data.updated}`);
+
+        const allPassed = issues.length === 0;
+        ctx.addResult('TG-24-003', '验证完整数据结构', cmd, '返回结构和内容准确',
+            allPassed ? '成功' : '部分失败', allPassed,
+            allPassed ? details.join('; ') : issues.join('; '));
     }
 }
 
@@ -199,33 +221,34 @@ if (!result.success) {
         requiresParam ? '正确提示缺少参数' : '应该要求提供文档ID');
 }
 
-// TG-24-010: 短选项支持
+// TG-24-010: --raw 选项支持
 {
-    const cmd5 = `info ${docId} -f json`;
+    const cmd5 = `info ${docId} --raw`;
     const result5 = ctx.runCmd(cmd5);
     const data5 = parseJSON(result5.output);
-    
+
     const hasId = data5 && data5.id === docId;
     const hasTitle = data5 && data5.title === docTitle;
-    
-    ctx.addResult('TG-24-010', '短选项支持', cmd5, '短选项-f应等同于--format',
-        hasId && hasTitle ? '成功' : '信息不匹配', hasId && hasTitle,
-        hasId && hasTitle ? '短选项正常工作' : '短选项功能异常');
+    const hasNoWrapper = result5.output && !result5.output.includes('success');
+
+    ctx.addResult('TG-24-010', '--raw 选项支持', cmd5, '--raw 应直接输出数据',
+        hasId && hasTitle && hasNoWrapper ? '成功' : '信息不匹配', hasId && hasTitle && hasNoWrapper,
+        hasId && hasTitle && hasNoWrapper ? '--raw 选项正常工作' : '--raw 选项功能异常');
 }
 
-// TG-24-011: Summary格式输出
+// TG-24-011: -r 短选项支持
 {
-    const cmd6 = `info ${docId}`;
+    const cmd6 = `info ${docId} -r`;
     const result6 = ctx.runCmd(cmd6);
     const data6 = parseJSON(result6.output);
-    
+
     const hasId = data6 && data6.id === docId;
     const hasTitle = data6 && data6.title === docTitle;
-    const hasPath = data6 && data6.path && typeof data6.path === 'string';
-    
-    ctx.addResult('TG-24-011', 'Summary格式输出', cmd6, '默认格式返回简化信息',
-        hasId && hasTitle && hasPath ? '成功' : '格式不正确', hasId && hasTitle && hasPath,
-        hasId && hasTitle && hasPath ? `路径: ${data6.path}` : 'Summary格式异常');
+    const hasNoWrapper = result6.output && !result6.output.includes('success');
+
+    ctx.addResult('TG-24-011', '-r 短选项支持', cmd6, '-r 应等同于 --raw',
+        hasId && hasTitle && hasNoWrapper ? '成功' : '信息不匹配', hasId && hasTitle && hasNoWrapper,
+        hasId && hasTitle && hasNoWrapper ? '-r 短选项正常工作' : '-r 短选项功能异常');
 }
 
 ctx.saveReports('TG-24-info', 'TG-24 文档信息测试报告');
