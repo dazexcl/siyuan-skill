@@ -16,14 +16,12 @@ const HELP_TEXT = `用法: info <docId> [选项]
   docId                文档/块ID
 
 选项:
-  --format <fmt>       输出格式：json/raw（默认：json）
-  -f <fmt>             输出格式的短选项
+  -r, --raw            直接输出数据，不包裹响应对象
   -h, --help           显示帮助信息
 
 示例:
   info 20231030-doc-id
-  info <id> --format raw
-  info <id> -f raw`;
+  info <id> --raw`;
 
 /**
  * 将短横线命名转为驼峰命名
