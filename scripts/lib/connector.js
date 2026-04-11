@@ -5,22 +5,19 @@
 
 const http = require('http');
 const https = require('https');
-
-/**
- * 默认 TLS 配置
- * 默认情况下，仅允许 localhost 使用自签名证书
- * 生产环境建议设置 allowSelfSignedCerts: false
- */
-const DEFAULT_TLS_CONFIG = {
-  allowSelfSignedCerts: false,
-  allowedHosts: ['localhost']
-};
+const ConfigManager = require('./config');
 
 /**
  * SiyuanConnector 类
  * 处理与 Siyuan Notes API 的通信
  */
 class SiyuanConnector {
+  /**
+   * 缓存的连接器实例（单例）
+   * @private
+   * @static
+   */
+  static _cachedConnector = null;
   /**
    * 构造函数
    * @param {Object} options - 配置选项
@@ -34,17 +31,19 @@ class SiyuanConnector {
    * @param {string[]} options.tls.allowedHosts - 允许自签名证书的主机列表
    */
   constructor(options = {}) {
-    this.baseURL = options.baseURL || 'http://localhost:6806';
-    this.token = options.token || '';
-    this.timeout = options.timeout || 10000;
+    const configManager = new ConfigManager();
+    this._config = configManager.getConfig();
+    
+    this.baseURL = options.baseURL || this._config.baseURL || 'http://localhost:6806';
+    this.token = options.token || this._config.token || '';
+    this.timeout = options.timeout || this._config.timeout || 10000;
     this.maxRetries = options.maxRetries || 3;
     this.retryDelay = options.retryDelay || 1000;
     
-    // TLS 配置（支持 options.tlsConfig 和 options.tls 两种方式）
-    const tlsConfig = options.tls || options.tlsConfig || {};
+    const tlsConfig = options.tls || options.tlsConfig || this._config.tls || {};
     this.tlsConfig = {
-      allowSelfSignedCerts: tlsConfig.allowSelfSignedCerts ?? DEFAULT_TLS_CONFIG.allowSelfSignedCerts,
-      allowedHosts: tlsConfig.allowedHosts || DEFAULT_TLS_CONFIG.allowedHosts
+      allowSelfSignedCerts: tlsConfig.allowSelfSignedCerts ?? this._config.tls.allowSelfSignedCerts,
+      allowedHosts: tlsConfig.allowedHosts || this._config.tls.allowedHosts
     };
     
     this.updateURL(this.baseURL);
@@ -63,7 +62,6 @@ class SiyuanConnector {
       try {
         return await this.makeRequest(endpoint, data);
       } catch (error) {
-        // 检查是否应该重试
         const shouldRetry = retryCount < this.maxRetries && 
           (error.code === 'ECONNABORTED' || 
            error.code === 'ECONNRESET' || 
@@ -107,12 +105,10 @@ class SiyuanConnector {
         timeout: this.timeout
       };
       
-      // 添加认证令牌
       if (this.token) {
         options.headers['Authorization'] = `Token ${this.token}`;
       }
       
-      // 处理 HTTPS（仅对允许的主机使用自签名证书）
       let agent = null;
       if (this.protocol === 'https:') {
         const isAllowedHost = this.tlsConfig.allowedHosts.includes(this.hostname);
@@ -134,12 +130,9 @@ class SiyuanConnector {
         
         res.on('end', () => {
           try {
-            // 检查 HTTP 状态码
             if (statusCode < 200 || statusCode >= 300) {
-              // 非 2xx 状态码，尝试提取错误信息
               let errorMessage = `HTTP ${statusCode}`;
               if (responseData) {
-                // 尝试从 JSON 响应中提取错误信息
                 try {
                   const errorData = JSON.parse(responseData);
                   if (errorData.msg) {
@@ -150,7 +143,6 @@ class SiyuanConnector {
                     errorMessage = `${statusCode}: ${responseData.substring(0, 200)}`;
                   }
                 } catch {
-                  // 不是 JSON，使用原始响应文本
                   errorMessage = `${statusCode}: ${responseData.substring(0, 200)}`;
                 }
               }
@@ -158,7 +150,6 @@ class SiyuanConnector {
               return;
             }
             
-            // 处理空响应
             if (!responseData) {
               resolve(null);
               return;
@@ -166,16 +157,13 @@ class SiyuanConnector {
             
             const parsedData = JSON.parse(responseData);
             
-            // 检查响应格式
             if (parsedData.code !== undefined) {
-              // 标准格式：{ code, data, msg }
               if (parsedData.code !== 0) {
                 reject(new Error(parsedData.msg || `API错误: code=${parsedData.code}`));
               } else {
                 resolve(parsedData.data);
               }
             } else {
-              // 非标准格式：直接返回响应数据
               resolve(parsedData);
             }
           } catch (error) {
@@ -186,18 +174,15 @@ class SiyuanConnector {
         });
       });
       
-      // 超时处理
       req.on('timeout', () => {
         req.destroy();
         reject(new Error(`请求超时 (${this.timeout}ms)`));
       });
       
-      // 错误处理
       req.on('error', (error) => {
         reject(error);
       });
       
-      // 发送请求数据
       const postData = JSON.stringify(data);
       options.headers['Content-Length'] = Buffer.byteLength(postData);
       
@@ -363,6 +348,37 @@ class SiyuanConnector {
     
     return formattedError;
   }
+  
+  /**
+   * 获取配置对象（实例方法）
+   * @returns {Object} 配置对象
+   */
+  getConfig() {
+    return this._config;
+  }
 }
+
+/**
+ * 获取配置好的连接器实例（静态方法）
+ * 首次调用时创建实例并缓存，后续调用返回缓存的实例
+ * @param {Object} overrideConfig - 覆盖配置（可选），如果提供则重新创建实例
+ * @returns {SiyuanConnector} 连接器实例
+ */
+SiyuanConnector.get = function(overrideConfig = {}) {
+  if (Object.keys(overrideConfig).length > 0) {
+    SiyuanConnector._cachedConnector = new SiyuanConnector(overrideConfig);
+  } else if (!SiyuanConnector._cachedConnector) {
+    SiyuanConnector._cachedConnector = new SiyuanConnector();
+  }
+  return SiyuanConnector._cachedConnector;
+};
+
+/**
+ * 清除缓存的连接器实例（静态方法）
+ * 用于需要重新创建实例的场景
+ */
+SiyuanConnector.clearCache = function() {
+  SiyuanConnector._cachedConnector = null;
+};
 
 module.exports = SiyuanConnector;

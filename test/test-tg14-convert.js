@@ -86,7 +86,7 @@ if (testDocId) {
     addResult('TG-14-01', 'ID转路径', 'convert --id <docId>', '返回文档路径', '测试文档创建失败', false);
 }
 
-//  TG-14-03: 不存在的ID
+// TG-14-02: 不存在的ID
 {
     const fakeId = '20230301' + Math.random().toString(36).substring(2, 15);
     const cmd = `convert --id ${fakeId}`;
@@ -99,31 +99,31 @@ if (testDocId) {
                    result.output.includes('not found') ||
                    result.output.includes('null');
     
-    addResult('TG-14-03', '转换不存在的ID', cmd, '返回错误提示',
+    addResult('TG-14-02', '转换不存在的ID', cmd, '返回错误提示',
         handled ? '成功' : '未正确处理', handled,
         handled ? '正确处理不存在的ID' : '未返回预期错误');
 }
 
-// TG-14-04: 简写模式 - ID
+// TG-14-03: 简写模式 - ID
 if (testDocId) {
     const cmd = `convert ${testDocId}`;
     const result = runCmd(cmd);
     
     if (!result.success) {
-        addResult('TG-14-04', '简写模式-ID', cmd, '自动识别为ID',
+        addResult('TG-14-03', '简写模式-ID', cmd, '自动识别为ID',
             '命令执行失败', false, result.error);
     } else {
         const data = parseConvertResult(result.output);
         const hasPath = data && (data.path || data.hPath);
-        addResult('TG-14-04', '简写模式-ID', cmd, '自动识别为ID',
+        addResult('TG-14-03', '简写模式-ID', cmd, '自动识别为ID',
             hasPath ? '成功' : '无路径', !!hasPath,
             hasPath ? '位置参数正确识别为ID' : '未返回路径');
     }
 } else {
-    addResult('TG-14-04', '简写模式-ID', 'convert <docId>', '自动识别为ID', '测试文档创建失败', false);
+    addResult('TG-14-03', '简写模式-ID', 'convert <docId>', '自动识别为ID', '测试文档创建失败', false);
 }
 
-// TG-14-05: 通过文档标题路径获取ID（使用完整hPath）
+// TG-14-04: 通过文档标题路径获取ID（使用完整hPath）
 if (testDocId) {
     const pathResult = runCmd(`convert --id ${testDocId}`);
     const pathData = parseConvertResult(pathResult.output);
@@ -134,28 +134,28 @@ if (testDocId) {
         const result = runCmd(cmd);
 
         if (!result.success) {
-            addResult('TG-14-05', '通过路径获取ID', cmd, '返回文档ID',
+            addResult('TG-14-04', '通过路径获取ID', cmd, '返回文档ID',
                 '命令执行失败', false, result.error);
         } else {
             const data = parseConvertResult(result.output);
             if (data && data.id) {
                 const idMatches = data.id === testDocId;
-                addResult('TG-14-05', '通过路径获取ID', cmd, '返回文档ID',
+                addResult('TG-14-04', '通过路径获取ID', cmd, '返回文档ID',
                     idMatches ? '成功' : 'ID不匹配', idMatches,
                     `路径: ${docHPath}, 返回ID: ${data.id}, 匹配: ${idMatches}`);
             } else {
-                addResult('TG-14-05', '通过路径获取ID', cmd, '返回文档ID',
+                addResult('TG-14-04', '通过路径获取ID', cmd, '返回文档ID',
                     '无ID返回', false, '未找到文档ID');
             }
         }
     } else {
-        addResult('TG-14-05', '通过路径获取ID', 'convert --path "/path"', '返回文档ID', '无法获取文档路径', false);
+        addResult('TG-14-04', '通过路径获取ID', 'convert --path "/path"', '返回文档ID', '无法获取文档路径', false);
     }
 } else {
-    addResult('TG-14-05', '通过路径获取ID', 'convert --path "/path"', '返回文档ID', '测试文档创建失败', false);
+    addResult('TG-14-04', '通过路径获取ID', 'convert --path "/path"', '返回文档ID', '测试文档创建失败', false);
 }
 
-// TG-14-06: 路径转ID（使用完整路径）
+// TG-14-05: 路径转ID（使用完整路径）
 if (testDocId) {
     // 先获取路径
     const pathResult = runCmd(`convert --id ${testDocId}`);
@@ -167,25 +167,25 @@ if (testDocId) {
         const result = runCmd(cmd);
         
         if (!result.success) {
-            addResult('TG-14-06', '路径转ID', cmd, '返回文档ID',
+            addResult('TG-14-05', '路径转ID', cmd, '返回文档ID',
                 '命令执行失败', false, result.error);
         } else {
             const data = parseConvertResult(result.output);
             if (data && data.id) {
                 const idMatches = data.id === testDocId;
-                addResult('TG-14-06', '路径转ID', cmd, '返回文档ID',
+                addResult('TG-14-05', '路径转ID', cmd, '返回文档ID',
                     idMatches ? '成功' : 'ID不匹配', idMatches,
                     `路径: ${docPath}, 返回ID: ${data.id}`);
             } else {
-                addResult('TG-14-06', '路径转ID', cmd, '返回文档ID',
+                addResult('TG-14-05', '路径转ID', cmd, '返回文档ID',
                     '无ID返回', false, '路径转ID失败');
             }
         }
     } else {
-        addResult('TG-14-06', '路径转ID', 'convert --path "/path"', '返回文档ID', '无法获取测试路径', false);
+        addResult('TG-14-05', '路径转ID', 'convert --path "/path"', '返回文档ID', '无法获取测试路径', false);
     }
 } else {
-    addResult('TG-14-06', '路径转ID', 'convert --path "/path"', '返回文档ID', '测试文档创建失败', false);
+    addResult('TG-14-05', '路径转ID', 'convert --path "/path"', '返回文档ID', '测试文档创建失败', false);
 }
 
 // 清理

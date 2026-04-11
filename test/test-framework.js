@@ -263,7 +263,7 @@ function runCmd(cmd) {
     /**
      * 清理详情文本（用于表格显示）
      */
-    function sanitizeDetails(details, maxLen = 50) {
+    function sanitizeDetails(details, maxLen = 100) {
         if (!details) return '-';
         return details
             .replace(/[\r\n]+/g, ' ')

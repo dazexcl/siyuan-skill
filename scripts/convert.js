@@ -1,19 +1,25 @@
 #!/usr/bin/env node
 /**
- * convert.js - 文档ID与路径互转
+ * convert.js - 文档 ID 与路径之间的互相转换
  * 
- * 支持完整的路径解析和ID转换功能
+ * 支持功能：
+ * - 根据文档ID获取人类可读路径
+ * - 根据人类可读路径获取文档ID
+ * - 支持默认笔记本配置
+ * - 支持强制返回第一个匹配结果
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
+const { checkPermissionResult } = require('./lib/permission');
+const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
 const HELP_TEXT = `用法: convert [选项]
 
 文档 ID 与路径之间的互相转换
 
 选项:
-  --id <id>         根据文档ID获取路径
-  --path <path>     根据路径获取文档ID
+  --id <id>         根据文档ID获取人类可读路径
+  --path <path>     根据人类可读路径获取文档ID
   --force           强制返回第一个结果（忽略多个匹配）
   -h, --help        显示帮助信息
 
@@ -26,246 +32,165 @@ const HELP_TEXT = `用法: convert [选项]
   convert --path "/笔记本名/文档名" --force`;
 
 /**
- * 将短横线命名转为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
+ * 校验文档ID格式
+ * @param {string} id - 文档ID
+ * @returns {boolean} 是否为有效的文档ID
  */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+function isValidDocId(id) {
+  return /^\d{14}-\w{7}$/.test(id);
 }
 
 /**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
+ * 校验笔记本ID格式
+ * @param {string} id - 笔记本ID
+ * @returns {boolean} 是否为有效的笔记本ID
  */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['id', 'path']);
+function isValidNotebookId(id) {
+  return /^\d{14}-\w{7}$/.test(id);
+}
 
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2 && arg !== '-') {
-      // 短选项暂不定义
-    } else {
-      positional.push(arg);
-    }
+/**
+ * 获取笔记本列表
+ * @returns {Promise<Array>} 笔记本列表
+ */
+async function getNotebooks() {
+  const connector = SiyuanConnector.get();
+  const result = await connector.request('/api/notebook/lsNotebooks', {});
+  return result?.notebooks || [];
+}
+
+/**
+ * 根据ID或名称查找笔记本
+ * @param {Array} notebooks - 笔记本列表
+ * @param {string} identifier - 笔记本ID或名称
+ * @returns {Object|null} 笔记本对象
+ */
+function findNotebook(notebooks, identifier) {
+  if (isValidNotebookId(identifier)) {
+    return notebooks.find(nb => nb.id === identifier);
   }
-  return { positional, ...options };
+  return notebooks.find(nb => nb.name === identifier);
+}
+
+/**
+ * 解析路径中的笔记本信息
+ * @param {Array} pathParts - 路径分割后的数组
+ * @param {Array} notebooks - 笔记本列表
+ * @param {string} defaultNotebook - 默认笔记本ID
+ * @returns {Object} 笔记本信息 {id, name, found}
+ */
+function resolveNotebook(pathParts, notebooks, defaultNotebook = null) {
+  const notebook = findNotebook(notebooks, pathParts[0]);
+  
+  if (notebook) {
+    return {
+      id: notebook.id,
+      name: notebook.name,
+      found: true
+    };
+  }
+  
+  if (defaultNotebook) {
+    const defaultNb = notebooks.find(nb => nb.id === defaultNotebook);
+    return {
+      id: defaultNotebook,
+      name: defaultNb?.name || null,
+      found: false
+    };
+  }
+  
+  return {
+    id: notebooks[0].id,
+    name: notebooks[0].name || null,
+    found: false
+  };
 }
 
 /**
  * 根据人类可读路径获取文档 ID
- * @param {SiyuanConnector} connector - 连接器实例
  * @param {string} hPath - 人类可读路径
  * @param {boolean} force - 是否强制返回第一个结果
  * @param {string} defaultNotebook - 默认笔记本ID
+ * @param {Object} config - 配置对象
  * @returns {Promise<Object>} 转换结果
  */
-async function pathToId(connector, hPath, force = false, defaultNotebook = null) {
+async function pathToId(hPath, force = false, defaultNotebook = null, config = null) {
   try {
     const pathParts = hPath.split('/').filter(p => p.trim() !== '');
     if (pathParts.length === 0) {
-      return {
-        success: false,
-        error: '无效路径',
-        message: '路径不能为空'
-      };
+      return createErrorResult('无效路径', '路径不能为空');
     }
 
-    const notebooksResult = await connector.request('/api/notebook/lsNotebooks', {});
-    if (!notebooksResult || !notebooksResult.notebooks) {
-      return {
-        success: false,
-        error: '获取笔记本列表失败',
-        message: '无法获取笔记本列表'
-      };
+    const notebooks = await getNotebooks();
+    if (notebooks.length === 0) {
+      return createErrorResult('未找到笔记本', '系统中没有可用的笔记本');
     }
 
-    let notebookId = null;
-    let notebookName = null;
-    let foundNotebook = false;
+    const { id: notebookId, name: notebookName, found: foundNotebook } = resolveNotebook(pathParts, notebooks, defaultNotebook);
 
-    // 检查是否为笔记本ID格式
-    if (/^\d{15}-\w{5}$/.test(pathParts[0])) {
-      const nbById = notebooksResult.notebooks.find(nb => nb.id === pathParts[0]);
-      if (nbById) {
-        notebookId = nbById.id;
-        notebookName = nbById.name;
-        foundNotebook = true;
-      }
-    } else {
-      for (const nb of notebooksResult.notebooks) {
-        if (nb.name === pathParts[0]) {
-          notebookId = nb.id;
-          notebookName = nb.name;
-          foundNotebook = true;
-          break;
-        }
-      }
-    }
-
-    if (!foundNotebook) {
-      if (defaultNotebook) {
-        notebookId = defaultNotebook;
-        const defaultNbInfo = notebooksResult.notebooks.find(nb => nb.id === defaultNotebook);
-        notebookName = defaultNbInfo?.name || '默认笔记本';
-      } else if (notebooksResult.notebooks.length > 0) {
-        notebookId = notebooksResult.notebooks[0].id;
-        notebookName = notebooksResult.notebooks[0].name || '未命名笔记本';
-      } else {
-        return {
-          success: false,
-          error: '未找到笔记本',
-          message: '系统中没有可用的笔记本'
-        };
+    if (config) {
+      const permission = checkPermissionResult(config, notebookId, notebooks);
+      if (!permission.hasPermission) {
+        return createErrorResult('权限被拒绝', permission.error);
       }
     }
 
     if (foundNotebook && pathParts.length === 1) {
-      return {
-        success: true,
-        data: {
-          id: notebookId,
-          name: notebookName,
-          path: hPath,
-          type: 'notebook'
-        },
-        message: '路径转 ID 成功'
-      };
+      return createSuccessResult({
+        id: notebookId,
+        path: hPath
+      }, '路径转 ID 成功');
     }
 
     const relativePath = foundNotebook
       ? '/' + pathParts.slice(1).join('/')
       : '/' + pathParts.join('/');
 
+    const connector = SiyuanConnector.get();
     const result = await connector.request('/api/filetree/getIDsByHPath', {
       notebook: notebookId,
       path: relativePath
     });
 
-    if (result && Array.isArray(result) && result.length > 0) {
+    if (Array.isArray(result) && result.length > 0) {
       if (result.length > 1 && !force) {
-        return {
-          success: false,
-          error: '多个匹配文档',
-          message: `找到 ${result.length} 个匹配的文档，请使用 --force 参数直接获取第一个结果`
-        };
+        return createErrorResult('多个匹配文档', `找到 ${result.length} 个匹配的文档，请使用 --force 参数直接获取第一个结果`);
       }
 
-      let docTitle = null;
-      try {
-        const attrs = await connector.request('/api/attr/getBlockAttrs', { id: result[0] });
-        if (attrs && attrs.title) {
-          docTitle = attrs.title;
-        }
-      } catch (error) {
-        // 忽略错误
-      }
-
-      return {
-        success: true,
-        data: {
-          id: result[0],
-          name: docTitle || pathParts[pathParts.length - 1],
-          path: hPath,
-          type: 'document',
-          notebook: notebookId,
-          notebookName: notebookName,
-          multipleMatches: result.length > 1
-        },
-        message: result.length > 1 ? '找到多个匹配文档，返回第一个结果' : '路径转 ID 成功'
-      };
+      return createSuccessResult({
+        id: result[0],
+        path: hPath,
+        notebook: notebookId,
+        multipleMatches: result.length > 1
+      }, result.length > 1 ? '找到多个匹配文档，返回第一个结果' : '路径转 ID 成功');
     }
 
-    return {
-      success: false,
-      error: '未找到文档',
-      message: `未找到路径对应的文档：${hPath}`
-    };
+    return createErrorResult('未找到文档', `未找到路径对应的文档：${hPath}`);
   } catch (error) {
-    return {
-      success: false,
-      error: error.message,
-      message: '路径转 ID 失败'
-    };
+    return createErrorResult(error.message, '路径转 ID 失败');
   }
 }
 
 /**
  * 根据文档 ID 获取人类可读路径
- * @param {SiyuanConnector} connector - 连接器实例
  * @param {string} id - 文档 ID
  * @returns {Promise<Object>} 转换结果
  */
-async function idToPath(connector, id) {
+async function idToPath(id) {
   try {
-    const pathInfo = await connector.request('/api/filetree/getPathByID', { id });
-
-    if (!pathInfo || !pathInfo.notebook || !pathInfo.path) {
-      return {
-        success: false,
-        error: '未找到文档',
-        message: `未找到 ID 对应的文档：${id}`
-      };
-    }
-
-    const notebooksResult = await connector.request('/api/notebook/lsNotebooks', {});
-    let notebookName = null;
-    if (notebooksResult && notebooksResult.notebooks) {
-      for (const nb of notebooksResult.notebooks) {
-        if (nb.id === pathInfo.notebook) {
-          notebookName = nb.name;
-          break;
-        }
-      }
-    }
-
+    const connector = SiyuanConnector.get();
     const hPath = await connector.request('/api/filetree/getHPathByID', { id });
-    const fullPath = notebookName ? `/${notebookName}${hPath}` : hPath;
 
-    let docTitle = null;
-    try {
-      const attrs = await connector.request('/api/attr/getBlockAttrs', { id });
-      if (attrs && attrs.title) {
-        docTitle = attrs.title;
-      }
-    } catch (error) {
-      // 忽略错误
+    if (!hPath) {
+      return createErrorResult('未找到文档', `未找到 ID 对应的文档：${id}`);
     }
 
-    return {
-      success: true,
-      data: {
-        id: id,
-        path: fullPath,
-        storagePath: pathInfo.path,
-        notebook: pathInfo.notebook,
-        notebookName: notebookName,
-        title: docTitle,
-        type: 'document'
-      },
-      message: 'ID 转路径成功'
-    };
+    return createSuccessResult({
+      id: id,
+      path: hPath
+    }, 'ID 转人类可读路径成功');
   } catch (error) {
-    return {
-      success: false,
-      error: error.message,
-      message: 'ID 转路径失败'
-    };
+    return createErrorResult(error.message, 'ID 转人类可读路径失败');
   }
 }
 
@@ -274,18 +199,21 @@ async function idToPath(connector, id) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['id', 'path'],
+    shortOpts: { 'h': 'help' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
 
-  const { positional, ...params } = parseArgs(args);
+  const params = { ...options, positional: positionalArgs };
 
-  // 支持简写模式：如果没有--id和--path，检查位置参数
-  if (!params.id && !params.path && positional.length > 0) {
-    const firstArg = positional[0];
-    // 判断是ID还是路径：如果是ID格式（14位数字-6位字符），则识别为ID
-    if (/^\d{14}-\w{7}$/.test(firstArg)) {
+  if (!params.id && !params.path && params.positional.length > 0) {
+    const firstArg = params.positional[0];
+    if (isValidDocId(firstArg)) {
       params.id = firstArg;
     } else {
       params.path = firstArg;
@@ -300,30 +228,31 @@ async function main() {
 
   if (params.id && params.path) {
     console.error('错误: --id 和 --path 参数只能提供一个');
+    console.log(HELP_TEXT);
     process.exit(1);
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
-    if (params.id) {
-      const result = await idToPath(connector, params.id);
-      console.log(JSON.stringify(result, null, 2));
-    } else if (params.path) {
-      const result = await pathToId(connector, params.path, params.force || false, config.defaultNotebook);
-      console.log(JSON.stringify(result, null, 2));
+    if (!config.baseURL || !config.token) {
+      console.error('错误: 配置文件中缺少必要的连接信息（baseURL 或 token）');
+      process.exit(1);
     }
 
-    process.exit(0);
+    let result;
+    if (params.id) {
+      result = await idToPath(params.id);
+    } else {
+      result = await pathToId(params.path, params.force || false, config.defaultNotebook, config);
+    }
+
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.success ? 0 : 1);
   } catch (error) {
     console.error('执行失败:', error.message);
+    console.error(error.stack);
     process.exit(1);
   }
 }

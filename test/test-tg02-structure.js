@@ -20,37 +20,16 @@ function parseStructure(output) {
 
 function findDocInStructure(structure, docId) {
     const docs = structure.documents || [];
-    const folders = structure.folders || [];
     
     for (const doc of docs) {
         if (doc.id === docId) return doc;
-    }
-    
-    for (const folder of folders) {
-        if (folder.id === docId) return folder;
-        if (folder.documents) {
-            for (const doc of folder.documents) {
-                if (doc.id === docId) return doc;
-            }
-        }
-        if (folder.folders) {
-            const found = findDocInStructure({ folders: folder.folders, documents: [] }, docId);
-            if (found) return found;
+        if (doc.documents) {
+            const foundInDocs = findDocInStructure(doc, docId);
+            if (foundInDocs) return foundInDocs;
         }
     }
     
     return null;
-}
-
-function countAllDocs(structure) {
-    let count = (structure.documents || []).length;
-    for (const folder of (structure.folders || [])) {
-        count += (folder.documents || []).length;
-        if (folder.subFolders) {
-            count += countAllDocs({ folders: folder.subFolders });
-        }
-    }
-    return count;
 }
 
 console.log('\n========================================');
@@ -146,10 +125,7 @@ console.log('\n测试用例:');
         
         const foundLevel1 = level1Doc !== null;
         const correctLevel1Title = level1Doc && level1Doc.title === level1Title;
-        const level1UnderRoot = rootDoc && (
-            (rootDoc.documents && rootDoc.documents.some(d => d.id === level1Id)) ||
-            (rootDoc.folders && rootDoc.folders.some(f => f.id === level1Id))
-        );
+        const level1UnderRoot = rootDoc && rootDoc.documents && rootDoc.documents.some(d => d.id === level1Id);
         
         if (foundLevel1 && correctLevel1Title && level1UnderRoot) {
             ctx.addResult('TG-02-02', '验证一级子文档', cmd, '子文档在父文档下', 
@@ -178,10 +154,7 @@ console.log('\n测试用例:');
         
         const foundLevel2 = level2Doc !== null;
         const correctLevel2Title = level2Doc && level2Doc.title === level2Title;
-        const level2UnderLevel1 = level1Doc && (
-            (level1Doc.documents && level1Doc.documents.some(d => d.id === level2Id)) ||
-            (level1Doc.folders && level1Doc.folders.some(f => f.id === level2Id))
-        );
+        const level2UnderLevel1 = level1Doc && level1Doc.documents && level1Doc.documents.some(d => d.id === level2Id);
         
         if (foundLevel2 && correctLevel2Title && level2UnderLevel1) {
             ctx.addResult('TG-02-03', '验证二级子文档嵌套', cmd, '孙子文档在子文档下', 
@@ -265,19 +238,14 @@ console.log('\n测试用例:');
         } else {
             const hasLevel1 = depth1Structure.documents && depth1Structure.documents.some(d => d.id === level1Id);
             const hasLevel2 = depth1Structure.documents && depth1Structure.documents.some(d => d.id === level2Id);
-            const hasLevel1InFolders = depth1Structure.folders && depth1Structure.folders.some(f => f.id === level1Id);
-            const hasLevel2InFolders = depth1Structure.folders && depth1Structure.folders.some(f => f.id === level2Id);
             
-            const foundLevel1 = hasLevel1 || hasLevel1InFolders;
-            const foundLevel2 = hasLevel2 || hasLevel2InFolders;
-            
-            if (foundLevel1 && !foundLevel2) {
+            if (hasLevel1 && !hasLevel2) {
                 ctx.addResult('TG-02-07', '测试depth=1', depth1Cmd, '只返回第一层文档', 
                     '成功', true, '包含一级子文档，但不包含二级子文档');
-            } else if (!foundLevel1) {
+            } else if (!hasLevel1) {
                 ctx.addResult('TG-02-07', '测试depth=1', depth1Cmd, '只返回第一层文档', 
                     '一级子文档缺失', false, 'depth=1应该返回一级子文档');
-            } else if (foundLevel2) {
+            } else if (hasLevel2) {
                 ctx.addResult('TG-02-07', '测试depth=1', depth1Cmd, '只返回第一层文档', 
                     '深度控制失败', false, 'depth=1不应包含二级子文档');
             }
@@ -303,8 +271,6 @@ console.log('\n测试用例:');
                 '无法解析返回数据', false);
         } else {
             const hasLevel1InDocs = depth2Structure.documents && depth2Structure.documents.some(d => d.id === level1Id);
-            const hasLevel1InFolders = depth2Structure.folders && depth2Structure.folders.some(f => f.id === level1Id);
-            const foundLevel1 = hasLevel1InDocs || hasLevel1InFolders;
             
             let foundLevel2 = false;
             let level2UnderLevel1 = false;
@@ -312,23 +278,15 @@ console.log('\n测试用例:');
             if (hasLevel1InDocs) {
                 const level1Doc = depth2Structure.documents.find(d => d.id === level1Id);
                 if (level1Doc) {
-                    foundLevel2 = (level1Doc.documents && level1Doc.documents.some(d => d.id === level2Id)) ||
-                                  (level1Doc.folders && level1Doc.folders.some(f => f.id === level2Id));
-                    level2UnderLevel1 = foundLevel2;
-                }
-            } else if (hasLevel1InFolders) {
-                const level1Folder = depth2Structure.folders.find(f => f.id === level1Id);
-                if (level1Folder) {
-                    foundLevel2 = (level1Folder.documents && level1Folder.documents.some(d => d.id === level2Id)) ||
-                                  (level1Folder.folders && level1Folder.folders.some(f => f.id === level2Id));
+                    foundLevel2 = level1Doc.documents && level1Doc.documents.some(d => d.id === level2Id);
                     level2UnderLevel1 = foundLevel2;
                 }
             }
             
-            if (foundLevel1 && foundLevel2 && level2UnderLevel1) {
+            if (hasLevel1InDocs && foundLevel2 && level2UnderLevel1) {
                 ctx.addResult('TG-02-08', '测试depth=2', depth2Cmd, '返回两层文档', 
                     '成功', true, '正确返回一级和二级子文档');
-            } else if (!foundLevel1) {
+            } else if (!hasLevel1InDocs) {
                 ctx.addResult('TG-02-08', '测试depth=2', depth2Cmd, '返回两层文档', 
                     '一级子文档缺失', false, 'depth=2应该返回一级子文档');
             } else if (!foundLevel2) {
@@ -361,10 +319,8 @@ console.log('\n测试用例:');
                 ctx.addResult('TG-02-09', '使用文档ID获取结构', docIdCmd, '返回文档树结构', 
                     '无法解析返回数据', false);
             } else {
-                const hasChildren = (docIdStructure.documents && docIdStructure.documents.length > 0) ||
-                                    (docIdStructure.folders && docIdStructure.folders.length > 0);
-                const hasLevel1 = (docIdStructure.documents && docIdStructure.documents.some(d => d.id === level1Id)) ||
-                                  (docIdStructure.folders && docIdStructure.folders.some(f => f.id === level1Id));
+                const hasChildren = docIdStructure.documents && docIdStructure.documents.length > 0;
+                const hasLevel1 = docIdStructure.documents && docIdStructure.documents.some(d => d.id === level1Id);
                 
                 if (hasChildren && hasLevel1) {
                     ctx.addResult('TG-02-09', '使用文档ID获取结构', docIdCmd, '返回文档树结构（默认depth=1）', 
@@ -399,14 +355,13 @@ console.log('\n测试用例:');
                 '无法解析返回数据', false);
         } else {
             const hasDocuments = depth0Structure.documents && depth0Structure.documents.length > 0;
-            const hasFolders = depth0Structure.folders && depth0Structure.folders.length > 0;
             
-            if (!hasDocuments && !hasFolders) {
+            if (!hasDocuments) {
                 ctx.addResult('TG-02-10', '测试depth=0', depth0Cmd, '不返回子文档', 
                     '成功', true, 'depth=0正确不返回任何子文档');
             } else {
                 ctx.addResult('TG-02-10', '测试depth=0', depth0Cmd, '不返回子文档', 
-                    'depth=0无效', false, `depth=0不应返回子文档，但返回了文档:${hasDocuments}, 文件夹:${hasFolders}`);
+                    'depth=0无效', false, `depth=0不应返回子文档，但返回了${depth0Structure.documents.length}个文档`);
             }
         }
     }
