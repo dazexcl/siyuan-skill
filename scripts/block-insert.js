@@ -17,11 +17,13 @@ const HELP_TEXT = `用法: block-insert <content> [选项]
   --parent-id <id>     父块ID
   --previous-id <id>   插入到该块之后
   --next-id <id>       插入到该块之前
+  -d, --data-type <type> 数据类型：markdown（默认）/dom
   -h, --help           显示帮助信息
 
 示例:
   block-insert "新段落内容" --parent-id <parent-id>
-  block-insert "内容" --previous-id <after-this-block>`;
+  block-insert "内容" --previous-id <after-this-block>
+  block-insert "内容" --parent-id <id> --data-type markdown`;
 
 /**
  * 主函数 - 插入块
@@ -29,8 +31,8 @@ const HELP_TEXT = `用法: block-insert <content> [选项]
 async function main() {
   const args = process.argv.slice(2);
   const { options, positionalArgs } = parseArgs(args, {
-    hasValueOpts: ['parent-id', 'previous-id', 'next-id'],
-    shortOpts: { p: 'parentId', P: 'previousId', n: 'nextId' }
+    hasValueOpts: ['parent-id', 'previous-id', 'next-id', 'data-type'],
+    shortOpts: { p: 'parentId', P: 'previousId', n: 'nextId', d: 'data-type' }
   });
 
   if (options.help) {
@@ -54,6 +56,13 @@ async function main() {
     process.exit(1);
   }
 
+  const dataType = options['data-type'] || options.dataType || 'markdown';
+
+  if (dataType !== 'markdown' && dataType !== 'dom') {
+    console.error('错误: dataType 必须是 "markdown" 或 "dom"');
+    process.exit(1);
+  }
+
   try {
     const connector = SiyuanConnector.get();
     const config = connector.getConfig();
@@ -68,7 +77,7 @@ async function main() {
     }
 
     const requestData = {
-      dataType: 'markdown',
+      dataType: dataType,
       data: content
     };
 

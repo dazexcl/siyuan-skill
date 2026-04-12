@@ -404,7 +404,23 @@ async function getAllDocs(connector, notebookId) {
   const docs = [];
   
   try {
-    const sqlQuery = `SELECT id, content, path, updated, box FROM blocks WHERE box = '${notebookId}' AND type = 'd'`;
+    const escapeSql = (value) => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const strValue = String(value);
+      return strValue
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\0/g, '\\0')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\x1a/g, '\\Z');
+    };
+
+    const escapedNotebookId = escapeSql(notebookId);
+    const sqlQuery = `SELECT id, content, path, updated, box FROM blocks WHERE box = '${escapedNotebookId}' AND type = 'd'`;
     const blocks = await connector.request('/api/query/sql', { stmt: sqlQuery });
 
     if (blocks?.length > 0) {

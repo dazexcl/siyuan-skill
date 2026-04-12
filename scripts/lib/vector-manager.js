@@ -312,8 +312,9 @@ class VectorManager {
     const denseVector = await this.embeddingManager.generateEmbedding(content);
     const sparseVector = this.embeddingManager.generateSparseVector(content);
 
+    const pointId = this.generateUUIDFromId(docId);
     const point = {
-      id: docId,
+      id: pointId,
       vector: {
         dense: denseVector,
         sparse: sparseVector
@@ -341,6 +342,7 @@ class VectorManager {
       return {
         success: true,
         docId,
+        pointId,
         vectorSize: denseVector.length
       };
     } catch (error) {
@@ -371,19 +373,10 @@ class VectorManager {
         documents.map(async (doc) => {
           const denseVector = await this.embeddingManager.generateEmbedding(doc.content);
           const sparseVector = this.embeddingManager.generateSparseVector(doc.content);
-
-          function hashStringToUint(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-              const char = str.charCodeAt(i);
-              hash = ((hash << 5) - hash) + char;
-              hash = hash & hash;
-            }
-            return Math.abs(hash);
-          }
+          const pointId = this.generateUUIDFromId(doc.docId);
 
           return {
-            id: hashStringToUint(doc.docId),
+            id: pointId,
             vector: {
               dense: denseVector,
               sparse: sparseVector
@@ -780,8 +773,9 @@ class VectorManager {
     }
 
     try {
+      const pointId = this.generateUUIDFromId(docId);
       await this.fetchAPI(`/collections/${this.collectionName}/points/delete?wait=true`, 'POST', {
-        points: [docId]
+        points: [pointId]
       });
       return true;
     } catch (error) {
@@ -829,6 +823,46 @@ class VectorManager {
 
       return false;
     }
+  }
+
+  /**
+   * 生成 UUID v4
+   * @returns {string} UUID 字符串
+   */
+  generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  /**
+   * 基于字符串生成稳定的 UUID v5（使用命名空间）
+   * @param {string} str - 输入字符串
+   * @returns {string} UUID 字符串
+   */
+  generateUUIDFromId(str) {
+    function hashString(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash);
+    }
+
+    const hash = hashString(str);
+    const hex = hash.toString(16).padStart(32, '0');
+    
+    return [
+      hex.substring(0, 8),
+      hex.substring(8, 12),
+      '4' + hex.substring(13, 16),
+      (8 + (parseInt(hex.substring(16, 17), 16) & 3)).toString(16) + hex.substring(17, 20),
+      hex.substring(20, 32)
+    ].join('-');
   }
 
   /**

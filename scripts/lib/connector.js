@@ -351,10 +351,41 @@ class SiyuanConnector {
   
   /**
    * 获取配置对象（实例方法）
+   * @param {boolean} reload - 是否重新加载配置
    * @returns {Object} 配置对象
    */
-  getConfig() {
+  getConfig(reload = false) {
+    if (reload) {
+      const configManager = new ConfigManager();
+      this._config = configManager.getConfig();
+      
+      if (this._config.baseURL) {
+        this.updateURL(this._config.baseURL);
+      }
+      if (this._config.token) {
+        this.token = this._config.token;
+      }
+      if (this._config.timeout) {
+        this.timeout = this._config.timeout;
+      }
+      
+      const tlsConfig = this._config.tls || {};
+      if (tlsConfig.allowSelfSignedCerts !== undefined || tlsConfig.allowedHosts) {
+        this.tlsConfig = {
+          allowSelfSignedCerts: tlsConfig.allowSelfSignedCerts ?? this.tlsConfig.allowSelfSignedCerts,
+          allowedHosts: tlsConfig.allowedHosts || this.tlsConfig.allowedHosts
+        };
+      }
+    }
     return this._config;
+  }
+
+  /**
+   * 重新加载配置
+   * @returns {Object} 新的配置对象
+   */
+  reloadConfig() {
+    return this.getConfig(true);
   }
 }
 
@@ -362,13 +393,16 @@ class SiyuanConnector {
  * 获取配置好的连接器实例（静态方法）
  * 首次调用时创建实例并缓存，后续调用返回缓存的实例
  * @param {Object} overrideConfig - 覆盖配置（可选），如果提供则重新创建实例
+ * @param {boolean} reload - 是否重新加载配置（仅对已存在的实例生效）
  * @returns {SiyuanConnector} 连接器实例
  */
-SiyuanConnector.get = function(overrideConfig = {}) {
+SiyuanConnector.get = function(overrideConfig = {}, reload = false) {
   if (Object.keys(overrideConfig).length > 0) {
     SiyuanConnector._cachedConnector = new SiyuanConnector(overrideConfig);
   } else if (!SiyuanConnector._cachedConnector) {
     SiyuanConnector._cachedConnector = new SiyuanConnector();
+  } else if (reload) {
+    SiyuanConnector._cachedConnector.reloadConfig();
   }
   return SiyuanConnector._cachedConnector;
 };
@@ -379,6 +413,18 @@ SiyuanConnector.get = function(overrideConfig = {}) {
  */
 SiyuanConnector.clearCache = function() {
   SiyuanConnector._cachedConnector = null;
+};
+
+/**
+ * 重新加载缓存的连接器实例配置（静态方法）
+ * @returns {SiyuanConnector|null} 连接器实例，如果不存在则返回 null
+ */
+SiyuanConnector.reloadConfig = function() {
+  if (SiyuanConnector._cachedConnector) {
+    SiyuanConnector._cachedConnector.reloadConfig();
+    return SiyuanConnector._cachedConnector;
+  }
+  return null;
 };
 
 module.exports = SiyuanConnector;

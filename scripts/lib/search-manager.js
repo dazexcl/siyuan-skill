@@ -151,7 +151,41 @@ class SearchManager {
   }
 
   /**
-   * 验证并清理 ID 格式（思源笔记 ID 为 14-22 位字母数字）
+   * 清理 WHERE 子句，防止 SQL 注入
+   * @param {string} where - WHERE 子句
+   * @returns {string} 清理后的 WHERE 子句
+   */
+  sanitizeWhereClause(where) {
+    if (!where || typeof where !== 'string') {
+      return '';
+    }
+
+    const dangerousKeywords = [
+      'DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE',
+      'TRUNCATE', 'EXEC', 'EXECUTE', 'UNION', 'SELECT', 'GRANT',
+      'REVOKE', 'SHUTDOWN', 'ATTACH', 'DETACH', 'PRAGMA'
+    ];
+
+    let sanitized = where
+      .replace(/--/g, '')
+      .replace(/;/g, '')
+      .replace(/\/\*/g, '')
+      .replace(/\*\//g, '')
+      .trim();
+
+    const upperSanitized = sanitized.toUpperCase();
+    for (const keyword of dangerousKeywords) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      if (regex.test(upperSanitized)) {
+        return '';
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * 验证并清理 ID 格式（思源笔记 ID 格式为 YYYYMMDDHHmmss-xxxxxx）
    * @param {string} id - 需要验证的 ID
    * @returns {string|null} 清理后的 ID 或 null
    */
@@ -160,7 +194,7 @@ class SearchManager {
       return null;
     }
     const cleaned = id.trim();
-    if (!/^[a-zA-Z0-9_-]{14,32}$/.test(cleaned)) {
+    if (!/^\d{14}-[a-z0-9]{4,14}$/.test(cleaned)) {
       return null;
     }
     return cleaned;
@@ -485,13 +519,8 @@ class SearchManager {
       let finalResults = mergedResults;
       let rerankInfo = null;
 
-      console.error(`重排条件检查: enableRerank=${enableRerank}, vectorManager=${!!this.vectorManager}, embeddingManager=${!!(this.vectorManager?.embeddingManager)}`);
-      console.log(`合并结果数量: ${mergedResults.length}`);
-
       if (enableRerank && this.vectorManager && this.vectorManager.embeddingManager) {
         try {
-          console.error(`创建重排器...`);
-          
           const rerankConfig = this.config?.rerank || {};
           const reranker = new Reranker(
             this.vectorManager.embeddingManager,
@@ -506,28 +535,8 @@ class SearchManager {
               maxContentLength: this.config?.embedding?.maxContentLength || 4000
             }
           );
-          console.error(`重排器创建成功，开始重排 ${mergedResults.length} 个结果...`);
-          console.error(`查询文本: "${query}"`);
-
-          if (mergedResults.length > 0) {
-            console.error(`第一个结果预览:`, {
-              id: mergedResults[0].id,
-              content: mergedResults[0].content?.substring(0, 50),
-              relevanceScore: mergedResults[0].relevanceScore
-            });
-          }
 
           finalResults = await reranker.rerank(query, mergedResults);
-          console.error(`重排完成，得到 ${finalResults.length} 个结果`);
-
-          if (finalResults.length > 0) {
-            console.error(`第一个重排结果:`, {
-              id: finalResults[0].id,
-              originalScore: finalResults[0].originalScore,
-              rerankScore: finalResults[0].rerankScore,
-              finalScore: finalResults[0].finalScore
-            });
-          }
 
           rerankInfo = {
             enabled: true,
@@ -542,8 +551,6 @@ class SearchManager {
             error: error.message
           };
         }
-      } else {
-        console.log('重排条件不满足，跳过重排');
       }
 
       return {
@@ -992,11 +999,7 @@ class SearchManager {
       }
       
       if (where && typeof where === 'string') {
-        const sanitizedWhere = where
-          .replace(/--/g, '')
-          .replace(/;/g, '')
-          .replace(/\/\*/g, '')
-          .replace(/\*\//g, '');
+        const sanitizedWhere = this.sanitizeWhereClause(where);
         sqlQuery += ` AND ${sanitizedWhere}`;
       }
       

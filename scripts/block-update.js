@@ -18,12 +18,14 @@ const HELP_TEXT = `用法: block-update <block-id> [content] [选项]
 选项:
   -c, --content <text>  块内容
   -f, --file <path>     从文件读取内容
+  -d, --data-type <type> 数据类型：markdown（默认）/dom
   -h, --help            显示帮助信息
 
 示例:
   block-update <block-id> "新内容"
   echo "内容" | block-update <block-id>
-  block-update <block-id> -f content.md`;
+  block-update <block-id> -f content.md
+  block-update <block-id> -c "内容" --data-type markdown`;
 
 async function readFromStdin() {
   return new Promise((resolve, reject) => {
@@ -35,11 +37,39 @@ async function readFromStdin() {
   });
 }
 
+/**
+ * 验证ID是否为块ID（不是文档ID）
+ * @param {SiyuanConnector} connector - 连接器实例
+ * @param {string} id - 要验证的ID
+ * @returns {Promise<Object>} 验证结果 { isBlock: boolean, error?: string, blockInfo?: Object }
+ */
+async function validateBlockId(connector, id) {
+  try {
+    const blockInfo = await connector.request('/api/block/getBlockInfo', { id });
+
+    if (!blockInfo) {
+      return { isBlock: false, error: '无法获取块信息，请检查ID是否正确' };
+    }
+
+    if (blockInfo.rootID === id && blockInfo.path && blockInfo.path.endsWith('.sy')) {
+      return {
+        isBlock: false,
+        error: '传入的ID是文档，不是块。请使用 update 命令更新文档内容',
+        blockInfo: blockInfo
+      };
+    }
+
+    return { isBlock: true, blockInfo: blockInfo };
+  } catch (error) {
+    return { isBlock: false, error: `验证块ID失败: ${error.message}` };
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const { options, positionalArgs } = parseArgs(args, {
-    hasValueOpts: ['content', 'file'],
-    shortOpts: { c: 'content', f: 'file' }
+    hasValueOpts: ['content', 'file', 'data-type'],
+    shortOpts: { c: 'content', f: 'file', d: 'data-type' }
   });
 
   if (options.help) {
@@ -75,16 +105,34 @@ async function main() {
     process.exit(1);
   }
 
+  const dataType = options['data-type'] || options.dataType || 'markdown';
+
+  if (dataType !== 'markdown' && dataType !== 'dom') {
+    console.error('错误: dataType 必须是 "markdown" 或 "dom"');
+    process.exit(1);
+  }
+
   try {
     const connector = SiyuanConnector.get();
     const config = connector.getConfig();
 
-    const blockInfo = await connector.request('/api/block/getBlockInfo', { id: blockId });
+    const validation = await validateBlockId(connector, blockId);
+
+    if (!validation.isBlock) {
+      console.log(JSON.stringify({
+        success: false,
+        error: '参数类型错误',
+        message: validation.error
+      }, null, 2));
+      process.exit(1);
+    }
+
+    const blockInfo = validation.blockInfo;
     checkPermission(config, blockInfo.box);
 
     const result = await connector.request('/api/block/updateBlock', {
       id: blockId,
-      dataType: 'markdown',
+      dataType: dataType,
       data: content
     });
 

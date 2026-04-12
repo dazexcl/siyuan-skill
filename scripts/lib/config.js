@@ -165,38 +165,6 @@ class ConfigManager {
     // 验证并返回配置
     return this.validateConfig(mergedConfig);
   }
-
-  /**
-   * 深度合并配置对象
-   */
-  deepMergeConfigs(...configs) {
-    return configs.reduce((target, source) => {
-      if (typeof target !== 'object' || target === null) {
-        return source;
-      }
-      
-      if (typeof source !== 'object' || source === null) {
-        return source;
-      }
-      
-      const merged = { ...target };
-      
-      for (const key in source) {
-        if (source[key] && typeof source[key] === 'object' && 
-            !Array.isArray(source[key]) && 
-            target[key] && typeof target[key] === 'object' && 
-            !Array.isArray(target[key])) {
-          // 深度合并嵌套对象
-          merged[key] = this.deepMergeConfigs(target[key], source[key]);
-        } else {
-          // 简单值或数组直接覆盖
-          merged[key] = source[key];
-        }
-      }
-      
-      return merged;
-    }, {});
-  }
   
   /**
    * 从环境变量加载配置
