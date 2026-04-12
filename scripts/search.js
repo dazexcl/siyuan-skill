@@ -7,12 +7,12 @@
  * - semantic: 使用向量嵌入进行语义搜索
  * - hybrid: 结合 Siyuan 原生搜索和向量搜索的混合模式
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const EmbeddingManager = require('./lib/embedding-manager');
 const VectorManager = require('./lib/vector-manager');
 const SearchManager = require('./lib/search-manager');
 const { checkPermission } = require('./lib/permission');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: search <query> [选项]
 
@@ -51,56 +51,6 @@ const HELP_TEXT = `用法: search <query> [选项]
   search "深度学习" --enable-rerank --rerank-top-k 100 --rerank-weight 0.7`;
 
 /**
- * 将连字符命名转换为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
- */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set([
-    'mode', 'type', 'types', 'limit', 'path', 'notebookId', 'notebook', 'threshold',
-    'sort', 'tags', 'where', 'denseWeight', 'sparseWeight', 'sqlWeight',
-    'rerankTopK', 'rerankWeight'
-  ]);
-  const SHORT_OPTS = { m: 'mode', T: 'type', l: 'limit', P: 'path', n: 'notebookId' };
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey && i + 1 < argv.length) {
-        options[shortKey] = argv[++i];
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
-/**
  * 执行 Siyuan 原生搜索
  * @param {SiyuanConnector} connector - Siyuan 连接器实例
  * @param {string} query - 搜索关键词
@@ -115,18 +65,25 @@ function parseArgs(argv) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['mode', 'type', 'types', 'limit', 'path', 'notebook-id', 'threshold',
+      'sort', 'tags', 'where', 'dense-weight', 'sparse-weight', 'sql-weight',
+      'rerank-top-k', 'rerank-weight'],
+    flagOpts: ['enable-rerank'],
+    shortOpts: { m: 'mode', T: 'type', l: 'limit', P: 'path', n: 'notebookId' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  if (params.positional.length === 0) {
+  if (positionalArgs.length === 0) {
     process.stdout.write('错误: 请提供搜索关键词\n');
     process.exit(1);
   }
 
-  const query = params.positional[0];
+  const params = options;
+  const query = positionalArgs[0];
   if (!query || query.trim() === '') {
     process.stdout.write('错误: 搜索关键词不能为空\n');
     process.exit(1);
@@ -147,25 +104,19 @@ async function main() {
   const tags = params.tags ? (typeof params.tags === 'string' ? params.tags.split(',').map(t => t.trim()) : params.tags) : null;
   const where = params.where || null;
   const sort = params.sort || 'relevance';
-  const denseWeight = parseFloat(params.denseWeight) || 0.7;
-  const sparseWeight = parseFloat(params.sparseWeight) || 0.3;
-  const sqlWeight = parseFloat(params.sqlWeight) || 0;
+  const denseWeight = parseFloat(params['dense-weight'] || params.denseWeight) || 0.7;
+  const sparseWeight = parseFloat(params['sparse-weight'] || params.sparseWeight) || 0.3;
+  const sqlWeight = parseFloat(params['sql-weight'] || params.sqlWeight) || 0;
   const limit = parseInt(params.limit) || 32;
   const threshold = parseFloat(params.threshold) || 0;
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
-    const enableRerank = params.enableRerank || config.rerank?.enable || false;
-    const rerankTopK = parseInt(params.rerankTopK) || config.rerank?.rerankTopK || 50;
-    const rerankWeight = parseFloat(params.rerankWeight) || config.rerank?.rerankWeight || 0.5;
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const enableRerank = params['enable-rerank'] || params.enableRerank || config.rerank?.enable || false;
+    const rerankTopK = parseInt(params['rerank-top-k'] || params.rerankTopK) || config.rerank?.rerankTopK || 50;
+    const rerankWeight = parseFloat(params['rerank-weight'] || params.rerankWeight) || config.rerank?.rerankWeight || 0.5;
 
     // 仅在配置了向量搜索相关参数时初始化
     let vectorManager = null;

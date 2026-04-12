@@ -2,9 +2,11 @@
 /**
  * delete.js - 删除文档
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const { parseArgs } = require('./lib/args-parser');
+const EmbeddingManager = require('./lib/embedding-manager');
+const VectorManager = require('./lib/vector-manager');
 
 const HELP_TEXT = `用法: delete <docId> [选项]
 
@@ -22,62 +24,22 @@ const HELP_TEXT = `用法: delete <docId> [选项]
   delete <doc-id> --confirm-title "文档标题"`;
 
 /**
- * 将短横线命名转为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
- */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['confirmTitle']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2 && arg !== '-') {
-      // 短选项暂不定义
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
-/**
  * 主入口函数
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['confirm-title']
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-  
-  const params = parseArgs(args);
-  if (params.positional.length > 0) {
-    params.docId = params.positional[0];
+  if (positionalArgs.length > 0) {
+    options.docId = positionalArgs[0];
   }
-  delete params.positional;
+  const params = options;
 
   if (!params.docId) {
     console.error('错误: 缺少必需的文档ID参数');
@@ -86,14 +48,8 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     // 获取文档信息以检查保护状态
     let docInfo;
@@ -134,7 +90,8 @@ async function main() {
       }
       
       // 非安全模式：检查是否需要确认标题
-      if (config.deleteProtection.requireConfirmation && !params.confirmTitle) {
+      const confirmTitle = params['confirm-title'] || params.confirmTitle;
+      if (config.deleteProtection.requireConfirmation && !confirmTitle) {
         console.error('错误: 需要确认文档标题');
         console.error(`请使用 --confirm-title "${docInfo.rootTitle || docInfo.content}" 确认删除`);
         process.exit(1);
@@ -148,10 +105,11 @@ async function main() {
     }
 
     // 如果提供了确认标题，必须验证（无论安全模式是否启用）
-    if (params.confirmTitle && params.confirmTitle !== (docInfo.rootTitle || docInfo.content)) {
+    const confirmTitle = params['confirm-title'] || params.confirmTitle;
+    if (confirmTitle && confirmTitle !== (docInfo.rootTitle || docInfo.content)) {
       console.error('错误: 确认标题与文档标题不匹配');
       console.error(`文档标题: "${docInfo.rootTitle || docInfo.content}"`);
-      console.error(`确认标题: "${params.confirmTitle}"`);
+      console.error(`确认标题: "${confirmTitle}"`);
       process.exit(1);
     }
 
@@ -175,6 +133,19 @@ async function main() {
     
     console.log('删除文档API返回结果:', JSON.stringify(result, null, 2));
     console.log('删除验证成功：文档已删除');
+    
+    // 清理向量数据库中的索引
+    try {
+      const embeddingManager = new EmbeddingManager(config.embedding);
+      const vectorManager = new VectorManager(config, embeddingManager);
+      const removeResult = await vectorManager.removeDoc(params.docId);
+      if (removeResult.success) {
+        console.log(`已清理向量索引: 删除了 ${removeResult.deletedCount || 0} 个向量`);
+      }
+    } catch (vectorError) {
+      // 向量索引清理失败不影响主流程，仅记录日志
+      console.error(`警告: 清理向量索引失败: ${vectorError.message}`);
+    }
 
     console.log(JSON.stringify({
       success: true,

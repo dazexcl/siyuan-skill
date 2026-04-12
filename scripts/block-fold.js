@@ -2,8 +2,8 @@
 /**
  * block-fold.js - 折叠/展开块
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: block-fold <blockId> [选项]
 
@@ -20,53 +20,24 @@ const HELP_TEXT = `用法: block-fold <blockId> [选项]
   block-fold <block-id> --action fold
   block-fold <block-id> --action unfold`;
 
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['action']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2 && arg[1] === 'a' && i + 1 < argv.length) {
-      options.action = argv[++i];
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['action']
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  const blockId = params.positional[0];
+  const blockId = positionalArgs[0];
 
   if (!blockId) {
     console.error('错误: 请提供块ID');
     process.exit(1);
   }
 
+  const params = options;
   const action = params.action || 'fold';
   if (action !== 'fold' && action !== 'unfold') {
     console.error('错误: action 必须是 fold 或 unfold');
@@ -74,14 +45,7 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
 
     const endpoint = action === 'fold' ? '/api/block/foldBlock' : '/api/block/unfoldBlock';
     await connector.request(endpoint, { id: blockId });

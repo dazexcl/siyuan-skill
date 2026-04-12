@@ -152,7 +152,7 @@ console.log('\n步骤 2: 执行索引操作...');
 {
   if (docIds.length > 0) {
     const firstDocId = docIds[0].id;
-    const cmd = `index --doc-ids "${firstDocId}" --force`;
+    const cmd = `index --doc-ids "${firstDocId}" --force --quiet`;
     const result = runCmd(cmd);
     
     if (!result.success) {

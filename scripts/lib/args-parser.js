@@ -31,6 +31,7 @@ function parseSimpleArgs(args) {
  * @param {Object} config - 配置选项
  * @param {Object} config.hasValueOpts - 需要值的选项集合（Set 或 数组）
  * @param {Object} config.shortOpts - 短选项映射 { 'h': 'help' }
+ * @param {Object} config.multiValueOpts - 支持多值的选项集合（Set 或 数组）
  * @param {Object} config.defaults - 默认值
  * @returns {Object} { options: Object, positionalArgs: string[] }
  */
@@ -38,6 +39,7 @@ function parseArgs(args, config = {}) {
   const positionalArgs = [];
   const options = { ...config.defaults };
   const hasValueOpts = new Set(config.hasValueOpts || []);
+  const multiValueOpts = new Set(config.multiValueOpts || []);
   const shortOpts = config.shortOpts || {};
   
   for (let i = 0; i < args.length; i++) {
@@ -49,13 +51,37 @@ function parseArgs(args, config = {}) {
       const eqIndex = arg.indexOf('=');
       if (eqIndex > -1) {
         const key = arg.slice(2, eqIndex);
-        options[key] = arg.slice(eqIndex + 1);
+        const value = arg.slice(eqIndex + 1);
+        if (multiValueOpts.has(key)) {
+          if (!Array.isArray(options[key])) {
+            options[key] = [];
+          }
+          options[key].push(value);
+        } else {
+          options[key] = value;
+        }
       } else {
         const key = arg.slice(2);
         if (hasValueOpts.has(key) && i + 1 < args.length && !args[i + 1].startsWith('-')) {
-          options[key] = args[++i];
+          const value = args[++i];
+          if (multiValueOpts.has(key)) {
+            if (!Array.isArray(options[key])) {
+              options[key] = [];
+            }
+            options[key].push(value);
+          } else {
+            options[key] = value;
+          }
         } else if (hasValueOpts.has(key) && i + 1 < args.length && args[i + 1].startsWith('-') && /^-?\d+$/.test(args[i + 1])) {
-          options[key] = args[++i];
+          const value = args[++i];
+          if (multiValueOpts.has(key)) {
+            if (!Array.isArray(options[key])) {
+              options[key] = [];
+            }
+            options[key].push(value);
+          } else {
+            options[key] = value;
+          }
         } else {
           options[key] = true;
         }
@@ -64,9 +90,25 @@ function parseArgs(args, config = {}) {
       const shortKey = arg[1];
       const longKey = shortOpts[shortKey] || shortKey;
       if (hasValueOpts.has(longKey) && i + 1 < args.length && !args[i + 1].startsWith('-')) {
-        options[longKey] = args[++i];
+        const value = args[++i];
+        if (multiValueOpts.has(longKey)) {
+          if (!Array.isArray(options[longKey])) {
+            options[longKey] = [];
+          }
+          options[longKey].push(value);
+        } else {
+          options[longKey] = value;
+        }
       } else if (hasValueOpts.has(longKey) && i + 1 < args.length && args[i + 1].startsWith('-') && /^-?\d+$/.test(args[i + 1])) {
-        options[longKey] = args[++i];
+        const value = args[++i];
+        if (multiValueOpts.has(longKey)) {
+          if (!Array.isArray(options[longKey])) {
+            options[longKey] = [];
+          }
+          options[longKey].push(value);
+        } else {
+          options[longKey] = value;
+        }
       } else {
         options[longKey] = true;
       }

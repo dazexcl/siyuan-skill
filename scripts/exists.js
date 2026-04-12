@@ -2,8 +2,8 @@
 /**
  * exists.js - 检查文档是否存在
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: exists [选项]
 
@@ -24,70 +24,25 @@ const HELP_TEXT = `用法: exists [选项]
   exists --title "标题" --parent-id <id>
   exists --path "/目录/文档"`;
 
-/** 短选项到长选项的映射 */
-const SHORT_OPTS = { t: 'title', p: 'parentId', n: 'notebookId' };
-
-/**
- * 将短横线命名转为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
- */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['title', 'path', 'parentId', 'notebookId']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey && i + 1 < argv.length) {
-        options[shortKey] = argv[++i];
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
 /**
  * 主入口函数
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['title', 'path', 'parent-id', 'notebook-id'],
+    shortOpts: { t: 'title', p: 'parentId', n: 'notebookId' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-  
-  const params = parseArgs(args);
+  const params = options;
   // 第一个位置参数可作为 title
-  if (params.positional.length > 0 && !params.title) {
-    params.title = params.positional[0];
+  if (positionalArgs.length > 0 && !params.title) {
+    params.title = positionalArgs[0];
   }
-  delete params.positional;
 
   if (!params.title && !params.path) {
     console.error('错误: 需要提供 --title 或 --path 参数');
@@ -96,28 +51,23 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
 
     let searchPath = params.path;
     let notebookId = null;
 
     // 如果提供了 title 和 parentId，构建完整路径
-    if (params.title && params.parentId) {
+    const parentId = params['parent-id'] || params.parentId;
+    const notebookIdParam = params['notebook-id'] || params.notebookId;
+    if (params.title && parentId) {
       try {
         const parentInfo = await connector.request('/api/block/getBlockInfo', {
-          id: params.parentId
+          id: parentId
         });
         if (parentInfo && parentInfo.box) {
           notebookId = parentInfo.box;
           const parentHPath = await connector.request('/api/filetree/getHPathByID', {
-            id: params.parentId
+            id: parentId
           });
           if (parentHPath) {
             searchPath = parentHPath + '/' + params.title;
@@ -126,10 +76,10 @@ async function main() {
       } catch (err) {
         // 获取父文档信息失败，继续
       }
-    } else if (params.title && params.notebookId) {
+    } else if (params.title && notebookIdParam) {
       // 获取笔记本信息
       const notebooks = await connector.request('/api/notebook/lsNotebooks');
-      const notebook = notebooks?.notebooks?.find(n => n.id === params.notebookId);
+      const notebook = notebooks?.notebooks?.find(n => n.id === notebookIdParam);
       if (notebook) {
         notebookId = notebook.id;
         searchPath = '/' + params.title;

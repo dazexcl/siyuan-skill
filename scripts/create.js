@@ -6,9 +6,9 @@
  * - 通过 parentId 在指定父文档下创建
  * - 通过 path 在指定路径创建（自动创建中间目录）
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const { parseArgs } = require('./lib/args-parser');
 const fs = require('fs');
 
 const HELP_TEXT = `用法: create <title> [选项]
@@ -37,52 +37,13 @@ const HELP_TEXT = `用法: create <title> [选项]
   - 使用 --parent-id 时，参数可以是笔记本ID或文档ID，但不能是内容块ID
   - 使用 --path 时，路径首位支持笔记本名称或笔记本ID`;
 
-/** 短选项到长选项的映射 */
-const SHORT_OPTS = { p: 'parentId', P: 'path', c: 'content', f: 'file' };
-
 /**
- * 将短横线命名转为驼峰命名
+ * 将短横线命名转为驼峰命名（保留此函数，因为公共解析器不提供）
  * @param {string} str - 输入字符串
  * @returns {string} 驼峰命名字符串
  */
 function camelCase(str) {
   return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['parentId', 'path', 'content', 'file']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-        options[shortKey] = argv[++i];
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
 }
 
 /**
@@ -152,52 +113,48 @@ async function pathToId(connector, path, force = false) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['parent-id', 'path', 'content', 'file'],
+    shortOpts: { p: 'parentId', P: 'path', c: 'content', f: 'file' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  if (params.positional.length > 0) {
-    params.title = params.positional[0];
+  if (positionalArgs.length > 0) {
+    options.title = positionalArgs[0];
     // 第二个位置参数作为内容（如果没有通过 --content 指定）
-    if (params.positional.length > 1 && !params.content) {
-      params.content = params.positional[1];
+    if (positionalArgs.length > 1 && !options.content) {
+      options.content = positionalArgs[1];
     }
   }
-  delete params.positional;
 
   // 如果使用 --path 模式，可以不提供 title 参数（从路径中提取）
-  if (!params.title && !params.path) {
+  if (!options.title && !options.path) {
     console.error('错误: 缺少必需的标题参数');
     console.log(HELP_TEXT);
     process.exit(1);
   }
 
-  if (params.parentId && params.path) {
+  if ((options['parent-id'] || options.parentId) && options.path) {
     console.error('错误: --parent-id 和 --path 参数只能二选一');
     process.exit(1);
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     let notebookId = null;
     let parentId = null;
     let fullPath = '';
-    let displayTitle = params.title || null;
+    let displayTitle = options.title || null;
 
     // 处理路径模式
-    if (params.path) {
-      const pathEndsWithSlash = params.path.endsWith('/');
-      const pathComponents = params.path.split('/').filter(c => c.trim());
+    if (options.path) {
+      const pathEndsWithSlash = options.path.endsWith('/');
+      const pathComponents = options.path.split('/').filter(c => c.trim());
 
       if (pathComponents.length === 0) {
         console.error('错误: 路径不能为空');
@@ -230,7 +187,7 @@ async function main() {
       }
 
       // 确定最终标题 - 优先使用 --title 参数
-      const finalTitle = pathEndsWithSlash ? params.title : (params.title || pathComponents[pathComponents.length - 1]);
+      const finalTitle = pathEndsWithSlash ? options.title : (options.title || pathComponents[pathComponents.length - 1]);
       
       // 保存最终标题，用于后续设置文档标题
       displayTitle = finalTitle;
@@ -246,7 +203,7 @@ async function main() {
       }
     } else {
       // parentId 模式
-      parentId = params.parentId || config.defaultNotebook;
+      parentId = options['parent-id'] || config.defaultNotebook;
 
       if (!parentId) {
         console.error('错误: 必须提供 --parent-id 或配置默认笔记本');
@@ -334,20 +291,20 @@ async function main() {
 
       // 构建完整路径
       if (parentId === notebookId) {
-        fullPath = '/' + params.title;
+        fullPath = '/' + options.title;
       } else {
         try {
           const hPathInfo = await connector.request('/api/filetree/getHPathByID', { id: parentId });
-          fullPath = hPathInfo ? `${hPathInfo}/${params.title}` : '/' + params.title;
+          fullPath = hPathInfo ? `${hPathInfo}/${options.title}` : '/' + options.title;
         } catch (e) {
-          fullPath = '/' + params.title;
+          fullPath = '/' + options.title;
         }
       }
     }
 
     // 重名检测和强制创建逻辑
     let existingDocId = null;
-    if (!params.force) {
+    if (!options.force) {
       try {
         const existResult = await connector.request('/api/filetree/getIDsByHPath', {
           notebook: notebookId,
@@ -377,14 +334,14 @@ async function main() {
       }
     }
 
-    let content = params.content;
+    let content = options.content;
 
     // 从文件读取内容
-    if (params.file) {
+    if (options.file) {
       try {
-        content = fs.readFileSync(params.file, 'utf8');
+        content = fs.readFileSync(options.file, 'utf8');
       } catch (fileError) {
-        console.error('错误: 无法读取文件', params.file);
+        console.error('错误: 无法读取文件', options.file);
         console.error(fileError.message);
         process.exit(1);
       }
@@ -403,13 +360,13 @@ async function main() {
         });
         createResult = existingDocId;
 
-        if (params.title) {
+        if (options.title) {
           try {
             await connector.request('/api/attr/setBlockAttrs', {
               id: existingDocId,
-              attrs: { title: params.title }
+              attrs: { title: options.title }
             });
-            displayTitle = params.title;
+            displayTitle = options.title;
           } catch (e) {
           }
         }
@@ -425,7 +382,7 @@ async function main() {
       });
 
       if (createResult) {
-        if (params.path) {
+        if (options.path) {
           try {
             await connector.request('/api/filetree/renameDocByID', {
               id: createResult,

@@ -2,9 +2,9 @@
 /**
  * block-delete.js - 删除块
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const { parseSimpleArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: block-delete <blockId>
 
@@ -19,25 +19,15 @@ const HELP_TEXT = `用法: block-delete <blockId>
 示例:
   block-delete <block-id>`;
 
-function parseArgs(argv) {
-  const positional = [];
-  for (const arg of argv) {
-    if (!arg.startsWith('-')) {
-      positional.push(arg);
-    }
-  }
-  return { positional };
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseSimpleArgs(args);
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  const blockId = params.positional[0];
+  const blockId = positionalArgs[0];
 
   if (!blockId) {
     console.error('错误: 请提供块ID');
@@ -45,14 +35,8 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     // 获取块信息以检查笔记本权限
     const blockInfo = await connector.request('/api/block/getBlockInfo', { id: blockId });

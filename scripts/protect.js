@@ -7,9 +7,9 @@
  * - 支持临时保护（可移除）和永久保护（不可通过命令移除）
  * - 集成权限检查，确保操作在授权笔记本内执行
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: protect <docId> [选项]
 
@@ -33,72 +33,38 @@ const HELP_TEXT = `用法: protect <docId> [选项]
   protect <doc-id> --remove           # 移除临时保护
   protect <doc-id> --permanent --remove # 尝试移除永久保护（会失败）`;
 
-/** 短选项映射 */
-const SHORT_OPTS = { r: 'remove', p: 'permanent' };
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      options[key] = true;
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey) {
-        options[shortKey] = true;
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
 /**
  * 主入口函数
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    shortOpts: { r: 'remove', p: 'permanent' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-  
-  const params = parseArgs(args);
-  if (params.positional.length > 0) {
-    params.docId = params.positional[0];
+  if (positionalArgs.length > 0) {
+    options.docId = positionalArgs[0];
   }
-  delete params.positional;
 
-  if (!params.docId) {
+  if (!options.docId) {
     console.error('错误: 缺少必需的文档ID参数');
     console.log(HELP_TEXT);
     process.exit(1);
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     // 获取文档所属笔记本ID以检查权限（使用 getPathByID 避免 getBlockInfo 的索引问题）
     let notebookId;
     try {
       const pathInfo = await connector.request('/api/filetree/getPathByID', {
-        id: params.docId
+        id: options.docId
       });
       notebookId = pathInfo?.box || pathInfo?.notebook;
     } catch (error) {
@@ -125,14 +91,14 @@ async function main() {
     let currentAttrs;
     try {
       currentAttrs = await connector.request('/api/attr/getBlockAttrs', {
-        id: params.docId
+        id: options.docId
       });
     } catch (error) {
       // 如果获取属性失败，假设没有属性
       currentAttrs = {};
     }
 
-    if (params.remove) {
+    if (options.remove) {
       // 移除保护标记前，检查是否为永久保护
       if (currentAttrs && currentAttrs['custom-protected'] === 'permanent') {
         console.error('错误: 文档被标记为永久保护，无法通过命令移除保护');
@@ -144,12 +110,12 @@ async function main() {
       const newAttrs = { ...currentAttrs };
       newAttrs['custom-protected'] = '';
       await connector.request('/api/attr/setBlockAttrs', {
-        id: params.docId,
+        id: options.docId,
         attrs: newAttrs
       });
       console.log(JSON.stringify({
         success: true,
-        id: params.docId,
+        id: options.docId,
         protected: false,
         level: null,
         message: '保护标记已移除',
@@ -157,21 +123,21 @@ async function main() {
       }, null, 2));
     } else {
       // 设置保护标记（与历史版本保持一致：true 表示临时保护，permanent 表示永久保护）
-      const protectionValue = params.permanent ? 'permanent' : 'true';
+      const protectionValue = options.permanent ? 'permanent' : 'true';
       const newAttrs = {
         ...currentAttrs,
         'custom-protected': protectionValue
       };
       await connector.request('/api/attr/setBlockAttrs', {
-        id: params.docId,
+        id: options.docId,
         attrs: newAttrs
       });
       console.log(JSON.stringify({
         success: true,
-        id: params.docId,
+        id: options.docId,
         protected: true,
-        level: params.permanent ? 'permanent' : 'protected',
-        message: params.permanent ? '文档已设置为永久保护' : '文档已受保护',
+        level: options.permanent ? 'permanent' : 'protected',
+        message: options.permanent ? '文档已设置为永久保护' : '文档已受保护',
         timestamp: Date.now()
       }, null, 2));
     }

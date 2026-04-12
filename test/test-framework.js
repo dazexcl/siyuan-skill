@@ -202,17 +202,30 @@ function runCmd(cmd) {
         const result = runCmd(`convert --id ${docId}`);
         if (!result.success) return null;
         const pathMatch = result.output.match(/"path"\s*:\s*"([^"]+)"/);
-        const notebookNameMatch = result.output.match(/"notebookName"\s*:\s*"([^"]+)"/);
-        if (!pathMatch || !notebookNameMatch) return null;
+        if (!pathMatch) return null;
         
         let path = pathMatch[1];
-        const notebookName = notebookNameMatch[1];
-        const prefix = `/${notebookName}/`;
-        if (path.startsWith(prefix)) {
-            path = path.substring(prefix.length);
-        } else if (path.startsWith(`/${notebookName}`)) {
-            path = path.substring(`/${notebookName}`.length);
+        
+        // convert.js 返回的路径可能不包含笔记本名称
+        // 如果路径不以 /笔记本名/ 开头，则直接返回
+        const notebooksResult = runCmd('notebooks');
+        let notebookName = null;
+        if (notebooksResult.success) {
+            const notebookMatch = notebooksResult.output.match(new RegExp(`"id"\\s*:\\s*"${NOTEBOOK_ID}"[\\s\\S]*?"name"\\s*:\\s*"([^"]+)"`));
+            if (notebookMatch) {
+                notebookName = notebookMatch[1];
+            }
         }
+        
+        if (notebookName) {
+            const prefix = `/${notebookName}/`;
+            if (path.startsWith(prefix)) {
+                path = path.substring(prefix.length);
+            } else if (path.startsWith(`/${notebookName}`)) {
+                path = path.substring(`/${notebookName}`.length);
+            }
+        }
+        
         return path;
     }
     

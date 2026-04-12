@@ -3,9 +3,9 @@
  * move.js - 移动文档到另一个目录
  * 支持文档ID或路径格式，包含重名检测和详细返回信息
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: move <docId|path> [targetParentId|path] [选项]
 
@@ -25,18 +25,6 @@ const HELP_TEXT = `用法: move <docId|path> [targetParentId|path] [选项]
   move <id> --target <parentId>
   move <id> <parentId> --new-title "新标题"
   move "/笔记本名/文档路径" "/笔记本名/目标路径"`;
-
-/** 短选项到长选项的映射 */
-const SHORT_OPTS = { T: 'target', t: 'newTitle' };
-
-/**
- * 将短横线命名转为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
- */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
 
 /**
  * 根据人类可读路径获取文档 ID
@@ -144,63 +132,29 @@ async function checkDuplicateDocument(connector, targetParentId, title, excludeI
 }
 
 /**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['target', 'newTitle']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey && i + 1 < argv.length) {
-        options[shortKey] = argv[++i];
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
-/**
  * 主入口函数
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['target', 'new-title'],
+    shortOpts: { T: 'target', t: 'newTitle' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-  
-  const params = parseArgs(args);
-  if (params.positional.length > 0) {
-    params.docId = params.positional[0];
+  if (positionalArgs.length > 0) {
+    options.docId = positionalArgs[0];
   }
-  if (params.positional.length > 1 && !params.target) {
-    params.targetParentId = params.positional[1];
+  if (positionalArgs.length > 1 && !options.target) {
+    options.targetParentId = positionalArgs[1];
   }
-  if (params.target && !params.targetParentId) {
-    params.targetParentId = params.target;
+  if (options.target && !options.targetParentId) {
+    options.targetParentId = options.target;
   }
-  delete params.positional;
-  delete params.target;
+  const params = options;
 
   if (!params.docId) {
     console.error('错误: 缺少必需的文档ID参数');
@@ -215,14 +169,8 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     let originalDocPath = null;
     let originalTargetPath = null;
@@ -284,7 +232,7 @@ async function main() {
       process.exit(1);
     }
 
-    let titleToUse = params.newTitle || docInfo.rootTitle;
+    let titleToUse = params['new-title'] || params.newTitle || docInfo.rootTitle;
 
     const existingDoc = await checkDuplicateDocument(
       connector,
@@ -307,12 +255,13 @@ async function main() {
       toID: targetParentId
     });
 
-    if (params.newTitle && params.newTitle !== docInfo.rootTitle) {
+    const newTitle = params['new-title'] || params.newTitle;
+    if (newTitle && newTitle !== docInfo.rootTitle) {
       await connector.request('/api/filetree/renameDocByID', {
         id: docId,
-        title: params.newTitle
+        title: newTitle
       });
-      docInfo.rootTitle = params.newTitle;
+      docInfo.rootTitle = newTitle;
     }
 
     let newPath = null;
@@ -333,7 +282,7 @@ async function main() {
         to: newPath?.path || null,
         targetParentId,
         originalTargetPath: originalTargetPath,
-        newTitle: params.newTitle || null,
+        newTitle: params['new-title'] || params.newTitle || null,
         moved: true
       },
       message: '文档迁移成功',

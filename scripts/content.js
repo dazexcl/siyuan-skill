@@ -6,9 +6,9 @@
  * 支持 docId 或 path 参数
  * 支持 raw 模式直接输出
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const { checkPermission } = require('./lib/permission');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: content [<docId>] [选项]
 
@@ -28,48 +28,6 @@ const HELP_TEXT = `用法: content [<docId>] [选项]
   content --path "/笔记本名/文档名"
   content <id> --format markdown
   content <id> --format text --raw`;
-
-/**
- * 将短横线命名转为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
- */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['path', 'format']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2 && arg !== '-') {
-      // 短选项暂不定义
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
 
 /**
  * Markdown 转纯文本
@@ -197,19 +155,22 @@ async function pathToDocId(connector, path, defaultNotebook) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['path', 'format']
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
   
+  const params = options;
   let docId = null;
   let format = params.format || 'kramdown';
   const raw = params.raw || false;
 
-  if (params.positional.length > 0) {
-    docId = params.positional[0];
+  if (positionalArgs.length > 0) {
+    docId = positionalArgs[0];
   }
 
   // 参数验证
@@ -231,14 +192,8 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     // 处理路径参数
     if (params.path) {

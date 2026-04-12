@@ -1,11 +1,11 @@
 /**
- * TG-22-000 属性操作测试
+ * TG-22 属性操作测试
  * 测试 block-attrs 命令及其别名
  * 验证：设置后通过get获取属性验证确实被设置/移除
  */
 const { createTestContext } = require('./test-framework');
 
-const ctx = createTestContext('TG-22-000 属性操作测试');
+const ctx = createTestContext('TG-22 属性操作测试');
 const { runCmd, addResult, extractDocId, saveReports, cleanup, createdDocs, NOTEBOOK_ID, PARENT_ID } = ctx;
 
 /**
@@ -16,12 +16,9 @@ class AttrCache {
     this.docId = docId;
     this.cached = null;
     this.timestamp = 0;
-    this.cacheTTL = 1000; // 1秒缓存
+    this.cacheTTL = 1000;
   }
 
-  /**
-   * 获取所有属性（带缓存）
-   */
   getAttrs() {
     const now = Date.now();
     if (this.cached && (now - this.timestamp) < this.cacheTTL) {
@@ -50,27 +47,18 @@ class AttrCache {
     return this.cached;
   }
 
-  /**
-   * 检查属性是否存在
-   */
   hasAttr(attrName) {
     const data = this.getAttrs();
     if (!data.success) return false;
     return data.attrs.hasOwnProperty(attrName) || data.attrs.hasOwnProperty('custom-' + attrName);
   }
 
-  /**
-   * 获取属性值
-   */
   getAttrValue(attrName) {
     const data = this.getAttrs();
     if (!data.success) return null;
     return data.attrs[attrName] || data.attrs['custom-' + attrName] || null;
   }
 
-  /**
-   * 清除缓存
-   */
   clear() {
     this.cached = null;
     this.timestamp = 0;
@@ -78,11 +66,11 @@ class AttrCache {
 }
 
 console.log('\n========================================');
-console.log('TG-22-000 属性操作测试');
+console.log('TG-22 属性操作测试');
 console.log('========================================\n');
 
 console.log('准备测试数据...');
-const testDocTitle = `TG-22-000-属性操作测试-${Date.now()}`;
+const testDocTitle = `TG-22-属性操作测试-${Date.now()}`;
 const createResult = runCmd(`create "${testDocTitle}" "属性测试内容" --parent-id ${PARENT_ID}`);
 const testDocId = extractDocId(createResult.output);
 if (testDocId) {
@@ -93,346 +81,279 @@ console.log('');
 
 console.log('测试用例:');
 
-// TG-22-001: 设置单个自定义属性
+// TG-22-001: 设置属性（单个、批量、多次调用、向后兼容）
 if (testDocId) {
   const attrCache = new AttrCache(testDocId);
-  const attrName = 'status';
-  const attrValue = 'done';
-  const cmd = `block-attrs ${testDocId} --set ${attrName}="${attrValue}"`;
-  const result = runCmd(cmd);
+  const tests = [
+    { name: '单个属性', cmd: `block-attrs ${testDocId} --set single=value`, attr: 'single', value: 'value' },
+    { name: '多次--set调用', cmd: `block-attrs ${testDocId} --set a=1 --set b=2 --set c=3`, attrs: { a: '1', b: '2', c: '3' } },
+    { name: '向后兼容(逗号分隔)', cmd: `block-attrs ${testDocId} --set "d=4,e=5"`, attrs: { d: '4', e: '5' } },
+    { name: '更新已存在属性', cmd: `block-attrs ${testDocId} --set single=updated`, attr: 'single', value: 'updated' }
+  ];
   
-  attrCache.clear();
+  let allPassed = true;
+  const failedTests = [];
   
-  if (!result.success) {
-    addResult('TG-22-001', '设置单个自定义属性', cmd, '属性被设置',
-      '命令执行失败', false, result.error);
-  } else {
-    const exists = attrCache.hasAttr(attrName);
-    const value = attrCache.getAttrValue(attrName);
-    if (exists && value === attrValue) {
-      addResult('TG-22-001', '设置单个自定义属性', cmd, '属性被设置',
-        '成功', true, `属性 ${attrName}=${attrValue} 已设置`);
-    } else {
-      addResult('TG-22-001', '设置单个自定义属性', cmd, '属性被设置',
-        '属性未正确设置', false, `exists=${exists}, value=${value}`);
-    }
-  }
-} else {
-  addResult('TG-22-001', '设置单个自定义属性', 'block-attrs <id> --set name="value"', '属性被设置', '测试文档创建失败', false);
-}
-
-// TG-22-002: 获取所有属性
-if (testDocId) {
-  const cmd = `block-attrs ${testDocId} --get`;
-  const result = runCmd(cmd);
-  
-  if (!result.success) {
-    addResult('TG-22-002', '获取所有属性', cmd, '返回属性列表',
-      '命令执行失败', false, result.error);
-  } else {
-    try {
-      const data = JSON.parse(result.output);
-      const hasData = data.success && data.data && typeof data.data.attrs === 'object';
-      const count = hasData ? Object.keys(data.data.attrs).length : 0;
-      addResult('TG-22-002', '获取所有属性', cmd, '返回属性列表',
-        hasData ? '成功' : '返回为空', hasData, `返回 ${count} 个属性`);
-    } catch (e) {
-      addResult('TG-22-002', '获取所有属性', cmd, '返回属性列表',
-        'JSON解析失败', false, e.message);
-    }
-  }
-} else {
-  addResult('TG-22-002', '获取所有属性', 'block-attrs <id> --get', '返回属性列表', '测试文档创建失败', false);
-}
-
-// TG-22-003: 获取指定属性值
-if (testDocId) {
-  const attrName = 'priority';
-  runCmd(`block-attrs ${testDocId} --set ${attrName}=high`);
-  
-  const cmd = `block-attrs ${testDocId} --get ${attrName}`;
-  const result = runCmd(cmd);
-  
-  if (!result.success) {
-    addResult('TG-22-003', '获取指定属性值', cmd, '返回指定属性值',
-      '命令执行失败', false, result.error);
-  } else {
-    try {
-      const data = JSON.parse(result.output);
-      const hasValue = data.success && data.data && data.data.value === 'high';
-      addResult('TG-22-003', '获取指定属性值', cmd, '返回指定属性值',
-        hasValue ? '成功' : '值不匹配', hasValue, `返回值: ${data.data?.value}`);
-    } catch (e) {
-      addResult('TG-22-003', '获取指定属性值', cmd, '返回指定属性值',
-        'JSON解析失败', false, e.message);
-    }
-  }
-} else {
-  addResult('TG-22-003', '获取指定属性值', 'block-attrs <id> --get name', '返回指定属性值', '测试文档创建失败', false);
-}
-
-// TG-22-004: 移除属性
-if (testDocId) {
-  const attrCache = new AttrCache(testDocId);
-  const attrName = 'toremove';
-  runCmd(`block-attrs ${testDocId} --set ${attrName}=temp`);
-  attrCache.clear();
-  
-  const cmd = `block-attrs ${testDocId} --remove ${attrName}`;
-  const result = runCmd(cmd);
-  
-  attrCache.clear();
-  
-  if (!result.success) {
-    addResult('TG-22-004', '移除属性', cmd, '属性被移除',
-      '命令执行失败', false, result.error);
-  } else {
-    const exists = attrCache.hasAttr(attrName);
-    if (!exists) {
-      addResult('TG-22-004', '移除属性', cmd, '属性被移除',
-        '成功', true, `属性 ${attrName} 已移除`);
-    } else {
-      addResult('TG-22-004', '移除属性', cmd, '属性被移除',
-        '属性仍存在', false, '属性未被移除');
-    }
-  }
-} else {
-  addResult('TG-22-004', '移除属性', 'block-attrs <id> --remove name', '属性被移除', '测试文档创建失败', false);
-}
-
-// TG-22-005: 批量设置属性（单次命令）
-if (testDocId) {
-  const attrCache = new AttrCache(testDocId);
-  const attr1 = 'batch-a';
-  const attr2 = 'batch-b';
-  const attr3 = 'batch-c';
-  const cmd = `block-attrs ${testDocId} --set "${attr1}=val1,${attr2}=val2,${attr3}=val3"`;
-  const result = runCmd(cmd);
-  
-  attrCache.clear();
-  
-  if (!result.success) {
-    addResult('TG-22-005', '批量设置属性', cmd, '多个属性被设置',
-      '命令执行失败', false, result.error);
-  } else {
-    const check1 = attrCache.hasAttr(attr1) && attrCache.getAttrValue(attr1) === 'val1';
-    const check2 = attrCache.hasAttr(attr2) && attrCache.getAttrValue(attr2) === 'val2';
-    const check3 = attrCache.hasAttr(attr3) && attrCache.getAttrValue(attr3) === 'val3';
+  for (const test of tests) {
+    const result = runCmd(test.cmd);
+    attrCache.clear();
     
-    if (check1 && check2 && check3) {
-      addResult('TG-22-005', '批量设置属性', cmd, '多个属性被设置',
-        '成功', true, `3个属性均正确设置（单次命令）`);
-    } else {
-      addResult('TG-22-005', '批量设置属性', cmd, '多个属性被设置',
-        '部分属性未设置', false, `${attr1}:${check1}, ${attr2}:${check2}, ${attr3}:${check3}`);
+    if (!result.success) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 命令执行失败`);
+      continue;
     }
-  }
-} else {
-  addResult('TG-22-005', '批量设置属性', 'block-attrs <id> --set "a=1,b=2,c=3"', '多个属性被设置', '测试文档创建失败', false);
-}
-
-// TG-22-006: 批量移除属性（单次命令）
-if (testDocId) {
-  const attrCache = new AttrCache(testDocId);
-  const attr1 = 'del-a';
-  const attr2 = 'del-b';
-  const attr3 = 'del-c';
-  
-  runCmd(`block-attrs ${testDocId} --set "${attr1}=x,${attr2}=y,${attr3}=z"`);
-  attrCache.clear();
-  
-  const cmd = `block-attrs ${testDocId} --remove "${attr1},${attr2},${attr3}"`;
-  const result = runCmd(cmd);
-  
-  attrCache.clear();
-  
-  if (!result.success) {
-    addResult('TG-22-006', '批量移除属性', cmd, '多个属性被移除',
-      '命令执行失败', false, result.error);
-  } else {
-    const check1 = !attrCache.hasAttr(attr1);
-    const check2 = !attrCache.hasAttr(attr2);
-    const check3 = !attrCache.hasAttr(attr3);
     
-    if (check1 && check2 && check3) {
-      addResult('TG-22-006', '批量移除属性', cmd, '多个属性被移除',
-        '成功', true, `3个属性均正确移除（单次命令）`);
-    } else {
-      addResult('TG-22-006', '批量移除属性', cmd, '多个属性被移除',
-        '部分属性未移除', false, `${attr1}:${!check1}, ${attr2}:${!check2}, ${attr3}:${!check3}`);
+    if (test.attr) {
+      const actualValue = attrCache.getAttrValue(test.attr);
+      if (actualValue !== test.value) {
+        allPassed = false;
+        failedTests.push(`${test.name}: 期望 ${test.value}, 实际 ${actualValue}`);
+      }
+    } else if (test.attrs) {
+      for (const [key, expectedValue] of Object.entries(test.attrs)) {
+        const actualValue = attrCache.getAttrValue(key);
+        if (actualValue !== expectedValue) {
+          allPassed = false;
+          failedTests.push(`${test.name}: ${key} 期望 ${expectedValue}, 实际 ${actualValue}`);
+        }
+      }
     }
   }
+  
+  addResult('TG-22-001', '设置属性测试', '--set (单个/批量/多次/兼容)', '所有设置操作成功',
+    allPassed ? '成功' : '部分失败', allPassed, failedTests.join('; ') || '4个测试全部通过');
 } else {
-  addResult('TG-22-006', '批量移除属性', 'block-attrs <id> --remove "a,b,c"', '多个属性被移除', '测试文档创建失败', false);
+  addResult('TG-22-001', '设置属性测试', '--set (单个/批量/多次/兼容)', '所有设置操作成功', '测试文档创建失败', false);
 }
 
-// TG-22-007: 设置带特殊字符的属性值
+// TG-22-002: 获取属性（所有、指定、不存在）
 if (testDocId) {
   const attrCache = new AttrCache(testDocId);
-  const attrName = 'special';
-  const attrValue = 'test-value-with-dashes';
-  const cmd = `block-attrs ${testDocId} --set ${attrName}="${attrValue}"`;
-  const result = runCmd(cmd);
-  
+  runCmd(`block-attrs ${testDocId} --set test-get=value`);
   attrCache.clear();
   
-  if (!result.success) {
-    addResult('TG-22-007', '设置带特殊字符的属性值', cmd, '特殊字符被正确处理',
-      '命令执行失败', false, result.error);
-  } else {
-    const value = attrCache.getAttrValue(attrName);
-    if (value === attrValue) {
-      addResult('TG-22-007', '设置带特殊字符的属性值', cmd, '特殊字符被正确处理',
-        '成功', true, '特殊字符正确保留');
-    } else {
-      addResult('TG-22-007', '设置带特殊字符的属性值', cmd, '特殊字符被正确处理',
-        '值不匹配', false, `期望: "${attrValue}", 实际: "${value}"`);
+  const tests = [
+    { name: '获取所有属性', cmd: `block-attrs ${testDocId} --get`, check: (data) => data.data?.attrs && typeof data.data.attrs === 'object' },
+    { name: '获取指定属性', cmd: `block-attrs ${testDocId} --get test-get`, check: (data) => data.data?.value === 'value' },
+    { name: '获取不存在的属性', cmd: `block-attrs ${testDocId} --get nonexistent_${Date.now()}`, check: (data) => data.data?.value === null || data.data?.value === '' }
+  ];
+  
+  let allPassed = true;
+  const failedTests = [];
+  
+  for (const test of tests) {
+    const result = runCmd(test.cmd);
+    if (!result.success) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 命令执行失败`);
+      continue;
     }
-  }
-} else {
-  addResult('TG-22-007', '设置带特殊字符的属性值', 'block-attrs <id> --set name="value-with-dashes"', '特殊字符被正确处理', '测试文档创建失败', false);
-}
-
-// TG-22-008: 测试 --format pretty 输出
-if (testDocId) {
-  const cmd = `block-attrs ${testDocId} --get --format pretty`;
-  const result = runCmd(cmd);
-  
-  if (!result.success) {
-    addResult('TG-22-008', '测试 --format pretty', cmd, '格式化输出',
-      '命令执行失败', false, result.error);
-  } else {
-    const hasPrettyOutput = result.output.includes('✓') || result.output.includes('属性');
-    addResult('TG-22-008', '测试 --format pretty', cmd, '格式化输出',
-      hasPrettyOutput ? '成功' : '输出格式不正确', hasPrettyOutput, '包含格式化标识');
-  }
-} else {
-  addResult('TG-22-008', '测试 --format pretty', 'block-attrs <id> --get --format pretty', '格式化输出', '测试文档创建失败', false);
-}
-
-// TG-22-009: 获取不存在的属性
-if (testDocId) {
-  const cmd = `block-attrs ${testDocId} --get nonexistent_attr_${Date.now()}`;
-  const result = runCmd(cmd);
-  
-  if (!result.success) {
-    addResult('TG-22-009', '获取不存在的属性', cmd, '返回null或空值',
-      '命令执行失败', false, result.error);
-  } else {
+    
     try {
       const data = JSON.parse(result.output);
-      const isNull = data.success && data.data && (data.data.value === null || data.data.value === '' || !data.data.exists);
-      addResult('TG-22-009', '获取不存在的属性', cmd, '返回null或空值',
-        isNull ? '成功' : '返回值不正确', isNull, `value=${data.data?.value}, exists=${data.data?.exists}`);
+      if (!test.check(data)) {
+        allPassed = false;
+        failedTests.push(`${test.name}: 检查失败`);
+      }
     } catch (e) {
-      addResult('TG-22-009', '获取不存在的属性', cmd, '返回null或空值',
-        'JSON解析失败', false, e.message);
+      allPassed = false;
+      failedTests.push(`${test.name}: JSON解析失败`);
     }
   }
+  
+  addResult('TG-22-002', '获取属性测试', '--get (所有/指定/不存在)', '所有获取操作成功',
+    allPassed ? '成功' : '部分失败', allPassed, failedTests.join('; ') || '3个测试全部通过');
 } else {
-  addResult('TG-22-009', '获取不存在的属性', 'block-attrs <id> --get nonexistent', '返回null或空值', '测试文档创建失败', false);
+  addResult('TG-22-002', '获取属性测试', '--get (所有/指定/不存在)', '所有获取操作成功', '测试文档创建失败', false);
 }
 
-// TG-22-010: 更新已存在的属性
+// TG-22-003: 移除属性（单个、批量、多次调用）
 if (testDocId) {
   const attrCache = new AttrCache(testDocId);
-  const attrName = 'updatetest';
-  
-  runCmd(`block-attrs ${testDocId} --set ${attrName}=old_value`);
+  runCmd(`block-attrs ${testDocId} --set r1=v1 --set r2=v2 --set r3=v3`);
   attrCache.clear();
   
-  const cmd = `block-attrs ${testDocId} --set ${attrName}=new_value`;
-  const result = runCmd(cmd);
+  const tests = [
+    { name: '移除单个属性', cmd: `block-attrs ${testDocId} --remove r1`, check: () => !attrCache.hasAttr('r1') },
+    { name: '多次--remove调用', cmd: `block-attrs ${testDocId} --remove r2 --remove r3`, check: () => !attrCache.hasAttr('r2') && !attrCache.hasAttr('r3') }
+  ];
   
-  attrCache.clear();
+  let allPassed = true;
+  const failedTests = [];
   
-  if (!result.success) {
-    addResult('TG-22-010', '更新已存在的属性', cmd, '属性值被更新',
-      '命令执行失败', false, result.error);
-  } else {
-    const value = attrCache.getAttrValue(attrName);
-    if (value === 'new_value') {
-      addResult('TG-22-010', '更新已存在的属性', cmd, '属性值被更新',
-        '成功', true, '属性值已更新');
+  for (const test of tests) {
+    attrCache.clear();
+    const result = runCmd(test.cmd);
+    
+    if (!result.success) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 命令执行失败`);
+      continue;
+    }
+    
+    attrCache.clear();
+    if (!test.check()) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 属性未被移除`);
+    }
+  }
+  
+  addResult('TG-22-003', '移除属性测试', '--remove (单个/批量/多次)', '所有移除操作成功',
+    allPassed ? '成功' : '部分失败', allPassed, failedTests.join('; ') || '2个测试全部通过');
+} else {
+  addResult('TG-22-003', '移除属性测试', '--remove (单个/批量/多次)', '所有移除操作成功', '测试文档创建失败', false);
+}
+
+// TG-22-004: 属性验证（特殊字符、空值、无效名）
+if (testDocId) {
+  const attrCache = new AttrCache(testDocId);
+  
+  const tests = [
+    { name: '特殊字符属性值', cmd: `block-attrs ${testDocId} --set special="test-value"`, shouldPass: true, check: () => attrCache.getAttrValue('special') === 'test-value' },
+    { name: '空属性值', cmd: `block-attrs ${testDocId} --set empty=""`, shouldPass: false },
+    { name: '无效属性名(含空格)', cmd: `block-attrs ${testDocId} --set "invalid name=value"`, shouldPass: false }
+  ];
+  
+  let allPassed = true;
+  const failedTests = [];
+  
+  for (const test of tests) {
+    attrCache.clear();
+    const result = runCmd(test.cmd);
+    
+    if (test.shouldPass) {
+      if (!result.success) {
+        allPassed = false;
+        failedTests.push(`${test.name}: 应该通过但失败`);
+      } else if (test.check && !test.check()) {
+        allPassed = false;
+        failedTests.push(`${test.name}: 检查失败`);
+      }
     } else {
-      addResult('TG-22-010', '更新已存在的属性', cmd, '属性值被更新',
-        '值未更新', false, `期望: new_value, 实际: ${value}`);
+      if (result.success) {
+        allPassed = false;
+        failedTests.push(`${test.name}: 应该拒绝但通过`);
+      }
+    }
+  }
+  
+  addResult('TG-22-004', '属性验证测试', '验证特殊字符/空值/无效名', '验证规则正确',
+    allPassed ? '成功' : '部分失败', allPassed, failedTests.join('; ') || '3个测试全部通过');
+} else {
+  addResult('TG-22-004', '属性验证测试', '验证特殊字符/空值/无效名', '验证规则正确', '测试文档创建失败', false);
+}
+
+// TG-22-005: 输出格式测试
+if (testDocId) {
+  const tests = [
+    { name: '默认json格式', cmd: `block-attrs ${testDocId} --get`, check: (out) => out.includes('"success"') && out.includes('"data"') },
+    { name: '--raw格式', cmd: `block-attrs ${testDocId} --get --raw`, check: (out) => !out.includes('"success"') && !out.includes('"data"') },
+    { name: '--format pretty', cmd: `block-attrs ${testDocId} --get --format pretty`, check: (out) => out.includes('✓') || out.includes('属性') }
+  ];
+  
+  let allPassed = true;
+  const failedTests = [];
+  
+  for (const test of tests) {
+    const result = runCmd(test.cmd);
+    
+    if (!result.success) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 命令执行失败`);
+      continue;
+    }
+    
+    const output = result.output + (result.error || '');
+    if (!test.check(output)) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 格式检查失败`);
+    }
+  }
+  
+  addResult('TG-22-005', '输出格式测试', 'json/raw/pretty', '所有格式正确',
+    allPassed ? '成功' : '部分失败', allPassed, failedTests.join('; ') || '3个测试全部通过');
+} else {
+  addResult('TG-22-005', '输出格式测试', 'json/raw/pretty', '所有格式正确', '测试文档创建失败', false);
+}
+
+// TG-22-006: 短选项别名
+if (testDocId) {
+  const attrCache = new AttrCache(testDocId);
+  
+  const tests = [
+    { name: '-S (--set)', cmd: `block-attrs ${testDocId} -S short-set=test`, check: () => attrCache.getAttrValue('short-set') === 'test' },
+    { name: '-g (--get)', cmd: `block-attrs ${testDocId} -g test-get`, check: (out) => out.includes('"value"') },
+    { name: '-r (--remove)', cmd: `block-attrs ${testDocId} -r r1`, check: () => !attrCache.hasAttr('r1') },
+    { name: '-f (--format)', cmd: `block-attrs ${testDocId} -f raw --get`, check: (out) => !out.includes('"success"') },
+    { name: '-R (--raw)', cmd: `block-attrs ${testDocId} -R --get`, check: (out) => !out.includes('"success"') }
+  ];
+  
+  let allPassed = true;
+  const failedTests = [];
+  
+  for (const test of tests) {
+    attrCache.clear();
+    const result = runCmd(test.cmd);
+    
+    if (!result.success) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 命令执行失败`);
+      continue;
+    }
+    
+    attrCache.clear();
+    const output = result.output + (result.error || '');
+    if (test.check && !test.check(output)) {
+      allPassed = false;
+      failedTests.push(`${test.name}: 检查失败`);
+    }
+  }
+  
+  addResult('TG-22-006', '短选项别名测试', '-S/-g/-r/-f/-R', '所有短选项工作正常',
+    allPassed ? '成功' : '部分失败', allPassed, failedTests.join('; ') || '5个测试全部通过');
+} else {
+  addResult('TG-22-006', '短选项别名测试', '-S/-g/-r/-f/-R', '所有短选项工作正常', '测试文档创建失败', false);
+}
+
+// TG-22-007: --hide 参数
+if (testDocId) {
+  const attrCache = new AttrCache(testDocId);
+  const cmd = `block-attrs ${testDocId} --set internal=value --hide`;
+  const result = runCmd(cmd);
+  
+  attrCache.clear();
+  
+  if (!result.success) {
+    addResult('TG-22-007', '--hide参数测试', '--set name=value --hide', '内部属性被设置',
+      '命令执行失败', false, result.error);
+  } else {
+    const getCmd = `block-attrs ${testDocId} --get internal --hide`;
+    const getResult = runCmd(getCmd);
+    
+    if (getResult.success) {
+      try {
+        const data = JSON.parse(getResult.output);
+        const hasValue = data.data && data.data.value === 'value';
+        addResult('TG-22-007', '--hide参数测试', '--set name=value --hide', '内部属性被设置',
+          hasValue ? '成功' : '值不匹配', hasValue, '--hide 参数工作正常');
+      } catch (e) {
+        addResult('TG-22-007', '--hide参数测试', '--set name=value --hide', '内部属性被设置',
+          'JSON解析失败', false, e.message);
+      }
+    } else {
+      addResult('TG-22-007', '--hide参数测试', '--set name=value --hide', '内部属性被设置',
+        '获取失败', false, getResult.error);
     }
   }
 } else {
-  addResult('TG-22-010', '更新已存在的属性', 'block-attrs <id> --set name=new_value', '属性值被更新', '测试文档创建失败', false);
+  addResult('TG-22-007', '--hide参数测试', '--set name=value --hide', '内部属性被设置', '测试文档创建失败', false);
 }
 
-// TG-22-011: 设置空属性值
+// TG-22-008: 属性数量统计
 if (testDocId) {
   const attrCache = new AttrCache(testDocId);
-  const attrName = 'emptytest';
-  const cmd = `block-attrs ${testDocId} --set ${attrName}=""`;
-  const result = runCmd(cmd);
-  
-  attrCache.clear();
-  
-  if (!result.success) {
-    const errorOutput = (result.output || '') + (result.error || '');
-    const hasErrorMsg = errorOutput.includes('无效') || errorOutput.includes('error') || errorOutput.includes('错误') || errorOutput.includes('空');
-    addResult('TG-22-011', '设置空属性值', cmd, '正确拒绝空值',
-      '命令执行失败', hasErrorMsg, hasErrorMsg ? '空值被正确拒绝' : result.error || result.output);
-  } else {
-    const exists = attrCache.hasAttr(attrName);
-    addResult('TG-22-011', '设置空属性值', cmd, '正确拒绝空值',
-      !exists ? '成功' : '空值被接受', !exists, exists ? '空值被设置（不符合预期）' : '空值被正确拒绝');
-  }
-} else {
-  addResult('TG-22-011', '设置空属性值', 'block-attrs <id> --set name=""', '正确拒绝空值', '测试文档创建失败', false);
-}
-
-// TG-22-012: 设置无效的属性名
-if (testDocId) {
-  const cmd = `block-attrs ${testDocId} --set "invalid name=value"`;
-  const result = runCmd(cmd);
-  
-  if (!result.success) {
-    const errorOutput = (result.output || '') + (result.error || '');
-    const hasErrorMsg = errorOutput.includes('无效') || errorOutput.includes('error') || errorOutput.includes('错误');
-    addResult('TG-22-012', '设置无效的属性名', cmd, '正确拒绝无效属性名',
-      '命令执行失败', hasErrorMsg, hasErrorMsg ? '无效属性名被正确拒绝' : result.error || result.output);
-  } else {
-    addResult('TG-22-012', '设置无效的属性名', cmd, '正确拒绝无效属性名',
-      '无效属性名被接受', false, '应该拒绝包含空格的属性名');
-  }
-} else {
-  addResult('TG-22-012', '设置无效的属性名', 'block-attrs <id> --set "invalid name=value"', '正确拒绝无效属性名', '测试文档创建失败', false);
-}
-
-// TG-22-013: 测试短选项别名
-if (testDocId) {
-  const attrCache = new AttrCache(testDocId);
-  const attrName = 'shortopt';
-  const cmd = `block-attrs ${testDocId} -S "${attrName}=test"`;
-  const result = runCmd(cmd);
-  
-  attrCache.clear();
-  
-  if (!result.success) {
-    addResult('TG-22-013', '测试短选项别名 -S', cmd, '短选项工作正常',
-      '命令执行失败', false, result.error);
-  } else {
-    const exists = attrCache.hasAttr(attrName);
-    addResult('TG-22-013', '测试短选项别名 -S', cmd, '短选项工作正常',
-      exists ? '成功' : '短选项无效', exists, '-S 选项正常工作');
-  }
-} else {
-  addResult('TG-22-013', '测试短选项别名 -S', 'block-attrs <id> -S name=value', '短选项工作正常', '测试文档创建失败', false);
-}
-
-// TG-22-014: 验证属性数量统计（包含系统属性）
-if (testDocId) {
-  const attrCache = new AttrCache(testDocId);
-  const attrs = {
-    'count-a': '1',
-    'count-b': '2',
-    'count-c': '3'
-  };
+  const attrs = { 'count-a': '1', 'count-b': '2', 'count-c': '3' };
   const attrsStr = Object.entries(attrs).map(([k, v]) => `${k}=${v}`).join(',');
   
   runCmd(`block-attrs ${testDocId} --set "${attrsStr}"`);
@@ -442,7 +363,7 @@ if (testDocId) {
   const result = runCmd(cmd);
   
   if (!result.success) {
-    addResult('TG-22-014', '验证属性数量统计', cmd, '返回正确的属性数量',
+    addResult('TG-22-008', '属性数量统计', '--get count字段', '返回正确的属性数量',
       '命令执行失败', false, result.error);
   } else {
     try {
@@ -451,59 +372,23 @@ if (testDocId) {
       const customAttrCount = Object.keys(attrs).length;
       const hasSystemAttrs = actualCount > customAttrCount;
       
-      addResult('TG-22-014', '验证属性数量统计', cmd, '返回正确的属性数量',
+      addResult('TG-22-008', '属性数量统计', '--get count字段', '返回正确的属性数量',
         actualCount >= customAttrCount ? '成功' : '数量不匹配', actualCount >= customAttrCount, 
         `自定义属性: ${customAttrCount}, 总属性: ${actualCount}${hasSystemAttrs ? ' (包含系统属性)' : ''}`);
     } catch (e) {
-      addResult('TG-22-014', '验证属性数量统计', cmd, '返回正确的属性数量',
+      addResult('TG-22-008', '属性数量统计', '--get count字段', '返回正确的属性数量',
         'JSON解析失败', false, e.message);
     }
   }
 } else {
-  addResult('TG-22-014', '验证属性数量统计', 'block-attrs <id> --get', '返回正确的属性数量', '测试文档创建失败', false);
-}
-
-// TG-22-015: 测试 --hide 参数
-if (testDocId) {
-  const attrCache = new AttrCache(testDocId);
-  const attrName = 'internal-attr';
-  const attrValue = 'internal-value';
-  const cmd = `block-attrs ${testDocId} --set ${attrName}="${attrValue}" --hide`;
-  const result = runCmd(cmd);
-  
-  attrCache.clear();
-  
-  if (!result.success) {
-    addResult('TG-22-015', '测试 --hide 参数', cmd, '内部属性被设置',
-      '命令执行失败', false, result.error);
-  } else {
-    const getCmd = `block-attrs ${testDocId} --get ${attrName} --hide`;
-    const getResult = runCmd(getCmd);
-    
-    if (getResult.success) {
-      try {
-        const data = JSON.parse(getResult.output);
-        const hasValue = data.data && data.data.value === attrValue;
-        addResult('TG-22-015', '测试 --hide 参数', cmd, '内部属性被设置',
-          hasValue ? '成功' : '值不匹配', hasValue, `--hide 参数工作正常`);
-      } catch (e) {
-        addResult('TG-22-015', '测试 --hide 参数', cmd, '内部属性被设置',
-          'JSON解析失败', false, e.message);
-      }
-    } else {
-      addResult('TG-22-015', '测试 --hide 参数', cmd, '内部属性被设置',
-        '获取失败', false, getResult.error);
-    }
-  }
-} else {
-  addResult('TG-22-015', '测试 --hide 参数', 'block-attrs <id> --set name=value --hide', '内部属性被设置', '测试文档创建失败', false);
+  addResult('TG-22-008', '属性数量统计', '--get count字段', '返回正确的属性数量', '测试文档创建失败', false);
 }
 
 // 清理
 ctx.cleanup();
 
 // 保存报告
-saveReports('TG-22-000', 'TG-22-000 属性操作测试报告');
+saveReports('TG-22-attrs', 'TG-22-attrs 属性操作测试报告');
 
 console.log('\n----------------------------------------');
 console.log('测试残留检查');

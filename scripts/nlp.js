@@ -2,8 +2,8 @@
 /**
  * nlp.js - 对文本进行 NLP 分析
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: nlp <text> [选项]
 
@@ -22,34 +22,13 @@ const HELP_TEXT = `用法: nlp <text> [选项]
   nlp "文本内容" --tasks entities,keywords
   nlp "文本内容" --tasks keywords --top-n 3`;
 
+/**
+ * 将短横线命名转为驼峰命名（保留此函数，因为公共解析器不提供）
+ * @param {string} str - 输入字符串
+ * @returns {string} 驼峰命名字符串
+ */
 function camelCase(str) {
   return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['tasks', 'topN']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
 }
 
 /**
@@ -449,35 +428,34 @@ function generateStats(text, tokens, keywords, entities) {
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['tasks', 'top-n']
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  if (params.positional.length === 0) {
+  if (positionalArgs.length === 0) {
     console.error('错误: 请提供待分析的文本');
     process.exit(1);
   }
 
-  const text = params.positional[0];
+  const text = positionalArgs[0];
   
   if (!text || text.trim() === '') {
     console.error('错误: 请提供待分析的文本');
     process.exit(1);
   }
 
-  let tasks = params.tasks ? params.tasks.split(',') : ['tokenize', 'entities', 'keywords'];
-  const topN = params.topN ? parseInt(params.topN, 10) || 10 : 10;
+  let tasks = options.tasks ? options.tasks.split(',') : ['tokenize', 'entities', 'keywords'];
+  const topN = options['top-n'] ? parseInt(options['top-n'], 10) || 10 : 10;
 
   if (tasks.includes('all')) {
     tasks = ['tokenize', 'entities', 'keywords', 'summary'];
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-
     const result = {
       success: true,
       text: text

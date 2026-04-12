@@ -2,8 +2,8 @@
 /**
  * tags.js - 管理块/文档的标签
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: tags <id> [tags] [选项]
 
@@ -25,51 +25,28 @@ const HELP_TEXT = `用法: tags <id> [tags] [选项]
   tags <id> "标签1" --add
   tags <id> "标签1" --remove`;
 
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const flagOpts = new Set(['add', 'remove', 'get']);
-
-  for (const arg of argv) {
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      if (flagOpts.has(key)) {
-        options[key] = true;
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    flagOpts: ['add', 'remove', 'get']
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  if (params.positional.length === 0) {
+  if (positionalArgs.length === 0) {
     console.error('错误: 请提供块/文档ID');
     process.exit(1);
   }
 
-  const id = params.positional[0];
-  const tagsInput = params.positional.length > 1 ? params.positional[1] : null;
+  const id = positionalArgs[0];
+  const tagsInput = positionalArgs.length > 1 ? positionalArgs[1] : null;
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
 
-    if (params.get || !tagsInput) {
+    if (options.get || !tagsInput) {
       const attrs = await connector.request('/api/attr/getBlockAttrs', { id });
       const tags = attrs.tags ? attrs.tags.split(',').filter(t => t.trim()) : [];
       console.log(JSON.stringify({
@@ -84,9 +61,9 @@ async function main() {
     let currentTags = existingAttrs.tags ? existingAttrs.tags.split(',').filter(t => t.trim()) : [];
     const newTags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
 
-    if (params.add) {
+    if (options.add) {
       currentTags = [...new Set([...currentTags, ...newTags])];
-    } else if (params.remove) {
+    } else if (options.remove) {
       const removeSet = new Set(newTags);
       currentTags = currentTags.filter(t => !removeSet.has(t));
     } else {

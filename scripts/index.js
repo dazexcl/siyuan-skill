@@ -5,12 +5,12 @@
  * 将 Siyuan Notes 文档分块并索引到 Qdrant 向量数据库
  * 支持增量索引和强制重建索引
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
 const EmbeddingManager = require('./lib/embedding-manager');
 const VectorManager = require('./lib/vector-manager');
 const { checkPermission } = require('./lib/permission');
 const ConcurrentQueue = require('./lib/concurrent-queue');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: index [<id>] [选项]
 
@@ -24,6 +24,7 @@ const HELP_TEXT = `用法: index [<id>] [选项]
   --doc-ids <ids>       指定文档 ID 列表（逗号分隔）
   --force               强制重建索引
   --remove              只移除索引，不重新索引
+  --quiet               静默模式，不输出进度信息
   -h, --help            显示帮助信息
 
 示例:
@@ -50,51 +51,6 @@ const HELP_TEXT = `用法: index [<id>] [选项]
   index --remove
   index --notebook <notebook-id> --remove
   index --doc-ids "doc-id-1,doc-id-2" --remove`;
-
-/**
- * 将连字符命名转换为驼峰命名
- * @param {string} str - 输入字符串
- * @returns {string} 驼峰命名字符串
- */
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-/**
- * 解析命令行参数
- * @param {string[]} argv - 命令行参数数组
- * @returns {Object} 解析后的参数对象
- */
-function parseArgs(argv) {
-  const options = {};
-  const hasValueOpts = new Set(['notebook', 'docIds']);
-  const positionalArgs = [];
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (!arg.startsWith('-')) {
-      positionalArgs.push(arg);
-    }
-  }
-
-  if (positionalArgs.length > 0) {
-    options.id = positionalArgs[0];
-  }
-
-  return options;
-}
 
 /**
  * 索引统计信息
@@ -474,10 +430,12 @@ async function getAllDocs(connector, notebookId) {
  * @param {SiyuanConnector} connector - Siyuan 连接器
  * @param {string[]} docIds - 文档ID列表
  * @param {Object} config - 配置对象（用于白名单检查）
- * @returns {Promise<Array>} 文档列表
+ * @returns {Promise<Object>} { docs: Array, invalidDocIds: Array }
  */
 async function getDocsByIds(connector, docIds, config = null) {
   const docs = [];
+  const invalidDocIds = [];
+  
   for (const docId of docIds) {
     try {
       const docInfo = await connector.request('/api/block/getBlockInfo', { id: docId });
@@ -510,12 +468,15 @@ async function getDocsByIds(connector, docIds, config = null) {
         } else {
           docs.push(doc);
         }
+      } else {
+        invalidDocIds.push(docId);
       }
     } catch (error) {
-      console.warn(`获取文档 ${docId} 失败:`, error.message);
+      invalidDocIds.push(docId);
     }
   }
-  return docs;
+  
+  return { docs, invalidDocIds };
 }
 
 /**
@@ -591,17 +552,32 @@ async function removeIndex(vectorManager, params) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['notebook', 'doc-ids'],
+    flagOpts: ['quiet']
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
+  
+  // 将位置参数合并到 options
+  if (positionalArgs.length > 0) {
+    options.id = positionalArgs[0];
+  }
+  const params = options;
+  
+  // 兼容性处理：支持 kebab-case 和 camelCase 两种格式
+  if (params['doc-ids'] && !params.docIds) {
+    params.docIds = params['doc-ids'];
+  }
   const stats = new IndexStats();
+  const quiet = params.quiet;
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
+    const connector = SiyuanConnector.get();
+    const config = connector.getConfig();
 
     // 检查向量搜索配置是否完整
     if (!config.qdrant || !config.qdrant.url) {
@@ -620,18 +596,11 @@ async function main() {
       process.exit(1);
     }
 
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
-
     const embeddingManager = new EmbeddingManager(config.embedding);
     const vectorManager = new VectorManager(config, embeddingManager);
 
     // 初始化 Embedding Manager
-    console.error('正在初始化嵌入服务...');
+    if (!quiet) console.error('正在初始化嵌入服务...');
     const embeddingInitResult = await embeddingManager.initialize();
     if (!embeddingInitResult) {
       console.log(JSON.stringify({
@@ -642,7 +611,7 @@ async function main() {
     }
 
     // 确保集合存在
-    console.error('正在初始化向量数据库...');
+    if (!quiet) console.error('正在初始化向量数据库...');
     const collectionResult = await vectorManager.ensureCollection();
     if (!collectionResult.success) {
       console.log(JSON.stringify({
@@ -651,7 +620,7 @@ async function main() {
       }, null, 2));
       process.exit(1);
     }
-    console.error(collectionResult.message);
+    if (!quiet) console.error(collectionResult.message);
 
     // 处理位置参数
     if (params.id) {
@@ -673,6 +642,23 @@ async function main() {
       if (typeof params.docIds === 'string') {
         params.docIds = params.docIds.split(',').map(id => id.trim());
       }
+      
+      // 验证文档ID格式
+      const invalidIds = params.docIds.filter(id => {
+        // 思源笔记的ID格式通常是: YYYYMMDDHHmmss-xxxxxx
+        return !/^\d{14}-[a-z0-9]{6,}$/.test(id);
+      });
+      
+      if (invalidIds.length > 0) {
+        console.log(JSON.stringify({
+          success: false,
+          message: `错误: 无效的文档ID格式: ${invalidIds.join(', ')}`,
+          invalidIds
+        }, null, 2));
+        process.exit(1);
+      }
+      
+      console.error(`处理 ${params.docIds.length} 个指定文档...`);
     }
 
     // 移除索引模式
@@ -684,8 +670,22 @@ async function main() {
 
     // 获取文档列表（只处理白名单笔记本）
     let docs = [];
+    let invalidDocIds = [];
+    
     if (params.docIds && params.docIds.length > 0) {
-      docs = await getDocsByIds(connector, params.docIds, config);
+      const result = await getDocsByIds(connector, params.docIds, config);
+      docs = result.docs;
+      invalidDocIds = result.invalidDocIds;
+      
+      // 如果所有文档ID都无效，返回错误
+      if (docs.length === 0 && invalidDocIds.length > 0) {
+        console.log(JSON.stringify({
+          success: false,
+          message: `错误: 所有文档ID均无效或不存在: ${invalidDocIds.join(', ')}`,
+          invalidDocIds
+        }, null, 2));
+        process.exit(1);
+      }
     } else if (params.notebook) {
       // 检查笔记本权限
       try {
@@ -726,7 +726,7 @@ async function main() {
     }
 
     stats.totalDocs = docs.length;
-    console.error(`发现 ${docs.length} 个文档`);
+    if (!quiet) console.error(`发现 ${docs.length} 个文档`);
 
     // 强制重建：先删除现有索引
     if (params.force) {
@@ -739,7 +739,7 @@ async function main() {
     let cleanedCount = 0;
 
     if (!params.force) {
-      console.error('检查文档更新状态...');
+      if (!quiet) console.error('检查文档更新状态...');
 
       const allDocInfos = await Promise.all(
         docs.map(doc => checkDocumentNeedsIndex(doc, connector, config))
@@ -762,7 +762,7 @@ async function main() {
         }
       }
 
-      console.error(`发现 ${docsToProcess.length} 个文档需要更新，跳过 ${skippedCount} 个未变化文档`);
+      if (!quiet) console.error(`发现 ${docsToProcess.length} 个文档需要更新，跳过 ${skippedCount} 个未变化文档`);
 
       const siyuanDocIds = new Set(docs.map(d => d.id));
       cleanedCount = await cleanOrphanedIndices(vectorManager, siyuanDocIds, params.notebook || null);
@@ -799,7 +799,7 @@ async function main() {
 
         const length = result.docLength || 0;
         const chunks = result.chunkCount || 1;
-        console.error(`${doc.name} (${processedDocs}/${totalDocs}) - ${length}字符/${chunks}块`);
+        if (!quiet) console.error(`${doc.name} (${processedDocs}/${totalDocs}) - ${length}字符/${chunks}块`);
 
         if (result.vectors.length > 0) {
           indexQueue.add(async () => {
@@ -834,10 +834,10 @@ async function main() {
           doc: doc.name,
           message: error.message
         });
-        console.error(`${doc.name} (${processedDocs}/${totalDocs}) - 处理失败: ${error.message}`);
+        if (!quiet) console.error(`${doc.name} (${processedDocs}/${totalDocs}) - 处理失败: ${error.message}`);
       }
     }
-    console.error('文档处理完成，等待索引队列...');
+    if (!quiet) console.error('文档处理完成，等待索引队列...');
 
     await indexQueue.waitForAll();
 

@@ -2,8 +2,8 @@
 /**
  * block-get.js - 获取块信息
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: block-get <block-id> [选项]
 
@@ -22,68 +22,27 @@ const HELP_TEXT = `用法: block-get <block-id> [选项]
   block-get <block-id> --mode markdown
   block-get <block-id> --mode children`;
 
-const SHORT_OPTS = { m: 'mode' };
-
-function camelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['mode']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        options[camelCase(arg.slice(2, eqIndex))] = arg.slice(eqIndex + 1);
-      } else {
-        const key = camelCase(arg.slice(2));
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key] = argv[++i];
-        } else {
-          options[key] = true;
-        }
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const shortKey = SHORT_OPTS[arg[1]];
-      if (shortKey && i + 1 < argv.length) {
-        options[shortKey] = argv[++i];
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['mode'],
+    shortOpts: { m: 'mode' }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  if (params.positional.length === 0) {
+  if (positionalArgs.length === 0) {
     console.error('错误: 请提供块ID');
     process.exit(1);
   }
 
-  const blockId = params.positional[0];
-  const mode = params.mode || 'info';
+  const blockId = positionalArgs[0];
+  const mode = options.mode || 'info';
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
 
     if (mode === 'info') {
       const result = await connector.request('/api/block/getBlockInfo', { id: blockId });

@@ -2,8 +2,8 @@
 /**
  * block-transfer.js - 转移块引用
  */
-const ConfigManager = require('./lib/config');
 const SiyuanConnector = require('./lib/connector');
+const { parseArgs } = require('./lib/args-parser');
 
 const HELP_TEXT = `用法: block-transfer <sourceId> <targetId>
 
@@ -19,42 +19,19 @@ const HELP_TEXT = `用法: block-transfer <sourceId> <targetId>
 示例:
   block-transfer <source-id> <target-id>`;
 
-function parseArgs(argv) {
-  const positional = [];
-  const options = {};
-  const hasValueOpts = new Set(['from-id', 'to-id', 'fromId', 'toId']);
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const eqIndex = arg.indexOf('=');
-      if (eqIndex > -1) {
-        const key = arg.slice(2, eqIndex);
-        const value = arg.slice(eqIndex + 1);
-        options[key === 'from-id' ? 'fromId' : key === 'to-id' ? 'toId' : key] = value;
-      } else {
-        const key = arg.slice(2);
-        if (hasValueOpts.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-          options[key === 'from-id' ? 'fromId' : key === 'to-id' ? 'toId' : key] = argv[++i];
-        }
-      }
-    } else if (!arg.startsWith('-')) {
-      positional.push(arg);
-    }
-  }
-  return { positional, ...options };
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { options, positionalArgs } = parseArgs(args, {
+    hasValueOpts: ['from-id', 'to-id'],
+    defaults: { fromId: null, toId: null }
+  });
+
+  if (options.help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
-
-  const params = parseArgs(args);
-  let sourceId = params.fromId || params.positional[0];
-  let targetId = params.toId || params.positional[1];
+  let sourceId = options['from-id'] || options.fromId || positionalArgs[0];
+  let targetId = options['to-id'] || options.toId || positionalArgs[1];
 
   if (!sourceId || !targetId) {
     console.error('错误: 请提供源块ID和目标块ID');
@@ -62,14 +39,7 @@ async function main() {
   }
 
   try {
-    const configManager = new ConfigManager();
-    const config = configManager.getConfig();
-    const connector = new SiyuanConnector({
-      baseURL: config.baseURL,
-      token: config.token,
-      timeout: config.timeout,
-      tls: config.tls
-    });
+    const connector = SiyuanConnector.get();
 
     await connector.request('/api/block/transferBlockRef', {
       fromID: sourceId,
