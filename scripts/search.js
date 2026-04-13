@@ -48,7 +48,10 @@ const HELP_TEXT = `用法: search <query> [选项]
   search "综合查询" --mode hybrid --threshold 0.5
   search "标签" --tags "技术,笔记" --sort date
   search "机器学习" --mode hybrid --enable-rerank
-  search "深度学习" --enable-rerank --rerank-top-k 100 --rerank-weight 0.7`;
+  search "深度学习" --enable-rerank --rerank-top-k 100 --rerank-weight 0.7
+
+💡 语义搜索配置: 详见 references/advanced/vector-search.md
+📋 问题排查: 详见 references/troubleshooting.md#搜索与索引问题`;
 
 /**
  * 执行 Siyuan 原生搜索

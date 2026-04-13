@@ -42,15 +42,18 @@
 | `info` | **文档 ID 或块 ID** | - |
 | `block-get` | **块 ID** | ❌ `block-get.js <docId>` |
 
-## 常见错误预防
+## 常见错误与解决
 
-| 错误场景 | 错误做法 | 正确做法 |
-|----------|----------|----------|
-| 文档已存在 | 直接 create | 先 `exists.js` 检查，再 `--force` |
-| 删除被阻止 | 反复尝试 | 告知用户修改配置或用 `protect.js --remove` |
-| ID 类型混淆 | `update.js` 用块ID | `update.js` 只用文档ID，`block-update.js` 只用块ID |
-| 修改部分内容 | 删了重建 | 用 `block-update.js` 或 `block-delete.js` 进行块级操作 |
-| 格式化问题 | 所有内容一行 | 用 `\n` 换行 |
+| 错误场景 | 错误做法 | 正确做法 | 如果已经错了怎么办？ |
+|----------|----------|----------|---------------------|
+| 文档已存在 | 直接 create | 先 `exists.js` 检查，再 `--force` | 使用 `update.js` 更新现有文档，或 `create.js --force` 强制创建 |
+| 删除被阻止 | 反复尝试 | 告知用户修改配置或用 `protect.js --remove` | [查看删除保护文档](advanced/delete-protection.md) |
+| ID 类型混淆 | `update.js` 用块ID | `update.js` 只用文档ID，`block-update.js` 只用块ID | [查看 ID 类型区分说明](#id-类型区分) |
+| 修改部分内容 | 删了重建 | 用 `block-update.js` 或 `block-delete.js` 进行块级操作 | [查看块操作指南](../examples/block-operations.md) |
+| 格式化问题 | 所有内容一行 | 用 `\\n` 换行 | [查看格式标准](format-standard.md) |
+| 内部链接错误 | `[文本](id)` | `((id "文本"))` | [查看格式标准 - 引用语法](format-standard.md#引用语法) |
+
+> 📋 更多问题：[troubleshooting.md](troubleshooting.md)
 
 ## 标准工作流
 
@@ -69,3 +72,27 @@ content.js <docId> → 判断范围 → update.js <docId> --content "全文" 或
 ```
 search.js "关键词" → content.js <docId> → update.js/block-update.js 修改
 ```
+
+## 内容格式规范
+
+> ⚠️ **写入内容前必查**：完整规范见 [format-standard.md](format-standard.md)
+
+### 内部链接（最常出错）
+
+| 格式 | 示例 | 说明 |
+|------|------|------|
+| 正确 | `((20200813004931-q4cu8na "什么是内容块"))` | 静态锚文本 |
+| 正确 | `((20200813004931-q4cu8na '什么是内容块'))` | 动态锚文本（跟随原文变化） |
+| 错误 | `[什么是内容块](20200813004931-q4cu8na)` | ❌ 不要用 Markdown 链接 |
+| 错误 | `((20200813004931-q4cu8na 什么是内容块))` | ❌ 锚文本必须用引号 |
+
+### 基础排版
+
+| 元素 | 格式 | 示例 |
+|------|------|------|
+| 换行 | `\\n` | `第一行\\n第二行` |
+| 段落 | `\\n\\n` | `第一段\\n\\n第二段` |
+| 标题 | `## ~######` | `## 二级标题` |
+| 代码块 | \\`\\`\\`语言 | \\`\\`\\`javascript ... \\`\\`\\` |
+
+> 📋 更多格式：[format-standard.md](format-standard.md) | [规范索引](spec-index.md)

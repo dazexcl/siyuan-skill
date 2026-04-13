@@ -145,7 +145,7 @@ node <skills-directory>/siyuan-skill/scripts/<command> [options]
 node scripts/notebooks.js
 
 # 查看文档结构
-node scripts/structure.js <notebookId>
+node scripts/structure.js <notebookId|docId>
 
 # 获取文档内容
 node scripts/content.js <docId>
@@ -161,7 +161,8 @@ node scripts/update.js <docId> --content "新内容"
 node scripts/delete.js <docId>
 
 # 移动文档
-node scripts/move.js <docId> <targetParentId>
+node scripts/move.js <docId|path> <targetParentId|path>
+node scripts/move.js <docId|path> --target <targetParentId|path>
 
 # 重命名文档
 node scripts/rename.js <docId> "新标题"
@@ -174,7 +175,8 @@ node scripts/rename.js <docId> "新标题"
 node scripts/block-get.js <blockId>
 
 # 插入块
-node scripts/block-insert.js <parentId> "块内容"
+node scripts/block-insert.js "块内容" --parent-id <parentId>
+node scripts/block-insert.js "块内容" --previous-id <previousId>
 
 # 更新块
 node scripts/block-update.js <blockId> "新内容"
@@ -183,7 +185,8 @@ node scripts/block-update.js <blockId> "新内容"
 node scripts/block-delete.js <blockId>
 
 # 移动块
-node scripts/block-move.js <blockId> --previous-id <targetId>
+node scripts/block-move.js <blockId> --parent-id <parentId>
+node scripts/block-move.js <blockId> --previous-id <previousId>
 ```
 
 #### 搜索与索引
@@ -312,11 +315,13 @@ node scripts/search.js "查询内容" --mode semantic
 ### 详细文档
 
 - [快速参考](references/quick-reference.md) - 命令决策表和常见错误预防
+- [格式标准](references/format-standard.md) - 内容书写规范（内部链接、块语法、排版）
+- [问题解决索引](references/troubleshooting.md) - 按错误信息和任务场景的问题索引
+- [规范索引](references/spec-index.md) - 所有规范文档的导航
 - [配置说明](references/config/setup.md) - 环境变量和配置文件
 - [高级配置](references/config/advanced.md) - 完整配置选项
 - [安全文档](references/advanced/security.md) - 安全最佳实践
 - [最佳实践](references/advanced/best-practices.md) - 使用建议和技巧
-- [书写规范](references/advanced/writing-guide.md) - 内容书写规范
 
 ### 功能文档
 
@@ -329,6 +334,8 @@ node scripts/search.js "查询内容" --mode semantic
 - [思源笔记 API](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md) - 官方 API 文档
 
 ## 常见问题
+
+> 📋 完整问题解决索引：[troubleshooting.md](references/troubleshooting.md)
 
 ### 连接问题
 

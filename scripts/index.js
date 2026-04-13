@@ -623,6 +623,11 @@ async function main() {
         success: false,
         message: '初始化嵌入服务失败，请检查 Ollama 服务'
       }, null, 2));
+      console.error('💡 解决方案：');
+      console.error('   1. 确认 Ollama 服务正在运行');
+      console.error('   2. 检查 OLLAMA_BASE_URL 配置');
+      console.error('   3. 拉取 Embedding 模型: ollama pull nomic-embed-text');
+      console.error('📋 详见: references/advanced/vector-search.md#环境配置');
       process.exit(1);
     }
 
@@ -634,6 +639,10 @@ async function main() {
         success: false,
         message: `初始化向量数据库失败: ${collectionResult.message}`
       }, null, 2));
+      console.error('💡 解决方案：');
+      console.error('   1. 确认 Qdrant 服务正在运行');
+      console.error('   2. 检查 QDRANT_URL 配置');
+      console.error('📋 详见: references/advanced/vector-search.md#环境配置');
       process.exit(1);
     }
     if (!quiet) console.error(collectionResult.message);

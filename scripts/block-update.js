@@ -25,7 +25,10 @@ const HELP_TEXT = `用法: block-update <block-id> [content] [选项]
   block-update <block-id> "新内容"
   echo "内容" | block-update <block-id>
   block-update <block-id> -f content.md
-  block-update <block-id> -c "内容" --data-type markdown`;
+  block-update <block-id> -c "内容" --data-type markdown
+
+⚠️ 格式规范：更新内容时请遵循内部链接格式 ((id "文本"))
+   详见: references/format-standard.md`;
 
 async function readFromStdin() {
   return new Promise((resolve, reject) => {

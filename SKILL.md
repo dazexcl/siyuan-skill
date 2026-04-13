@@ -16,6 +16,27 @@ node {baseDir}/scripts/<command>.js [options]
 node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 ```
 
+## 场景化快速开始
+
+> 💡 根据你的任务场景，快速找到对应的命令和工作流
+
+### 我要...
+
+| 场景 | 核心命令 | 详细文档 |
+|------|---------|---------|
+| **创建新文档** | `create.js` | [文档工作流示例](examples/document-workflow.md#场景创建并编辑一个项目文档) |
+| **更新文档内容** | `update.js` / `block-update.js` | [基础用法示例](examples/basic-usage.md#修改文档) |
+| **搜索内容** | `search.js` | [向量搜索配置](references/advanced/vector-search.md) |
+| **删除文档** | `delete.js` | [删除保护文档](references/advanced/delete-protection.md) ⚠️ |
+| **批量操作** | `search.js` + 其他命令 | [批量整理文档](examples/document-workflow.md#场景批量整理文档) |
+| **使用语义搜索** | `search.js --mode semantic` | [向量搜索文档](references/advanced/vector-search.md) |
+| **遇到权限问题** | - | [配置说明](references/config/setup.md#权限配置) |
+| **遇到删除问题** | - | [删除保护文档](references/advanced/delete-protection.md) |
+| **遇到搜索问题** | - | [向量搜索配置](references/advanced/vector-search.md#常见问题) |
+| **写入内容格式错误** | - | [格式标准](references/format-standard.md) |
+
+> 📋 更多场景：[troubleshooting.md](references/troubleshooting.md)
+
 ## 命令列表
 
 ### 笔记本/文档操作
@@ -23,13 +44,13 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | 脚本 | 说明 | 示例 |
 |------|------|------|
 | `notebooks` | 列出笔记本 | `node {baseDir}/scripts/notebooks.js` |
-| `structure` | 查看文档结构 | `node {baseDir}/scripts/structure.js <docId>` |
+| `structure` | 查看文档结构 | `node {baseDir}/scripts/structure.js <notebookId|docId>` |
 | `content` | 获取文档内容 | `node {baseDir}/scripts/content.js <docId>` |
 | `info` | 获取文档/块信息 | `node {baseDir}/scripts/info.js <docId> [--raw]` |
 | `create` | 创建文档 | `node {baseDir}/scripts/create.js <title> --parent-id <id>` 或 `--path <path>` |
 | `update` | 更新文档 | `node {baseDir}/scripts/update.js <docId> --content <md>` |
 | `delete` | 删除文档 | `node {baseDir}/scripts/delete.js <docId>` |
-| `move` | 移动文档 | `node {baseDir}/scripts/move.js <docId> --target <notebookId>` |
+| `move` | 移动文档 | `node {baseDir}/scripts/move.js <docId|path> --target <notebookId|path>` |
 | `rename` | 重命名文档 | `node {baseDir}/scripts/rename.js <docId> <title>` |
 | `protect` | 保护/取消保护 | `node {baseDir}/scripts/protect.js <docId>` |
 | `exists` | 检查文档存在 | `node {baseDir}/scripts/exists.js --title <title>` |
@@ -41,10 +62,10 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | 脚本 | 说明 | 示例 |
 |------|------|------|
 | `block-get` | 获取块信息 | `node {baseDir}/scripts/block-get.js <blockId>` |
-| `block-insert` | 插入块 | `node {baseDir}/scripts/block-insert.js <content> --parent-id <id>` |
+| `block-insert` | 插入块 | `node {baseDir}/scripts/block-insert.js "内容" --parent-id <id>` |
 | `block-update` | 更新块 | `node {baseDir}/scripts/block-update.js <blockId> --content <md>` |
 | `block-delete` | 删除块 | `node {baseDir}/scripts/block-delete.js <blockId>` |
-| `block-move` | 移动块 | `node {baseDir}/scripts/block-move.js <blockId> --parent-id <id>` |
+| `block-move` | 移动块 | `node {baseDir}/scripts/block-move.js <blockId> --parent-id <parentId>` |
 | `block-fold` | 折叠/展开 | `node {baseDir}/scripts/block-fold.js <blockId> --action fold` |
 | `block-transfer` | 转移引用 | `node {baseDir}/scripts/block-transfer.js <srcId> <tgtId>` |
 | `block-attrs` | 块属性 | `node {baseDir}/scripts/block-attrs.js <blockId> --set key=value` |
@@ -64,7 +85,7 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 
 ## ID 区分
 
-- **文档操作** (`update`/`delete`/`move`/`rename`) 只接受**文档 ID**
+- **文档操作** (`update`/`delete`/`move`/`rename`) 接受**文档 ID**（部分命令也支持路径）
 - **块操作** (`block-update`/`block-delete` 等) 只接受**块 ID**
 - 混用会导致错误, 详见 [快速参考](references/quick-reference.md)
 
@@ -80,6 +101,19 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 - 支持 `permissionMode`: `all`(默认) / `whitelist` / `blacklist`
 - 写入操作 (create/update/delete/move 等) 会检查笔记本权限
 - 通过 `SIYUAN_NOTEBOOK_LIST` 环境变量配置笔记本列表
+
+## 格式规范（重要）
+
+写入思源笔记时**必须**遵循以下格式：
+
+| 场景 | 正确格式 | 错误格式 |
+|------|---------|---------|
+| 内部链接 | `((id "锚文本"))` | `[文本](id)` ❌ |
+| 动态锚文本 | `((id '锚文本'))` | `((id 锚文本))` ❌ |
+| 换行 | `\\n` | 直接换行 |
+| 段落分隔 | `\\n\\n` | 单个 \\n |
+
+> 📋 **完整规范**：[format-standard.md](references/format-standard.md) | **快速参考**：[quick-reference.md](references/quick-reference.md)
 
 ## 搜索模式
 
@@ -109,9 +143,84 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 
 # 参考文档
 
-- [快速参考 (完整决策表+错误预防)](references/quick-reference.md)
-- [安全文档](references/advanced/security.md)
-- [向量搜索配置](references/advanced/vector-search.md)
-- [思源笔记 API](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
+## 📋 必读文档
+
+| 文档 | 用途 | 何时阅读 |
+|------|------|---------|
+| **SKILL.md** | 本文档，核心入口 | 首次使用必读 |
+| **troubleshooting.md** | 问题解决索引 | 遇到问题时查阅 |
+| **quick-reference.md** | 快速决策表 | 选择命令时查阅 |
+| **format-standard.md** | 格式规范 | 写入内容前查阅 |
+
+## 🔧 配置与权限
+
+| 文档 | 用途 |
+|------|------|
+| [配置说明](references/config/setup.md) | 环境变量和 config.json 配置 |
+| [高级配置](references/config/advanced.md) | 完整配置选项 |
+
+## 🚀 进阶功能
+
+| 文档 | 用途 |
+|------|------|
+| [向量搜索](references/advanced/vector-search.md) | 语义搜索配置和使用 |
+| [删除保护](references/advanced/delete-protection.md) | 删除保护机制说明 |
+| [最佳实践](references/advanced/best-practices.md) | 使用建议和技巧 |
+| [安全文档](references/advanced/security.md) | 安全最佳实践 |
+
+## 📖 示例文档
+
+| 文档 | 用途 |
+|------|------|
+| [基础用法](examples/basic-usage.md) | 常用命令示例 |
+| [文档工作流](examples/document-workflow.md) | 完整任务场景示例 |
+| [块操作指南](examples/block-operations.md) | 块级操作详解 |
+
+## 🎯 快速导航
+
+- **遇到问题**：[troubleshooting.md](references/troubleshooting.md)
+- **查看命令**：[quick-reference.md](references/quick-reference.md)
+- **格式规范**：[format-standard.md](references/format-standard.md)
+- **规范索引**：[spec-index.md](references/spec-index.md)
+
+---
+
+## 🔧 遇到问题？
+
+如果在使用过程中遇到任何问题，请按以下步骤排查：
+
+### 1. 查看错误信息
+
+错误信息中通常会包含：
+- 错误原因
+- 解决方案提示
+- 相关文档链接
+
+### 2. 查阅问题解决索引
+
+📋 **[troubleshooting.md](references/troubleshooting.md)** - 按错误信息和任务场景组织的完整问题索引
+
+### 3. 查看快速参考
+
+📋 **[quick-reference.md](references/quick-reference.md)** - 命令决策表和常见错误预防
+
+### 4. 查看详细文档
+
+| 问题类型 | 文档 |
+|---------|------|
+| 连接/权限 | [配置说明](references/config/setup.md) |
+| 删除问题 | [删除保护文档](references/advanced/delete-protection.md) |
+| 搜索问题 | [向量搜索文档](references/advanced/vector-search.md) |
+| 格式问题 | [格式标准](references/format-standard.md) |
+
+### 5. 查看示例
+
+- [基础用法示例](examples/basic-usage.md)
+- [文档工作流](examples/document-workflow.md)
+- [块操作指南](examples/block-operations.md)
+
+---
+
+> 💡 **快速链接**：[规范索引](references/spec-index.md) | [问题解决索引](references/troubleshooting.md)
 
 ---

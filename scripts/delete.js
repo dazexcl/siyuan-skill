@@ -86,6 +86,10 @@ async function main() {
       // 全局安全模式：完全禁止删除（最高优先级）
       if (config.deleteProtection.safeMode) {
         console.error('错误: 全局安全模式已启用，禁止删除任何文档');
+        console.error('💡 解决方案：');
+        console.error('   1. 如需删除，请修改 config.json 中的 deleteProtection.safeMode');
+        console.error('   2. 或使用 protect.js --remove 移除文档保护标记');
+        console.error('📋 详见: references/advanced/delete-protection.md');
         process.exit(1);
       }
       
@@ -94,6 +98,11 @@ async function main() {
       if (config.deleteProtection.requireConfirmation && !confirmTitle) {
         console.error('错误: 需要确认文档标题');
         console.error(`请使用 --confirm-title "${docInfo.rootTitle || docInfo.content}" 确认删除`);
+        console.error('💡 提示：');
+        console.error('   1. 获取文档标题: info.js <docId>');
+        console.error('   2. 使用确认标题删除: delete.js <docId> --confirm-title "文档标题"');
+        console.error('   3. 或修改配置关闭确认要求');
+        console.error('📋 详见: references/advanced/delete-protection.md');
         process.exit(1);
       }
     }
@@ -101,6 +110,9 @@ async function main() {
     // 检查文档保护标记（低于safeMode，高于requireConfirmation）
     if (attrs && attrs['custom-protected']) {
       console.error('错误: 该文档已被保护，无法删除');
+      console.error('💡 解决方案：');
+      console.error('   使用 protect.js <docId> --remove 移除保护标记');
+      console.error('📋 详见: references/advanced/delete-protection.md');
       process.exit(1);
     }
 

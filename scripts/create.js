@@ -312,7 +312,11 @@ async function main() {
         });
 
         if (existResult && existResult.length > 0) {
-          console.error(`错误: 文档 "${fullPath}" 已存在 (ID: ${existResult[0]})，使用 --force 强制创建`);
+          console.error(`错误: 文档 "${fullPath}" 已存在 (ID: ${existResult[0]})`);
+          console.error('💡 解决方案：');
+          console.error(`   1. 如需更新现有文档，使用: update.js ${existResult[0]} --content "新内容"`);
+          console.error(`   2. 如需强制创建，使用: create.js "${options.title}" --path "${options.path}" --force`);
+          console.error('📋 详见: references/troubleshooting.md#文档操作问题');
           process.exit(1);
         }
       } catch (e) {

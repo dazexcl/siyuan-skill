@@ -39,7 +39,10 @@ const HELP_TEXT = `用法: update <docId> [content] [选项]
 
 限制:
   - 仅接受文档ID，不接受块ID
-  - 如果传入块ID，将返回错误提示使用 block-update 命令`;
+  - 如果传入块ID，将返回错误提示使用 block-update 命令
+
+⚠️ 格式规范：更新内容时请遵循内部链接格式 ((id "文本"))
+   详见: references/format-standard.md`;
 
 /**
  * 辅助函数：处理内容中的换行符
@@ -175,6 +178,11 @@ async function main() {
         error: '参数类型错误',
         message: validation.error
       }, null, 2));
+      console.error('💡 提示：');
+      console.error('   - 文档操作使用: update.js <docId>');
+      console.error('   - 块操作使用: block-update.js <blockId>');
+      console.error('📋 详见: references/quick-reference.md#id-类型区分');
+      console.error('📋 问题排查: references/troubleshooting.md#id-类型错误');
       process.exit(1);
     }
 
