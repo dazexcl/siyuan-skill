@@ -44,13 +44,13 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | 脚本 | 说明 | 示例 |
 |------|------|------|
 | `notebooks` | 列出笔记本 | `node {baseDir}/scripts/notebooks.js` |
-| `structure` | 查看文档结构 | `node {baseDir}/scripts/structure.js <notebookId|docId>` |
+| `structure` | 查看文档结构 | `node {baseDir}/scripts/structure.js <notebookId\|docId>` |
 | `content` | 获取文档内容 | `node {baseDir}/scripts/content.js <docId>` |
 | `info` | 获取文档/块信息 | `node {baseDir}/scripts/info.js <docId> [--raw]` |
 | `create` | 创建文档 | `node {baseDir}/scripts/create.js <title> --parent-id <id>` 或 `--path <path>` |
 | `update` | 更新文档 | `node {baseDir}/scripts/update.js <docId> --content <md>` |
 | `delete` | 删除文档 | `node {baseDir}/scripts/delete.js <docId>` |
-| `move` | 移动文档 | `node {baseDir}/scripts/move.js <docId|path> --target <notebookId|path>` |
+| `move` | 移动文档 | `node {baseDir}/scripts/move.js <docId\|path> --target <notebookId\|path>` |
 | `rename` | 重命名文档 | `node {baseDir}/scripts/rename.js <docId> <title>` |
 | `protect` | 保护/取消保护 | `node {baseDir}/scripts/protect.js <docId>` |
 | `exists` | 检查文档存在 | `node {baseDir}/scripts/exists.js --title <title>` |
@@ -75,7 +75,7 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | 脚本 | 说明 | 示例 |
 |------|------|------|
 | `search` | 搜索内容 | `node {baseDir}/scripts/search.js <query> --mode keyword` |
-| `tags` | 标签管理 | `node {baseDir}/scripts/tags.js <blockId> --add tag1,tag2` |
+| `tags` | 标签管理 | `node {baseDir}/scripts/tags.js <docId\|blockId> --add tag1,tag2` |
 | `index` | 索引到向量库 | `node {baseDir}/scripts/index.js --notebook <id>` |
 | `nlp` | NLP分析 | `node {baseDir}/scripts/nlp.js <text>` |
 

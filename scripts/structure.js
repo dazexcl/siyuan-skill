@@ -33,7 +33,7 @@ const HELP_TEXT = `用法: structure [<notebookId|docId>] [选项]
 
 选项:
   --path <path>       文档路径（与位置参数二选一）
-  --depth <n>         递归深度（默认1，-1表示无限）
+  --depth <n>         递归深度（默认5，-1表示无限）
   --force             强制使用第一个匹配结果（当路径匹配多个文档时）
   -r, --raw           直接输出数据，不包裹响应对象
   -h, --help          显示帮助信息
@@ -105,7 +105,7 @@ function countDocuments(structure) {
  * 
  * 注意：hasChildren: true 表示该文档包含子文档
  */
-async function buildDocStructure(connector, notebookId, notebookName, startPath = '/', depth = 1, parentHPath = '') {
+async function buildDocStructure(connector, notebookId, notebookName, startPath = '/', depth = 5, parentHPath = '') {
   const structure = {
     notebookId: notebookId,
     notebookName: notebookName,
