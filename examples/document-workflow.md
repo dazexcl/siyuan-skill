@@ -14,7 +14,7 @@ node scripts/exists.js --path "/笔记本/目录/项目计划"
 ### 步骤 2: 创建文档
 
 ```bash
-node scripts/create.js "项目计划" --content "# 项目计划
+node scripts/create.js "项目计划" --content "# 项目目标
 
 ## 目标
 - 目标1
@@ -26,7 +26,12 @@ node scripts/create.js "项目计划" --content "# 项目计划
 | 需求分析 | 1周 |" --parent-id <parentId>
 
 # 或使用路径创建
-node scripts/create.js --path "/笔记本/目录/项目计划" --content "# 项目计划..."
+node scripts/create.js --path "/笔记本/目录/项目计划" --content "# 项目目标
+
+## 目标
+- 目标1
+- 目标2
+..."
 ```
 
 ### 步骤 3: 添加标签和属性
@@ -48,8 +53,8 @@ node scripts/icon.js <docId> 1f4cb
 # 获取当前内容
 node scripts/content.js <docId>
 
-# 全文更新
-node scripts/update.js <docId> --content "# 更新后的内容..."
+# 全文更新（注意：内容中不包含标题）
+node scripts/update.js <docId> --content "## 更新后的内容..."
 
 # 从文件更新
 node scripts/update.js <docId> --file updated.md

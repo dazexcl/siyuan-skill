@@ -30,8 +30,9 @@ node scripts/content.js --path "/笔记本/文档路径"
 # 在指定父文档下创建
 node scripts/create.js "新文档" --parent-id <parentId>
 
-# 带内容创建
-node scripts/create.js "新文档" --content "文档内容" --parent-id <parentId>
+# 带内容创建（可以使用 # 作为内容结构）
+node scripts/create.js "新文档" --content "# 第一章
+文档内容" --parent-id <parentId>
 
 # 从文件读取内容
 node scripts/create.js "文档" --file content.md --parent-id <parentId>
@@ -39,6 +40,11 @@ node scripts/create.js "文档" --file content.md --parent-id <parentId>
 # 强制创建同名文档
 node scripts/create.js "文档" --parent-id <id> --force
 ```
+
+**⚠️ 重要提示：**
+- 标题通过位置参数 `"新文档"` 设置
+- `--content` 参数中可以使用 `#` 作为内容结构的一级标题
+- **不要在正文开头写 `# 新文档` 重复文档标题**
 
 ### 使用 --path 路径模式
 
@@ -66,8 +72,9 @@ node scripts/create.js --path "/SomeFolder/文档名" --content "内容"
 ## 修改文档
 
 ```bash
-# 全文替换
-node scripts/update.js <docId> --content "完整的新内容"
+# 全文替换（可以使用 # 作为内容结构）
+node scripts/update.js <docId> --content "# 更新后的内容
+正文段落"
 
 # 从文件读取内容
 node scripts/update.js <docId> --file content.md
@@ -75,6 +82,11 @@ node scripts/update.js <docId> --file content.md
 # 修改单个块
 node scripts/block-update.js <blockId> --content "新的块内容"
 ```
+
+**⚠️ 重要提示：**
+- 正文中可以使用 `#` 作为内容结构的一级标题
+- **不要在正文开头写 `# 文档标题` 重复文档标题**
+- 思源笔记的标题通过文档属性维护
 
 ## 搜索
 

@@ -22,6 +22,7 @@
 | 设置属性 | `block-attrs.js` | `node scripts/block-attrs.js <id> --set "key=value"` |
 | 管理标签 | `tags.js` | `node scripts/tags.js <id> --add "标签1,标签2"` |
 | 搜索内容 | `search.js` | `node scripts/search.js "关键词"` |
+| 查询引用关系 | `refs.js` | `node scripts/refs.js <docId>` |
 | 向量索引 | `index.js` | `node scripts/index.js --notebook <id>` |
 | NLP 分析 | `nlp.js` | `node scripts/nlp.js "文本"` |
 | 获取块信息 | `block-get.js` | `node scripts/block-get.js <blockId>` |

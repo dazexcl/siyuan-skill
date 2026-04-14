@@ -967,6 +967,26 @@ class SearchManager {
     try {
       const escapedQuery = this.escapeSql(query);
       let sqlQuery = `SELECT id, content, type, path, updated, box, parent_id, root_id FROM blocks WHERE content LIKE '%${escapedQuery}%'`;
+
+      const config = this.config || this.connector.getConfig();
+      const permissionMode = config.permissionMode || 'all';
+      const notebookList = Array.isArray(config.notebookList) ? config.notebookList : [];
+
+      if (permissionMode === 'whitelist' && notebookList.length > 0) {
+        const validNotebooks = notebookList
+          .map(id => this.validateId(id))
+          .filter(id => id !== null);
+        if (validNotebooks.length > 0) {
+          sqlQuery += ` AND box IN ('${validNotebooks.join("','")}')`;
+        }
+      } else if (permissionMode === 'blacklist' && notebookList.length > 0) {
+        const validNotebooks = notebookList
+          .map(id => this.validateId(id))
+          .filter(id => id !== null);
+        if (validNotebooks.length > 0) {
+          sqlQuery += ` AND box NOT IN ('${validNotebooks.join("','")}')`;
+        }
+      }
       
       if (notebookId) {
         const validNotebookId = this.validateId(notebookId);
